@@ -35,6 +35,10 @@ function log(msg) {
     io.emit('debug_msg', msg);
 }
 
+function activityLog(msg, type = 'action') {
+    io.emit('activity_log', { msg, type });
+}
+
 function createDeck() {
     const d = [];
     suits.forEach(s => ranks.forEach(r => d.push(r + s)));
@@ -58,6 +62,7 @@ function getPlayersInHand() {
 
 function startNewHand() {
     log('=== NEW HAND ===');
+    activityLog('--- NEW HAND ---', 'action');
     
     // Reset state
     community = [];
@@ -123,6 +128,7 @@ function startNewHand() {
     
     log('SB: ' + sbPlayer.name + ' posts ' + sbAmt);
     log('BB: ' + bbPlayer.name + ' posts ' + bbAmt);
+    activityLog('Blinds: ' + sbPlayer.name + ' (£' + sbAmt + ') / ' + bbPlayer.name + ' (£' + bbAmt + ')', 'bet');
     
     // Set first action to left of BB
     turnIndex = (dealerIndex + 3) % playerOrder.length;
@@ -228,16 +234,19 @@ function advanceStage() {
         community = [dealCard(), dealCard(), dealCard()];
         gameStage = 'FLOP';
         log('FLOP: ' + community.join(' '));
+        activityLog('FLOP: ' + community.join(' '), 'action');
     } else if (gameStage === 'FLOP') {
         // Deal turn
         community.push(dealCard());
         gameStage = 'TURN';
         log('TURN: ' + community[3]);
+        activityLog('TURN: ' + community[3], 'action');
     } else if (gameStage === 'TURN') {
         // Deal river
         community.push(dealCard());
         gameStage = 'RIVER';
         log('RIVER: ' + community[4]);
+        activityLog('RIVER: ' + community[4], 'action');
     } else if (gameStage === 'RIVER') {
         // Showdown
         gameStage = 'SHOWDOWN';
@@ -272,6 +281,8 @@ function performShowdown() {
     winners.forEach(id => {
         players[id].chips += winAmt;
         log(players[id].name + ' wins ' + winAmt);
+        const handName = evaluateHand(players[id].hand, community).name;
+        activityLog(players[id].name + ' wins £' + winAmt + ' with ' + handName, 'win');
     });
     
     pot = 0;
@@ -355,6 +366,7 @@ function handleAction(socket, action) {
     
     if (action.type === 'fold') {
         log(player.name + ' folds');
+        activityLog(player.name + ' folds', 'fold');
         player.status = 'FOLDED';
         player.hand = [];
         checkBettingRoundComplete();
@@ -364,10 +376,16 @@ function handleAction(socket, action) {
         player.chips -= callAmt;
         player.bet += callAmt;
         log(player.name + ' calls ' + callAmt + ' (total bet: ' + player.bet + ')');
+        if (callAmt === 0) {
+            activityLog(player.name + ' checks', 'action');
+        } else {
+            activityLog(player.name + ' calls £' + callAmt, 'action');
+        }
         
         if (player.chips === 0) {
             player.status = 'ALL_IN';
             log(player.name + ' is ALL IN');
+            activityLog(player.name + ' is ALL IN!', 'bet');
         }
         
         checkBettingRoundComplete();
@@ -389,10 +407,12 @@ function handleAction(socket, action) {
         actionCount = 1;  // Reset counter when someone raises - everyone else needs to act again
         
         log(player.name + ' raises to ' + raiseTotal);
+        activityLog(player.name + ' raises to £' + raiseTotal, 'bet');
         
         if (player.chips === 0) {
             player.status = 'ALL_IN';
             log(player.name + ' is ALL IN');
+            activityLog(player.name + ' is ALL IN!', 'bet');
         }
         
         checkBettingRoundComplete();
@@ -507,6 +527,13 @@ app.get('/', (req, res) => {
             #controls { background: #111; padding: 20px; display: none; border-top: 3px solid #f1c40f; text-align: center; }
             #controls button { margin: 5px; padding: 15px 30px; font-size: 16px; cursor: pointer; }
             #controls input { padding: 15px; font-size: 16px; }
+            
+            #activity-log { position: fixed; bottom: 20px; left: 20px; width: 350px; height: 180px; background: rgba(0,0,0,0.85); color: #ecf0f1; font-family: monospace; padding: 10px; overflow-y: scroll; border: 2px solid #34495e; border-radius: 5px; font-size: 12px; }
+            #activity-log .log-entry { margin: 3px 0; padding: 2px 0; border-bottom: 1px solid #2c3e50; }
+            #activity-log .log-win { color: #2ecc71; font-weight: bold; }
+            #activity-log .log-action { color: #3498db; }
+            #activity-log .log-bet { color: #e67e22; }
+            #activity-log .log-fold { color: #95a5a6; }
         </style>
     </head>
     <body>
@@ -518,7 +545,7 @@ app.get('/', (req, res) => {
         
         <div id="host-layer">
             <button id="start-btn" class="host-btn" onclick="socket.emit('start_game')">START TOURNAMENT</button>
-            <button id="continue-btn" class="host-btn" onclick="socket.emit('next_hand')" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; color: white; font-size: 2em; display: none; box-shadow: 0 0 30px rgba(39, 174, 96, 0.8); border-radius: 10px;">CONTINUE</button>
+            <button id="continue-btn" class="host-btn" onclick="socket.emit('next_hand')" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 20px 50px; background: #27ae60; color: white; font-size: 1.5em; display: none; box-shadow: 0 0 30px rgba(39, 174, 96, 0.8); border-radius: 10px;">CONTINUE</button>
             <button id="reset-btn" class="host-btn" onclick="socket.emit('reset_engine')">RESET ENGINE</button>
             <div id="debug-window"><b>ENGINE LOG</b><hr></div>
         </div>
@@ -535,6 +562,12 @@ app.get('/', (req, res) => {
             <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;"></button>
             <input type="number" id="bet-amt" placeholder="Amount" style="width: 100px;">
             <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value) || 100})" style="background: #e67e22;">RAISE</button>
+        </div>
+        
+        <div id="activity-log">
+            <b>ACTIVITY LOG</b>
+            <hr style="margin: 5px 0;">
+            <div id="log-entries"></div>
         </div>
 
         <script src="/socket.io/socket.io.js"></script>
@@ -557,6 +590,23 @@ app.get('/', (req, res) => {
                 const d = document.getElementById('debug-window');
                 d.innerHTML += '<div>' + new Date().toLocaleTimeString() + ' - ' + m + '</div>';
                 d.scrollTop = d.scrollHeight;
+            });
+            
+            socket.on('activity_log', data => {
+                const logDiv = document.getElementById('log-entries');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry log-' + data.type;
+                entry.textContent = data.msg;
+                logDiv.appendChild(entry);
+                
+                // Auto-scroll to bottom
+                const activityLog = document.getElementById('activity-log');
+                activityLog.scrollTop = activityLog.scrollHeight;
+                
+                // Keep only last 50 entries
+                while (logDiv.children.length > 50) {
+                    logDiv.removeChild(logDiv.firstChild);
+                }
             });
 
             socket.on('update', data => {
