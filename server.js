@@ -30,6 +30,11 @@ const cardValues = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':
 const suits = ['♠','♥','♦','♣'];
 const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 
+function getCardName(value) {
+    const names = {2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
+    return names[value] || value.toString();
+}
+
 function log(msg) {
     console.log(msg);
     io.emit('debug_msg', msg);
@@ -267,7 +272,9 @@ function performShowdown() {
     
     playersInHand.forEach(id => {
         const score = evaluateHand(players[id].hand, community);
-        log(players[id].name + ': ' + score.name + ' (score: ' + score.rank + ')');
+        const highCardName = score.highCard ? getCardName(score.highCard) : '';
+        const handDesc = highCardName ? score.name + ' (' + highCardName + ' high)' : score.name;
+        log(players[id].name + ': ' + handDesc + ' (score: ' + score.rank + ')');
         
         if (score.rank > bestScore) {
             bestScore = score.rank;
@@ -280,9 +287,11 @@ function performShowdown() {
     const winAmt = Math.floor(pot / winners.length);
     winners.forEach(id => {
         players[id].chips += winAmt;
+        const score = evaluateHand(players[id].hand, community);
+        const highCardName = score.highCard ? getCardName(score.highCard) : '';
+        const handDesc = highCardName ? score.name + ' (' + highCardName + ' high)' : score.name;
         log(players[id].name + ' wins ' + winAmt);
-        const handName = evaluateHand(players[id].hand, community).name;
-        activityLog(players[id].name + ' wins £' + winAmt + ' with ' + handName, 'win');
+        activityLog(players[id].name + ' wins £' + winAmt + ' with ' + handDesc, 'win');
     });
     
     pot = 0;
@@ -314,34 +323,76 @@ function evaluateHand(hand, board) {
     });
     
     const values = cards.map(c => cardValues[c.slice(0, -1)]).sort((a, b) => b - a);
+    const uniqueValues = [...new Set(values)].sort((a, b) => b - a);
     const isFlush = Object.values(suitCounts).some(c => c >= 5);
-    const isStraight = checkStraight(values);
+    const straightInfo = checkStraight(values);
+    const isStraight = straightInfo.isStraight;
+    const straightHigh = straightInfo.highCard;
     
-    const pairs = Object.values(counts).filter(c => c === 2).length;
-    const trips = Object.values(counts).some(c => c === 3);
-    const quads = Object.values(counts).some(c => c === 4);
+    const pairs = Object.entries(counts).filter(([k,v]) => v === 2).map(([k,v]) => cardValues[k]).sort((a,b) => b-a);
+    const trips = Object.entries(counts).filter(([k,v]) => v === 3).map(([k,v]) => cardValues[k]).sort((a,b) => b-a);
+    const quads = Object.entries(counts).filter(([k,v]) => v === 4).map(([k,v]) => cardValues[k]).sort((a,b) => b-a);
     
-    if (isFlush && isStraight) return { rank: 8, name: 'Straight Flush' };
-    if (quads) return { rank: 7, name: 'Four of a Kind' };
-    if (trips && pairs >= 1) return { rank: 6, name: 'Full House' };
-    if (isFlush) return { rank: 5, name: 'Flush' };
-    if (isStraight) return { rank: 4, name: 'Straight' };
-    if (trips) return { rank: 3, name: 'Three of a Kind' };
-    if (pairs >= 2) return { rank: 2, name: 'Two Pair' };
-    if (pairs === 1) return { rank: 1, name: 'Pair' };
-    return { rank: 0, name: 'High Card' };
+    // Get kickers (cards not used in the main hand)
+    const getKickers = (usedValues, count = 5) => {
+        return uniqueValues.filter(v => !usedValues.includes(v)).slice(0, count);
+    };
+    
+    if (isFlush && isStraight) {
+        return { rank: 8000000 + straightHigh, name: 'Straight Flush', highCard: straightHigh };
+    }
+    if (quads.length > 0) {
+        const kicker = getKickers(quads, 1)[0] || 0;
+        return { rank: 7000000 + quads[0] * 100 + kicker, name: 'Four of a Kind', highCard: quads[0] };
+    }
+    if (trips.length > 0 && pairs.length > 0) {
+        return { rank: 6000000 + trips[0] * 100 + pairs[0], name: 'Full House', highCard: trips[0] };
+    }
+    if (isFlush) {
+        const flushCards = uniqueValues.slice(0, 5);
+        const score = flushCards.reduce((acc, v, i) => acc + v * Math.pow(100, 4-i), 0);
+        return { rank: 5000000 + score, name: 'Flush', highCard: flushCards[0] };
+    }
+    if (isStraight) {
+        return { rank: 4000000 + straightHigh, name: 'Straight', highCard: straightHigh };
+    }
+    if (trips.length > 0) {
+        const kickers = getKickers(trips, 2);
+        const kickerScore = (kickers[0] || 0) * 100 + (kickers[1] || 0);
+        return { rank: 3000000 + trips[0] * 10000 + kickerScore, name: 'Three of a Kind', highCard: trips[0] };
+    }
+    if (pairs.length >= 2) {
+        const kicker = getKickers(pairs.slice(0,2), 1)[0] || 0;
+        return { rank: 2000000 + pairs[0] * 10000 + pairs[1] * 100 + kicker, name: 'Two Pair', highCard: pairs[0] };
+    }
+    if (pairs.length === 1) {
+        const kickers = getKickers(pairs, 3);
+        const kickerScore = (kickers[0] || 0) * 10000 + (kickers[1] || 0) * 100 + (kickers[2] || 0);
+        return { rank: 1000000 + pairs[0] * 100000 + kickerScore, name: 'Pair', highCard: pairs[0] };
+    }
+    
+    // High card
+    const topFive = uniqueValues.slice(0, 5);
+    const score = topFive.reduce((acc, v, i) => acc + v * Math.pow(100, 4-i), 0);
+    return { rank: score, name: 'High Card', highCard: topFive[0] };
 }
 
 function checkStraight(values) {
     const unique = [...new Set(values)].sort((a, b) => b - a);
+    
+    // Check for regular straights (5 consecutive cards)
     for (let i = 0; i < unique.length - 4; i++) {
-        if (unique[i] - unique[i + 4] === 4) return true;
+        if (unique[i] - unique[i + 4] === 4) {
+            return { isStraight: true, highCard: unique[i] };
+        }
     }
-    // Check for A-2-3-4-5
-    if (unique.includes(14) && unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5)) {
-        return true;
+    
+    // Check for A-2-3-4-5 (wheel/bicycle)
+    if (unique.includes(14) && unique.includes(5) && unique.includes(4) && unique.includes(3) && unique.includes(2)) {
+        return { isStraight: true, highCard: 5 }; // In A-2-3-4-5, the 5 is the high card
     }
-    return false;
+    
+    return { isStraight: false, highCard: 0 };
 }
 
 function handleAction(socket, action) {
@@ -528,7 +579,7 @@ app.get('/', (req, res) => {
             #controls button { margin: 5px; padding: 15px 30px; font-size: 16px; cursor: pointer; }
             #controls input { padding: 15px; font-size: 16px; }
             
-            #activity-log { position: fixed; bottom: 20px; left: 20px; width: 350px; height: 180px; background: rgba(0,0,0,0.85); color: #ecf0f1; font-family: monospace; padding: 10px; overflow-y: scroll; border: 2px solid #34495e; border-radius: 5px; font-size: 12px; }
+            #activity-log { position: fixed; bottom: 20px; left: 20px; width: 350px; height: 300px; background: rgba(0,0,0,0.85); color: #ecf0f1; font-family: monospace; padding: 10px; overflow-y: scroll; border: 2px solid #34495e; border-radius: 5px; font-size: 12px; }
             #activity-log .log-entry { margin: 3px 0; padding: 2px 0; border-bottom: 1px solid #2c3e50; }
             #activity-log .log-win { color: #2ecc71; font-weight: bold; }
             #activity-log .log-action { color: #3498db; }
