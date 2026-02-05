@@ -477,9 +477,9 @@ app.get('/', (req, res) => {
             .all-in { border-color: red !important; }
 
             #host-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
-            .host-btn { pointer-events: auto; cursor: pointer; border: 3px solid white; font-weight: bold; }
-            #start-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; font-size: 2em; display: none; }
-            #reset-btn { position: absolute; bottom: 100px; right: 20px; padding: 10px 20px; background: #c0392b; display: none; }
+            .host-btn { pointer-events: auto; cursor: pointer; border: 3px solid white; font-weight: bold; border-radius: 10px; }
+            #start-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; color: white; font-size: 2em; display: none; box-shadow: 0 0 30px rgba(39, 174, 96, 0.8); }
+            #reset-btn { position: absolute; bottom: 100px; right: 20px; padding: 10px 20px; background: #c0392b; color: white; display: none; }
             #debug-window { position: absolute; top: 70px; right: 20px; width: 300px; height: 200px; background: rgba(0,0,0,0.9); color: lime; font-family: monospace; padding: 10px; overflow-y: auto; display: none; font-size: 11px; border: 1px solid #333; }
             
             #controls { background: #111; padding: 20px; display: none; border-top: 3px solid #f1c40f; text-align: center; }
@@ -523,6 +523,11 @@ app.get('/', (req, res) => {
             }
             socket.emit('join', pName.trim());
 
+            // Show start button immediately for first player
+            socket.on('connect', () => {
+                // Will be updated properly when server sends update
+            });
+
             socket.on('force_refresh', () => location.reload());
             
             socket.on('debug_msg', m => {
@@ -532,6 +537,12 @@ app.get('/', (req, res) => {
             });
 
             socket.on('update', data => {
+                console.log('Update received:', {
+                    isHost: data.isHost,
+                    gameStage: data.gameStage,
+                    myId: data.myId
+                });
+                
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
                 document.getElementById('pot').innerText = data.pot;
                 document.getElementById('stage').innerText = data.gameStage;
@@ -539,9 +550,13 @@ app.get('/', (req, res) => {
 
                 // Host Controls
                 if(data.isHost) {
-                    document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY') ? 'block' : 'none';
+                    const shouldShow = (data.gameStage === 'LOBBY');
+                    console.log('I am host! Start button should show:', shouldShow);
+                    document.getElementById('start-btn').style.display = shouldShow ? 'block' : 'none';
                     document.getElementById('reset-btn').style.display = 'block';
                     document.getElementById('debug-window').style.display = 'block';
+                } else {
+                    console.log('I am NOT host');
                 }
 
                 // Player Controls
