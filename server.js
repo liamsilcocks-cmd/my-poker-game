@@ -284,11 +284,10 @@ function performShowdown() {
         }
     });
     
+    gameStage = 'SHOWDOWN';
     broadcast();
     
-    setTimeout(() => {
-        startNewHand();
-    }, 5000);
+    // Don't auto-start next hand - wait for host to click CONTINUE
 }
 
 function evaluateHand(hand, board) {
@@ -335,9 +334,19 @@ function checkStraight(values) {
 }
 
 function handleAction(socket, action) {
-    if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN') return;
+    log('ACTION received: ' + action.type + ' from socket: ' + socket.id);
+    log('Current gameStage: ' + gameStage);
+    log('Current turnIndex: ' + turnIndex);
+    log('Player at turnIndex: ' + (playerOrder[turnIndex] || 'NONE'));
+    log('Is it their turn? ' + (playerOrder[turnIndex] === socket.id));
+    
+    if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN' || gameStage === 'DEALER_SELECTION') {
+        log('Game not active, ignoring action');
+        return;
+    }
+    
     if (playerOrder[turnIndex] !== socket.id) {
-        log('Not your turn!');
+        log('Not your turn! Current turn: ' + players[playerOrder[turnIndex]].name);
         return;
     }
     
@@ -493,7 +502,7 @@ app.get('/', (req, res) => {
             .host-btn { pointer-events: auto; cursor: pointer; border: 3px solid white; font-weight: bold; border-radius: 10px; }
             #start-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; color: white; font-size: 2em; display: none; box-shadow: 0 0 30px rgba(39, 174, 96, 0.8); }
             #reset-btn { position: absolute; bottom: 100px; right: 20px; padding: 10px 20px; background: #c0392b; color: white; display: none; }
-            #debug-window { position: absolute; top: 70px; right: 20px; width: 300px; height: 200px; background: rgba(0,0,0,0.9); color: lime; font-family: monospace; padding: 10px; overflow-y: auto; display: none; font-size: 11px; border: 1px solid #333; }
+            #debug-window { position: absolute; top: 70px; right: 20px; width: 300px; height: 200px; background: rgba(0,0,0,0.9); color: lime; font-family: monospace; padding: 10px; overflow-y: scroll; display: none; font-size: 11px; border: 1px solid #333; white-space: pre-wrap; word-wrap: break-word; }
             
             #controls { background: #111; padding: 20px; display: none; border-top: 3px solid #f1c40f; text-align: center; }
             #controls button { margin: 5px; padding: 15px 30px; font-size: 16px; cursor: pointer; }
@@ -509,6 +518,7 @@ app.get('/', (req, res) => {
         
         <div id="host-layer">
             <button id="start-btn" class="host-btn" onclick="socket.emit('start_game')">START TOURNAMENT</button>
+            <button id="continue-btn" class="host-btn" onclick="socket.emit('next_hand')" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; color: white; font-size: 2em; display: none; box-shadow: 0 0 30px rgba(39, 174, 96, 0.8); border-radius: 10px;">CONTINUE</button>
             <button id="reset-btn" class="host-btn" onclick="socket.emit('reset_engine')">RESET ENGINE</button>
             <div id="debug-window"><b>ENGINE LOG</b><hr></div>
         </div>
@@ -564,8 +574,10 @@ app.get('/', (req, res) => {
                 // Host Controls
                 if(data.isHost) {
                     const shouldShow = (data.gameStage === 'LOBBY');
+                    const shouldShowContinue = (data.gameStage === 'SHOWDOWN');
                     console.log('I am host! Start button should show:', shouldShow);
                     document.getElementById('start-btn').style.display = shouldShow ? 'block' : 'none';
+                    document.getElementById('continue-btn').style.display = shouldShowContinue ? 'block' : 'none';
                     document.getElementById('reset-btn').style.display = 'block';
                     document.getElementById('debug-window').style.display = 'block';
                 } else {
@@ -573,7 +585,10 @@ app.get('/', (req, res) => {
                 }
 
                 // Player Controls
-                const isMyTurn = socket.id === data.activeId && data.gameStage !== 'LOBBY' && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'DEALER_SELECTION';
+                const isMyTurn = socket.id === data.activeId && 
+                                data.gameStage !== 'LOBBY' && 
+                                data.gameStage !== 'SHOWDOWN' && 
+                                data.gameStage !== 'DEALER_SELECTION';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if(isMyTurn) {
                     document.getElementById('call-btn').innerText = data.callAmount > 0 ? "CALL £" + data.callAmount : "CHECK";
@@ -665,6 +680,14 @@ io.on('connection', (socket) => {
             blindTimer = BLIND_INTERVAL;
             startNewHand();
         }, 3000);
+    });
+    
+    socket.on('next_hand', () => {
+        if(socket.id !== playerOrder[0]) return;
+        if(gameStage !== 'SHOWDOWN') return;
+        
+        log('=== NEXT HAND ===');
+        startNewHand();
     });
     
     socket.on('reset_engine', () => {
