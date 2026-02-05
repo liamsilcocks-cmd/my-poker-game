@@ -329,8 +329,7 @@ function handleAction(socket, action) {
         const callAmt = Math.min(currentBet - player.bet, player.chips);
         player.chips -= callAmt;
         player.bet += callAmt;
-        pot += callAmt;
-        log(player.name + ' calls ' + callAmt);
+        log(player.name + ' calls ' + callAmt + ' (total bet: ' + player.bet + ')');
         
         if (player.chips === 0) {
             player.status = 'ALL_IN';
@@ -345,12 +344,12 @@ function handleAction(socket, action) {
         
         if (raiseTotal <= currentBet) {
             log('Raise must be higher than current bet');
+            broadcast();
             return;
         }
         
         player.chips -= raiseAmt;
         player.bet = raiseTotal;
-        pot += raiseAmt;
         currentBet = raiseTotal;
         lastRaiser = turnIndex;
         
@@ -371,17 +370,23 @@ function broadcast() {
         if (!me) return;
         
         const isHost = (id === playerOrder[0]);
+        
+        // Calculate SB and BB positions
+        const sbIdx = dealerIndex >= 0 ? (dealerIndex + 1) % playerOrder.length : -1;
+        const bbIdx = dealerIndex >= 0 ? (dealerIndex + 2) % playerOrder.length : -1;
 
         io.to(id).emit('update', {
             myId: id,
             isHost: isHost,
-            players: playerOrder.map((pid) => ({
+            players: playerOrder.map((pid, idx) => ({
                 id: pid, 
                 name: players[pid].name, 
                 chips: players[pid].chips, 
                 bet: players[pid].bet, 
                 status: players[pid].status,
-                isDealer: playerOrder[dealerIndex] === pid,
+                isDealer: idx === dealerIndex,
+                isSB: idx === sbIdx,
+                isBB: idx === bbIdx,
                 displayCards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['🂠','🂠'] : [])
             })),
             community, 
@@ -445,7 +450,9 @@ app.get('/', (req, res) => {
             .player-seat { position: absolute; width: 180px; transform: translate(-50%, -50%); }
             .player-box { background: #222; border: 3px solid #555; padding: 10px; border-radius: 10px; text-align: center; }
             
-            .dealer-chip { background: white; color: black; border-radius: 50%; width: 20px; height: 20px; display: inline-block; font-weight: bold; line-height: 20px; }
+            .dealer-chip { background: white; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 14px; }
+            .sb-chip { background: #3498db; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 12px; }
+            .bb-chip { background: #e74c3c; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 12px; }
             
             @keyframes rainbow {
                 0% { border-color: red; } 50% { border-color: lime; } 100% { border-color: red; }
@@ -525,7 +532,7 @@ app.get('/', (req, res) => {
                 }
 
                 // Player Controls
-                const isMyTurn = socket.id === data.activeId && data.gameStage !== 'LOBBY' && data.gameStage !== 'SHOWDOWN';
+                const isMyTurn = socket.id === data.activeId && data.gameStage !== 'LOBBY' && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'DEALER_SELECTION';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if(isMyTurn) {
                     document.getElementById('call-btn').innerText = data.callAmount > 0 ? "CALL £" + data.callAmount : "CHECK";
@@ -543,12 +550,15 @@ app.get('/', (req, res) => {
                     const meClass = p.id === data.myId ? 'is-me' : '';
                     const turnClass = p.id === data.activeId && data.gameStage !== 'LOBBY' ? 'active-turn' : '';
                     const statusClass = p.status === 'FOLDED' ? 'folded' : (p.status === 'ALL_IN' ? 'all-in' : '');
-                    const dealerChip = p.isDealer ? '<span class="dealer-chip">D</span> ' : '';
+                    const dealerChip = p.isDealer ? '<span class="dealer-chip">D</span>' : '';
+                    const sbChip = p.isSB ? '<span class="sb-chip">SB</span>' : '';
+                    const bbChip = p.isBB ? '<span class="bb-chip">BB</span>' : '';
+                    const chips = dealerChip + sbChip + bbChip;
                     
                     area.innerHTML += \`
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${meClass} \${turnClass} \${statusClass}">
-                                \${dealerChip}<b>\${p.id === data.myId ? 'YOU' : p.name}</b><br>
+                                \${chips ? chips + '<br>' : ''}<b>\${p.id === data.myId ? 'YOU' : p.name}</b><br>
                                 <span style="color: #2ecc71; font-size: 1.2em;">£\${p.chips}</span><br>
                                 \${p.bet > 0 ? '<span style="color: #e74c3c;">BET: £'+p.bet+'</span><br>' : ''}
                                 <span style="font-size:1.5em;">\${p.displayCards.join(' ')}</span><br>
@@ -586,9 +596,34 @@ io.on('connection', (socket) => {
             players[id].chips = STARTING_CHIPS; 
             players[id].status = 'ACTIVE'; 
         });
-        dealerIndex = -1;
-        blindTimer = BLIND_INTERVAL;
-        startNewHand();
+        
+        // Deal one card to each player to determine initial dealer (high card)
+        deck = createDeck();
+        let highCard = { value: 0, playerId: null, card: '' };
+        
+        playerOrder.forEach(id => {
+            const card = dealCard();
+            const value = cardValues[card.slice(0, -1)];
+            players[id].hand = [card]; // Temporarily show the card
+            log(players[id].name + ' draws ' + card + ' (value: ' + value + ')');
+            
+            if (value > highCard.value) {
+                highCard = { value, playerId: id, card };
+            }
+        });
+        
+        dealerIndex = playerOrder.indexOf(highCard.playerId);
+        log(players[highCard.playerId].name + ' has high card ' + highCard.card + ' - IS DEALER');
+        
+        gameStage = 'DEALER_SELECTION';
+        broadcast();
+        
+        // Clear the cards after 3 seconds and start first hand
+        setTimeout(() => {
+            playerOrder.forEach(id => { players[id].hand = []; });
+            blindTimer = BLIND_INTERVAL;
+            startNewHand();
+        }, 3000);
     });
     
     socket.on('reset_engine', () => {
