@@ -7,7 +7,7 @@ const io = require('socket.io')(http);
 let STARTING_CHIPS = 6000;
 let SB = 25;
 let BB = 50;
-let BLIND_INTERVAL = 30; // UPDATED: 30 Seconds
+let BLIND_INTERVAL = 120; // UPDATED: 2 Minutes (120 Seconds)
 let TURN_TIME = 15; 
 
 // --- STATE ---
@@ -26,16 +26,58 @@ let lastRaiser = null;
 
 const cardValues = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
 
+// --- WIN LOGIC: evaluateHand() ---
+// This function assigns a numerical score to a hand. 
+// Higher score = Better hand.
 function evaluateHand(cards) {
     let values = cards.map(c => cardValues[c.slice(0,-1)]).sort((a,b)=>b-a);
-    let counts = {}; values.forEach(v => counts[v] = (counts[v]||0)+1);
+    let counts = {}; 
+    values.forEach(v => counts[v] = (counts[v]||0)+1);
     let freq = Object.values(counts).sort((a,b)=>b-a);
-    if (freq[0] === 4) return 700 + values[0];
-    if (freq[0] === 3 && freq[1] === 2) return 600 + values[0];
-    if (freq[0] === 3) return 300 + values[0];
-    if (freq[0] === 2 && freq[1] === 2) return 200 + values[0];
-    if (freq[0] === 2) return 100 + values[0];
-    return values[0];
+
+    // Score breakdown:
+    if (freq[0] === 4) return 700 + values[0];           // Four of a Kind
+    if (freq[0] === 3 && freq[1] === 2) return 600 + values[0]; // Full House
+    if (freq[0] === 3) return 300 + values[0];           // Three of a Kind
+    if (freq[0] === 2 && freq[1] === 2) return 200 + values[0]; // Two Pair
+    if (freq[0] === 2) return 100 + values[0];           // One Pair
+    return values[0];                                    // High Card
+}
+
+// --- WIN LOGIC: showdown() ---
+// This handles the pot distribution at the end of a round.
+function showdown(soleWinnerId = null) {
+    gameStage = 'SHOWDOWN';
+    let winners = [];
+    
+    if (soleWinnerId) { 
+        // If everyone else folded, the last remaining player wins.
+        winners = [soleWinnerId]; 
+    } else {
+        // If it goes to the end, evaluate everyone's best 5-card hand.
+        let bestScore = -1;
+        playerOrder.forEach(id => {
+            if (players[id].status === 'ACTIVE') {
+                let score = evaluateHand([...players[id].hand, ...community]);
+                if (score > bestScore) { 
+                    bestScore = score; 
+                    winners = [id]; 
+                } else if (score === bestScore) { 
+                    winners.push(id); 
+                }
+            }
+        });
+    }
+
+    // Distribute the pot (split pot logic included)
+    let winAmt = Math.floor(pot / winners.length);
+    winners.forEach(id => players[id].chips += winAmt);
+    
+    setTimeout(() => {
+        dealerIndex = (dealerIndex + 1) % playerOrder.length;
+        startNewHand();
+    }, 5000);
+    broadcast();
 }
 
 function debug(msg) {
@@ -83,28 +125,21 @@ setInterval(() => {
 }, 1000);
 
 function pickRandomDealer() {
-    debug("Dealing for high card to determine Dealer...");
     let tempDeck = (function(){
         const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
         let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
         return d.sort(()=>Math.random()-0.5);
     })();
-    
     let highVal = -1;
     let winnerIdx = 0;
-    
     playerOrder.forEach((id, idx) => {
         let card = tempDeck.pop();
         let val = cardValues[card.slice(0,-1)];
         debug(`${players[id].name} dealt ${card}`);
-        if (val > highVal) {
-            highVal = val;
-            winnerIdx = idx;
-        }
+        if (val > highVal) { highVal = val; winnerIdx = idx; }
     });
-    
     dealerIndex = winnerIdx;
-    debug(`${players[playerOrder[dealerIndex]].name} wins high card and is Dealer.`);
+    debug(`${players[playerOrder[dealerIndex]].name} is the Dealer.`);
 }
 
 function startNewHand() {
@@ -115,20 +150,16 @@ function startNewHand() {
         return d.sort(()=>Math.random()-0.5);
     })();
     community = []; pot = 0; currentBet = BB; turnTimer = TURN_TIME;
-    
     playerOrder.forEach(id => {
         players[id].hand = [deck.pop(), deck.pop()];
         players[id].bet = 0;
         players[id].status = (players[id].chips > 0) ? 'ACTIVE' : 'OUT';
     });
-
     let sbIdx = (dealerIndex + 1) % playerOrder.length;
     let bbIdx = (dealerIndex + 2) % playerOrder.length;
-    
     players[playerOrder[sbIdx]].chips -= SB; players[playerOrder[sbIdx]].bet = SB;
     players[playerOrder[bbIdx]].chips -= BB; players[playerOrder[bbIdx]].bet = BB;
     pot = SB + BB;
-    
     lastRaiser = playerOrder[bbIdx];
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     while(players[playerOrder[turnIndex]].status !== 'ACTIVE') turnIndex = (turnIndex + 1) % playerOrder.length;
@@ -138,7 +169,6 @@ function startNewHand() {
 function handleAction(id, type, amount = 0) {
     if (id !== playerOrder[turnIndex]) return;
     let p = players[id];
-
     if (type === 'fold') { p.status = 'FOLDED'; }
     else if (type === 'check') { debug(`${p.name} checked`); }
     else if (type === 'call') {
@@ -150,7 +180,6 @@ function handleAction(id, type, amount = 0) {
         currentBet = amount;
         lastRaiser = id;
     }
-    
     turnTimer = TURN_TIME;
     nextStep();
 }
@@ -158,15 +187,12 @@ function handleAction(id, type, amount = 0) {
 function nextStep() {
     let active = playerOrder.filter(id => players[id].status === 'ACTIVE');
     if (active.length === 1) return showdown(active[0]);
-
     let allMatched = active.every(id => players[id].bet === currentBet);
-    
     if (allMatched && playerOrder[turnIndex] === lastRaiser) {
         if (gameStage === 'PREFLOP') { community = [deck.pop(), deck.pop(), deck.pop()]; gameStage = 'FLOP'; }
         else if (gameStage === 'FLOP') { community.push(deck.pop()); gameStage = 'TURN'; }
         else if (gameStage === 'TURN') { community.push(deck.pop()); gameStage = 'RIVER'; }
         else if (gameStage === 'RIVER') return showdown();
-        
         currentBet = 0;
         playerOrder.forEach(id => players[id].bet = 0);
         turnIndex = (dealerIndex + 1) % playerOrder.length;
@@ -176,31 +202,6 @@ function nextStep() {
         turnIndex = (turnIndex + 1) % playerOrder.length;
         if (players[playerOrder[turnIndex]].status !== 'ACTIVE') return nextStep();
     }
-    broadcast();
-}
-
-function showdown(soleWinnerId = null) {
-    gameStage = 'SHOWDOWN';
-    let winners = [];
-    if (soleWinnerId) { winners = [soleWinnerId]; } 
-    else {
-        let bestScore = -1;
-        playerOrder.forEach(id => {
-            if (players[id].status === 'ACTIVE') {
-                let score = evaluateHand([...players[id].hand, ...community]);
-                if (score > bestScore) { bestScore = score; winners = [id]; }
-                else if (score === bestScore) { winners.push(id); }
-            }
-        });
-    }
-
-    let winAmt = Math.floor(pot / winners.length);
-    winners.forEach(id => players[id].chips += winAmt);
-    
-    setTimeout(() => {
-        dealerIndex = (dealerIndex + 1) % playerOrder.length;
-        startNewHand();
-    }, 5000);
     broadcast();
 }
 
@@ -226,16 +227,13 @@ app.get('/', (req, res) => {
             .role-BB { background: #f1c40f; }
             .controls { width: 100%; display: none; background: #000; padding: 25px 0; border-top: 8px solid #f1c40f; box-sizing: border-box; z-index: 2000; }
             .controls-inner { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 15px; }
-            
             button { padding: 15px 30px; cursor: pointer; font-weight: 900; border-radius: 15px; border: none; font-size: 1.2em; text-transform: uppercase; }
             input[type="number"] { width: 120px; padding: 15px; font-size: 1.5em; border-radius: 10px; border: 2px solid #f1c40f; background: #222; color: white; text-align: center; }
-            
             .btn-check { background: #7f8c8d; color: white; }
             .btn-call { background: #e67e22; color: white; }
             .btn-fold { background: #c0392b; color: white; }
             .btn-raise { background: #2980b9; color: white; }
-            
-            #start-btn { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2.5em; z-index: 9000; display: none; border: 5px solid white; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+            #start-btn { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2.5em; z-index: 9000; display: none; border: 5px solid white; }
             #timer-bar { height: 10px; background: #f1c40f; width: 0%; position: absolute; top: 0; transition: width 1s linear; }
             #debug-window { position: fixed; top: 0; right: 0; width: 320px; height: 100vh; background: #000; color: #0f0; font-family: monospace; font-size: 14px; overflow-y: scroll; padding: 15px; display: none; border-left: 3px solid #222; z-index: 4000; }
         </style>
@@ -244,7 +242,7 @@ app.get('/', (req, res) => {
         <div id="ui-bar">
             BLINDS: <span id="blinds"></span> | NEXT RAISE: <span id="b-timer"></span>s
         </div>
-        <div id="debug-window"><b>SERVER STATUS</b><hr></div>
+        <div id="debug-window"><b>SERVER LOG</b><hr></div>
         <div class="game-container">
             <div class="poker-table">
                 <div id="community"></div>
@@ -267,9 +265,7 @@ app.get('/', (req, res) => {
         <script>
             const socket = io();
             let name = "";
-            while (!name || name.trim().length === 0) {
-                name = prompt("Enter Player Name:");
-            }
+            while (!name || name.trim().length === 0) { name = prompt("Enter Player Name:"); }
             socket.emit('join', name.trim());
             socket.on('debug_msg', (msg) => {
                 const win = document.getElementById('debug-window');
@@ -282,7 +278,6 @@ app.get('/', (req, res) => {
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
-                
                 const isMyTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if (isMyTurn) {
@@ -291,17 +286,13 @@ app.get('/', (req, res) => {
                     if (data.canCall) document.getElementById('call-btn').innerText = "CALL £" + data.callAmount;
                     document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
                 }
-                const area = document.getElementById('seats');
-                area.innerHTML = '';
+                const area = document.getElementById('seats'); area.innerHTML = '';
                 const tableRect = document.querySelector('.poker-table').getBoundingClientRect();
-                const centerX = tableRect.width / 2;
-                const centerY = tableRect.height / 2;
-                const rx = centerX * 0.9;
-                const ry = centerY * 0.9;
+                const centerX = tableRect.width / 2; const centerY = tableRect.height / 2;
+                const rx = centerX * 0.9; const ry = centerY * 0.9;
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI + (Math.PI / 2);
-                    const x = centerX + rx * Math.cos(angle);
-                    const y = centerY + ry * Math.sin(angle);
+                    const x = centerX + rx * Math.cos(angle); const y = centerY + ry * Math.sin(angle);
                     area.innerHTML += \`
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''}">
@@ -331,7 +322,7 @@ io.on('connection', (socket) => {
     socket.on('start_game', () => {
         if (socket.id !== playerOrder[0]) return;
         playerOrder.forEach(id => { players[id].chips = STARTING_CHIPS; players[id].status = 'ACTIVE'; });
-        pickRandomDealer(); // TRIGGER RANDOM DEALER
+        pickRandomDealer();
         startNewHand();
     });
     socket.on('action', (d) => handleAction(socket.id, d.type, d.amt));
