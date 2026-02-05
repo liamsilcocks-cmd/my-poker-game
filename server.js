@@ -40,7 +40,7 @@ function evaluateHand(cards) {
 
 function debug(msg) {
     if (playerOrder.length > 0) {
-        io.to(playerOrder[0]).emit('debug_msg', `[DEBUG] ${msg}`);
+        io.to(playerOrder[0]).emit('debug_msg', `[SYSTEM] ${msg}`);
     }
 }
 
@@ -50,7 +50,6 @@ function broadcast() {
 
     playerOrder.forEach(id => {
         const me = players[id];
-        // Logic for which buttons to show
         const canCheck = (currentBet === 0) || (gameStage === 'PREFLOP' && id === playerOrder[bbIdx] && currentBet === BB && me.bet === BB);
         const canCall = (currentBet > me.bet);
 
@@ -73,7 +72,7 @@ setInterval(() => {
     if (blindTimer > 0) blindTimer--;
     else { 
         SB *= 2; BB *= 2; blindTimer = BLIND_INTERVAL; 
-        debug(`Blinds Escalated: ${SB}/${BB}`);
+        debug(`Blinds: ${SB}/${BB}`);
     }
     if (!['SHOWDOWN', 'LOBBY'].includes(gameStage)) {
         if (turnTimer > 0) turnTimer--;
@@ -105,6 +104,8 @@ function startNewHand() {
     
     lastRaiser = playerOrder[bbIdx];
     turnIndex = (dealerIndex + 3) % playerOrder.length;
+    // Ensure turnIndex is on an active player
+    while(players[playerOrder[turnIndex]].status !== 'ACTIVE') turnIndex = (turnIndex + 1) % playerOrder.length;
     broadcast();
 }
 
@@ -112,21 +113,16 @@ function handleAction(id, type, amount = 0) {
     if (id !== playerOrder[turnIndex]) return;
     let p = players[id];
 
-    if (type === 'fold') {
-        p.status = 'FOLDED';
-    } else if (type === 'check') {
-        debug(`${p.name} checks`);
-    } else if (type === 'call') {
+    if (type === 'fold') { p.status = 'FOLDED'; }
+    else if (type === 'call') {
         let diff = currentBet - p.bet;
         p.chips -= diff; p.bet += diff; pot += diff;
-        debug(`${p.name} calls`);
     } else if (type === 'raise') {
         let raiseTotal = currentBet + amount;
         let diff = raiseTotal - p.bet;
         p.chips -= diff; p.bet += raiseTotal; pot += diff;
         currentBet = raiseTotal;
         lastRaiser = id;
-        debug(`${p.name} raises to ${currentBet}`);
     }
     
     turnTimer = TURN_TIME;
@@ -135,6 +131,10 @@ function handleAction(id, type, amount = 0) {
 
 function nextStep() {
     let active = playerOrder.filter(id => players[id].status === 'ACTIVE');
+    
+    // If only one person left, they win immediately
+    if (active.length === 1) return showdown(active[0]);
+
     let allMatched = active.every(id => players[id].bet === currentBet);
     
     if (allMatched && playerOrder[turnIndex] === lastRaiser) {
@@ -150,28 +150,35 @@ function nextStep() {
         lastRaiser = playerOrder[(turnIndex + playerOrder.length - 1) % playerOrder.length];
     } else {
         turnIndex = (turnIndex + 1) % playerOrder.length;
-        if (players[playerOrder[turnIndex]].status !== 'ACTIVE') nextStep();
+        if (players[playerOrder[turnIndex]].status !== 'ACTIVE') return nextStep();
     }
     broadcast();
 }
 
-function showdown() {
+function showdown(soleWinnerId = null) {
     gameStage = 'SHOWDOWN';
     let winners = [];
-    let bestScore = -1;
-    playerOrder.forEach(id => {
-        if (players[id].status === 'ACTIVE') {
-            let score = evaluateHand([...players[id].hand, ...community]);
-            if (score > bestScore) { bestScore = score; winners = [id]; }
-            else if (score === bestScore) { winners.push(id); }
-        }
-    });
+    if (soleWinnerId) {
+        winners = [soleWinnerId];
+    } else {
+        let bestScore = -1;
+        playerOrder.forEach(id => {
+            if (players[id].status === 'ACTIVE') {
+                let score = evaluateHand([...players[id].hand, ...community]);
+                if (score > bestScore) { bestScore = score; winners = [id]; }
+                else if (score === bestScore) { winners.push(id); }
+            }
+        });
+    }
+
     let winAmt = Math.floor(pot / winners.length);
     winners.forEach(id => players[id].chips += winAmt);
+    
     setTimeout(() => {
         dealerIndex = (dealerIndex + 1) % playerOrder.length;
         startNewHand();
-    }, 5000);
+    }, 4000);
+    broadcast();
 }
 
 app.get('/', (req, res) => {
@@ -180,44 +187,49 @@ app.get('/', (req, res) => {
     <html>
     <head>
         <style>
-            body { background: #1a1a1a; color: white; font-family: monospace; margin: 0; overflow: hidden; text-align: center; }
-            .poker-table { position: relative; width: 600px; height: 350px; background: #1a472a; border: 12px solid #5d3a1a; border-radius: 200px; margin: 40px auto; }
-            .player-seat { position: absolute; width: 110px; transform: translate(-50%, -50%); }
-            .player-box { background: #000; border: 1px solid #fff; padding: 8px; border-radius: 8px; font-size: 0.8em; position: relative; }
-            .active-turn { border-color: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
-            .role-badge { position: absolute; top: -10px; right: -10px; background: white; color: black; border-radius: 50%; width: 22px; height: 22px; line-height: 22px; font-weight: bold; font-size: 0.7em; border: 1px solid black; }
-            .controls { position: fixed; bottom: 0; width: 100%; display:none; background: rgba(0,0,0,0.95); padding: 25px 0; border-top: 3px solid #f1c40f; z-index: 500; }
-            #debug-window { position: fixed; top: 0; right: 0; width: 250px; height: 100vh; background: #000; color: #0f0; font-size: 10px; text-align: left; overflow-y: scroll; padding: 10px; display: none; z-index: 1000; }
-            #timer-bar { height: 6px; background: #f1c40f; width: 100%; position: absolute; top: 0; }
-            #start-btn { position: fixed; bottom: 20px; left: 20px; padding: 15px 30px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 600; font-weight: bold; }
-            button { padding: 12px 24px; margin: 0 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; }
-            .btn-check { background: #7f8c8d; color: white; }
-            .btn-call { background: #f39c12; color: white; }
-            .btn-fold { background: #c0392b; color: white; }
+            body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; text-align: center; }
+            .poker-table { position: relative; width: 800px; height: 450px; background: radial-gradient(#2d5a27, #1a3c1a); border: 15px solid #3d2b1f; border-radius: 250px; margin: 50px auto; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+            .player-seat { position: absolute; width: 150px; transform: translate(-50%, -50%); transition: all 0.3s; }
+            .player-box { background: #1a1a1a; border: 2px solid #444; padding: 15px; border-radius: 12px; font-size: 1.1em; position: relative; }
+            .active-turn { border-color: #f1c40f; box-shadow: 0 0 20px #f1c40f; transform: scale(1.05); }
+            
+            .role-circle { position: absolute; top: -12px; right: -12px; width: 30px; height: 30px; border-radius: 50%; line-height: 30px; font-weight: bold; color: black; font-size: 0.8em; border: 2px solid #000; }
+            .role-D { background: white; }
+            .role-SB { background: #3498db; color: white; }
+            .role-BB { background: #f1c40f; }
+
+            .controls { position: fixed; bottom: 0; width: 100%; display:none; background: rgba(0,0,0,0.9); padding: 30px 0; border-top: 4px solid #f1c40f; z-index: 500; }
+            #debug-window { position: fixed; top: 0; right: 0; width: 280px; height: 100vh; background: #000; color: #0f0; font-family: monospace; font-size: 11px; text-align: left; overflow-y: scroll; padding: 10px; display: none; border-left: 2px solid #333; }
+            #timer-bar { height: 8px; background: #f1c40f; width: 100%; position: absolute; top: 0; }
+            button { padding: 15px 30px; margin: 0 10px; cursor: pointer; font-weight: bold; border-radius: 8px; border: none; font-size: 1em; text-transform: uppercase; }
+            .btn-check { background: #95a5a6; }
+            .btn-call { background: #f39c12; }
+            .btn-fold { background: #e74c3c; color: white; }
             .btn-raise { background: #2980b9; color: white; }
+            #start-btn { position: fixed; bottom: 20px; left: 20px; padding: 20px 40px; background: #27ae60; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 1.2em; }
         </style>
     </head>
     <body>
-        <div id="debug-window"><b>DEBUG LOG</b><hr></div>
-        <div id="ui" style="padding: 10px;">Blinds: <span id="blinds"></span> | Raise in: <span id="b-timer"></span>s</div>
+        <div id="debug-window"><b>ENGINE LOGS</b><hr></div>
+        <div id="ui" style="padding: 20px; font-size: 1.2em;">Blinds: <span id="blinds"></span> | Raise in: <span id="b-timer"></span>s</div>
         <div class="poker-table">
-            <div id="community" style="margin-top: 130px; font-size: 1.8em; letter-spacing: 2px;"></div>
-            <div id="pot" style="color: #f1c40f; font-weight: bold; font-size: 1.2em; margin-top: 10px;">Pot: 0</div>
+            <div id="community" style="margin-top: 170px; font-size: 2.5em; letter-spacing: 5px;"></div>
+            <div id="pot" style="color: #f1c40f; font-weight: bold; font-size: 1.8em; margin-top: 20px;">Pot: 0</div>
             <div id="seats"></div>
         </div>
         <div id="controls" class="controls">
             <div id="timer-bar"></div>
-            <button class="btn-fold" onclick="socket.emit('action', {type:'fold'})">FOLD</button>
-            <button id="check-btn" class="btn-check" onclick="socket.emit('action', {type:'check'})">CHECK</button>
-            <button id="call-btn" class="btn-call" onclick="socket.emit('action', {type:'call'})">CALL</button>
-            <button class="btn-raise" onclick="socket.emit('action', {type:'raise', amt:50})">RAISE 50</button>
+            <button class="btn-fold" onclick="socket.emit('action', {type:'fold'})">Fold</button>
+            <button id="check-btn" class="btn-check" onclick="socket.emit('action', {type:'check'})">Check</button>
+            <button id="call-btn" class="btn-call" onclick="socket.emit('action', {type:'call'})">Call</button>
+            <button class="btn-raise" onclick="socket.emit('action', {type:'raise', amt:100})">Raise 100</button>
         </div>
-        <button id="start-btn" onclick="socket.emit('start_game')">START GAME</button>
+        <button id="start-btn" onclick="socket.emit('start_game')">START TOURNAMENT</button>
 
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
-            const name = prompt("Name?") || "Player";
+            const name = prompt("Enter Name") || "Player";
             socket.emit('join', name);
             socket.on('debug_msg', (msg) => {
                 const win = document.getElementById('debug-window');
@@ -227,13 +239,12 @@ app.get('/', (req, res) => {
                 if (data.isHost) document.getElementById('debug-window').style.display = 'block';
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
                 document.getElementById('b-timer').innerText = data.blindTimer;
-                document.getElementById('pot').innerText = "Pot: £" + data.pot;
+                document.getElementById('pot').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
                 
-                const isMyTurn = socket.id === data.activeId;
+                const isMyTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
-                
                 if (isMyTurn) {
                     document.getElementById('check-btn').style.display = data.canCheck ? 'inline-block' : 'none';
                     document.getElementById('call-btn').style.display = data.canCall ? 'inline-block' : 'none';
@@ -244,14 +255,17 @@ app.get('/', (req, res) => {
                 area.innerHTML = '';
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI + (Math.PI / 2);
-                    const x = Math.cos(angle) * 380; const y = Math.sin(angle) * 230;
+                    const x = Math.cos(angle) * 480; const y = Math.sin(angle) * 280;
                     area.innerHTML += \`
                         <div class="player-seat" style="left:calc(50% + \${x}px); top:calc(50% + \${y}px)">
                             <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''}">
-                                \${p.role ? '<div class="role-badge">'+p.role+'</div>' : ''}
-                                <b>\${p.name}</b><br>£\${p.chips}<br>
-                                <span style="font-size:1.2em">\${p.displayCards.join(' ')}</span><br>
-                                <small>\${p.status === 'FOLDED' ? 'FOLDED' : 'Bet: ' + p.bet}</small>
+                                \${p.role ? '<div class="role-circle role-'+p.role+'">'+p.role+'</div>' : ''}
+                                <b style="font-size: 1.2em">\${p.name}</b><br>
+                                <span style="color: #27ae60; font-weight: bold;">£\${p.chips}</span><br>
+                                <div style="margin: 10px 0; font-size: 1.5em;">\${p.displayCards.join(' ')}</div>
+                                <small style="color: \${p.status === 'FOLDED' ? '#e74c3c' : '#bdc3c7'}">
+                                    \${p.status === 'FOLDED' ? 'FOLDED' : 'Bet: £' + p.bet}
+                                </small>
                             </div>
                         </div>\`;
                 });
@@ -285,4 +299,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-http.listen(PORT, () => console.log('Poker Engine Complete'));
+http.listen(PORT, () => console.log('Engine Online'));
