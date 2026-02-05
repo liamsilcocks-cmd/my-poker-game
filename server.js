@@ -82,7 +82,6 @@ setInterval(() => {
 }, 1000);
 
 function pickRandomDealer() {
-    debug("HIGH CARD: Determining the first dealer...");
     let tempDeck = (function(){
         const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
         let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
@@ -93,16 +92,13 @@ function pickRandomDealer() {
     playerOrder.forEach((id, idx) => {
         let card = tempDeck.pop();
         let val = cardValues[card.slice(0,-1)];
-        debug(`DRAW: ${players[id].name} - ${card}`);
         if (val > highVal) { highVal = val; winnerIdx = idx; }
     });
     dealerIndex = winnerIdx;
-    debug(`DEALER: ${players[playerOrder[dealerIndex]].name} wins button.`);
 }
 
 function startNewHand() {
     gameStage = 'PREFLOP';
-    debug("--- STARTING NEW HAND ---");
     deck = (function(){
         const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
         let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
@@ -128,8 +124,6 @@ function startNewHand() {
 function handleAction(id, type, amount = 0) {
     if (id !== playerOrder[turnIndex] || gameStage === 'SHOWDOWN') return;
     let p = players[id];
-    debug(`ACT: ${p.name} - ${type.toUpperCase()}`);
-
     if (type === 'fold') { p.status = 'FOLDED'; }
     else if (type === 'call') {
         let diff = currentBet - p.bet;
@@ -140,7 +134,6 @@ function handleAction(id, type, amount = 0) {
         currentBet = amount;
         lastRaiser = id;
     }
-    
     turnTimer = TURN_TIME;
     nextStep();
 }
@@ -148,15 +141,12 @@ function handleAction(id, type, amount = 0) {
 function nextStep() {
     let active = playerOrder.filter(id => players[id].status === 'ACTIVE');
     if (active.length === 1) return showdown(active[0]);
-
     let allMatched = active.every(id => players[id].bet === currentBet);
-    
     if (allMatched && playerOrder[turnIndex] === lastRaiser) {
         if (gameStage === 'PREFLOP') { community = [deck.pop(), deck.pop(), deck.pop()]; gameStage = 'FLOP'; }
         else if (gameStage === 'FLOP') { community.push(deck.pop()); gameStage = 'TURN'; }
         else if (gameStage === 'TURN') { community.push(deck.pop()); gameStage = 'RIVER'; }
         else if (gameStage === 'RIVER') { return showdown(); }
-        
         currentBet = 0;
         playerOrder.forEach(id => players[id].bet = 0);
         turnIndex = (dealerIndex + 1) % playerOrder.length;
@@ -185,7 +175,7 @@ function showdown(soleWinnerId = null) {
         });
     }
     let winAmt = Math.floor(pot / winners.length);
-    winners.forEach(id => { players[id].chips += winAmt; debug(`WIN: ${players[id].name} +£${winAmt}`); });
+    winners.forEach(id => { players[id].chips += winAmt; });
     setTimeout(() => { dealerIndex = (dealerIndex + 1) % playerOrder.length; startNewHand(); }, 5000);
     broadcast();
 }
@@ -204,9 +194,20 @@ app.get('/', (req, res) => {
             #community { font-size: 3.5em; letter-spacing: 12px; margin-bottom: 10px; }
             #pot-display { color: #f1c40f; font-size: 2.2em; font-weight: 900; }
             .player-seat { position: absolute; width: 220px; transform: translate(-50%, -50%); z-index: 10; }
-            .player-box { background: rgba(20, 20, 20, 0.95); border: 3px solid #555; padding: 15px; border-radius: 15px; text-align: center; transition: all 0.3s ease; }
-            .is-me { background: linear-gradient(180deg, #1a2a3a 0%, #0a0a0a 100%); border-color: #3498db !important; box-shadow: 0 0 15px rgba(52, 152, 219, 0.3); }
-            .active-turn { border-color: #f1c40f !important; box-shadow: 0 0 30px #f1c40f !important; transform: scale(1.05); }
+            .player-box { background: rgba(20, 20, 20, 0.95); border: 4px solid #555; padding: 15px; border-radius: 15px; text-align: center; transition: transform 0.3s ease; }
+            .is-me { background: linear-gradient(180deg, #1a2a3a 0%, #0a0a0a 100%); border-color: #3498db; }
+            
+            @keyframes rainbow {
+                0% { border-color: #ff0000; box-shadow: 0 0 20px #ff0000; }
+                17% { border-color: #ff8000; box-shadow: 0 0 20px #ff8000; }
+                33% { border-color: #ffff00; box-shadow: 0 0 20px #ffff00; }
+                50% { border-color: #00ff00; box-shadow: 0 0 20px #00ff00; }
+                67% { border-color: #0000ff; box-shadow: 0 0 20px #0000ff; }
+                84% { border-color: #8b00ff; box-shadow: 0 0 20px #8b00ff; }
+                100% { border-color: #ff0000; box-shadow: 0 0 20px #ff0000; }
+            }
+            .active-turn { animation: rainbow 2s infinite linear; transform: scale(1.1); z-index: 100; }
+
             .role-circle { position: absolute; top: -15px; right: -15px; width: 45px; height: 45px; border-radius: 50%; line-height: 45px; font-weight: 900; color: black; font-size: 1.2em; border: 3px solid #000; background: white; text-align: center; }
             .role-SB { background: #3498db; color: white; }
             .role-BB { background: #f1c40f; }
@@ -268,7 +269,7 @@ app.get('/', (req, res) => {
                     const y = ch + (ch * 0.8) * Math.sin(angle);
                     const isMeClass = p.id === data.myId ? 'is-me' : '';
                     const activeClass = p.id === data.activeId ? 'active-turn' : '';
-                    area.innerHTML += \`
+                    area.innerHTML += `
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${isMeClass} \${activeClass}">
                                 \${p.role ? '<div class="role-circle role-'+p.role+'">'+p.role+'</div>' : ''}
