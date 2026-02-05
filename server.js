@@ -39,18 +39,21 @@ function evaluateHand(cards) {
     return values[0];
 }
 
+function debug(msg) {
+    if (playerOrder.length > 0) {
+        io.to(playerOrder[0]).emit('debug_msg', `[${new Date().toLocaleTimeString()}] ${msg}`);
+    }
+}
+
 function broadcast() {
-    playerOrder.forEach((id, idx) => {
+    playerOrder.forEach((id) => {
         const me = players[id];
         if (!me) return;
         
-        // Host is ALWAYS the person at index 0 of the current playerOrder
-        const isHost = (id === playerOrder[0]);
-        
+        const isHost = (id === playerOrder[0]); // STRICT HOST CHECK
         const sbIdx = dealerIndex !== -1 ? (dealerIndex + 1) % playerOrder.length : -1;
         const bbIdx = dealerIndex !== -1 ? (dealerIndex + 2) % playerOrder.length : -1;
         const canCheck = (currentBet === 0) || (gameStage === 'PREFLOP' && id === playerOrder[bbIdx] && currentBet === BB && me.bet === BB);
-        const canCall = (currentBet > me.bet);
 
         io.to(id).emit('update', {
             myId: id,
@@ -62,7 +65,7 @@ function broadcast() {
                 displayCards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['🂠','🂠'] : [])
             })),
             community, pot, gameStage, activeId: playerOrder[turnIndex], currentBet, SB, BB, blindTimer, turnTimer,
-            canCheck, canCall, callAmount: currentBet - me.bet
+            canCheck, callAmount: currentBet - me.bet
         });
     });
 }
@@ -70,9 +73,13 @@ function broadcast() {
 setInterval(() => {
     if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN' || dealerIndex === -1) return;
     if (blindTimer > 0) blindTimer--;
-    else { SB *= 2; BB *= 2; blindTimer = BLIND_INTERVAL; }
+    else { SB *= 2; BB *= 2; blindTimer = BLIND_INTERVAL; debug(`Blinds Up: ${SB}/${BB}`);}
     if (turnTimer > 0) turnTimer--;
 }, 1000);
+
+function pickRandomDealer() {
+    dealerIndex = Math.floor(Math.random() * playerOrder.length);
+}
 
 function startNewHand() {
     gameStage = 'PREFLOP';
@@ -105,39 +112,42 @@ app.get('/', (req, res) => {
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
-            body { background: #050505; color: white; font-family: 'Arial Black', sans-serif; margin: 0; padding: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-            #ui-bar { width: 100%; padding: 15px; background: #111; text-align: center; border-bottom: 2px solid #444; z-index: 100; }
+            body { background: #050505; color: white; font-family: sans-serif; margin: 0; padding: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+            #ui-bar { width: 100%; padding: 15px; background: #111; text-align: center; border-bottom: 2px solid #444; }
             .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
-            .poker-table { width: 60vw; height: 40vh; background: radial-gradient(#2d5a27, #102e10); border: 12px solid #2b1d12; border-radius: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1; }
+            .poker-table { width: 60vw; height: 40vh; background: radial-gradient(#2d5a27, #102e10); border: 12px solid #2b1d12; border-radius: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
             #community { font-size: 3.5em; letter-spacing: 12px; }
-            .player-seat { position: absolute; width: 220px; transform: translate(-50%, -50%); z-index: 10; }
-            .player-box { background: rgba(20, 20, 20, 0.95); border: 4px solid #555; padding: 15px; border-radius: 15px; text-align: center; }
-            .is-me { border-color: #3498db; box-shadow: 0 0 15px #3498db; }
+            .player-seat { position: absolute; width: 200px; transform: translate(-50%, -50%); z-index: 10; }
+            .player-box { background: rgba(20, 20, 20, 0.95); border: 4px solid #555; padding: 10px; border-radius: 15px; text-align: center; }
             
+            /* RAINBOW ONLY FOR THE LOCAL PLAYER */
             @keyframes rainbow {
-                0% { border-color: red; box-shadow: 0 0 20px red; }
-                25% { border-color: yellow; box-shadow: 0 0 20px yellow; }
-                50% { border-color: lime; box-shadow: 0 0 20px lime; }
-                75% { border-color: blue; box-shadow: 0 0 20px blue; }
-                100% { border-color: red; box-shadow: 0 0 20px red; }
+                0% { border-color: red; }
+                33% { border-color: lime; }
+                66% { border-color: blue; }
+                100% { border-color: red; }
             }
-            .active-turn { animation: rainbow 2s infinite linear; transform: scale(1.1); z-index: 20; }
+            .is-me { animation: rainbow 3s infinite linear; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
             
-            /* HOST CONTROLS */
-            #host-controls { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 99999; }
-            .host-btn { pointer-events: auto; cursor: pointer; font-weight: 900; text-transform: uppercase; border: 4px solid white; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
-            #start-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 40px 80px; background: #27ae60; color: white; border-radius: 20px; font-size: 3em; display: none; }
-            #reset-btn { position: absolute; bottom: 20px; right: 20px; padding: 15px 30px; background: #c0392b; color: white; border-radius: 10px; font-size: 1.2em; display: none; }
+            /* TURN INDICATOR (SQUARE GOLD BORDER) */
+            .active-turn { border: 6px solid #f1c40f !important; transform: scale(1.1); }
+            
+            #host-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 99999; }
+            .host-ui { pointer-events: auto; }
+            #start-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; color: white; border-radius: 15px; font-size: 2.5em; border: 4px solid white; cursor: pointer; display: none; }
+            #reset-btn { position: absolute; bottom: 80px; right: 20px; padding: 10px 20px; background: #c0392b; color: white; border-radius: 8px; border: 2px solid white; cursor: pointer; display: none; }
+            #debug-window { position: absolute; top: 60px; right: 10px; width: 280px; height: 150px; background: rgba(0,0,0,0.9); color: #0f0; font-family: monospace; font-size: 11px; overflow-y: scroll; padding: 10px; border: 1px solid #333; display: none; }
             
             .controls { width: 100%; display: none; background: #111; padding: 20px 0; border-top: 5px solid #f1c40f; }
         </style>
     </head>
     <body>
-        <div id="ui-bar">BLINDS: <span id="blinds"></span> | NEXT RAISE: <span id="b-timer"></span>s</div>
+        <div id="ui-bar">BLINDS: <span id="blinds"></span> | NEXT: <span id="b-timer"></span>s</div>
         
-        <div id="host-controls">
-            <button id="start-btn" class="host-btn" onclick="socket.emit('start_game')">START GAME</button>
-            <button id="reset-btn" class="host-btn" onclick="if(confirm('RESET ENGINE?')) socket.emit('reset_engine')">RESET ENGINE</button>
+        <div id="host-layer">
+            <button id="start-btn" class="host-ui" onclick="socket.emit('start_game')">START GAME</button>
+            <button id="reset-btn" class="host-ui" onclick="socket.emit('reset_engine')">RESET ENGINE</button>
+            <div id="debug-window" class="host-ui"><b>ENGINE LOG</b><hr></div>
         </div>
 
         <div class="game-container">
@@ -152,7 +162,7 @@ app.get('/', (req, res) => {
             <div style="display:flex; justify-content:center; gap:10px;">
                 <button style="background:#c0392b; color:white; padding:15px;" onclick="socket.emit('action', {type:'fold'})">FOLD</button>
                 <button id="call-btn" style="background:#e67e22; color:white; padding:15px;" onclick="socket.emit('action', {type:'call'})"></button>
-                <input type="number" id="bet-amt" value="100" style="width:80px;">
+                <input type="number" id="bet-amt" value="100" style="width:70px;">
                 <button style="background:#2980b9; color:white; padding:15px;" onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})">RAISE</button>
             </div>
         </div>
@@ -160,40 +170,49 @@ app.get('/', (req, res) => {
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
-            let pName = prompt("Enter Name:");
+            let pName = "";
+            while(!pName) { pName = prompt("Name:"); }
             socket.on('connect', () => { socket.emit('join', pName); });
             socket.on('force_refresh', () => { location.reload(); });
+            socket.on('debug_msg', (m) => { 
+                const d = document.getElementById('debug-window');
+                d.innerHTML += '<div>' + m + '</div>';
+                d.scrollTop = d.scrollHeight;
+            });
 
             socket.on('update', (data) => {
-                // UI
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
                 document.getElementById('b-timer').innerText = data.gameStage === 'LOBBY' ? "--" : data.blindTimer;
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
 
-                // HOST ONLY BUTTONS
-                document.getElementById('start-btn').style.display = (data.isHost && data.gameStage === 'LOBBY') ? 'block' : 'none';
-                document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
+                // HOST ONLY
+                if(data.isHost) {
+                    document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY') ? 'block' : 'none';
+                    document.getElementById('reset-btn').style.display = 'block';
+                    document.getElementById('debug-window').style.display = 'block';
+                }
 
-                // PLAYER CONTROLS
-                const isTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN';
+                const isTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY';
                 document.getElementById('controls').style.display = isTurn ? 'block' : 'none';
                 if(isTurn) document.getElementById('call-btn').innerText = data.canCheck ? "CHECK" : "CALL £"+data.callAmount;
 
-                // SEATS
                 const area = document.getElementById('seats'); area.innerHTML = '';
-                const cw = window.innerWidth / 2;
-                const ch = window.innerHeight / 2;
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI + (Math.PI / 2);
-                    const x = cw + (cw * 0.7) * Math.cos(angle);
-                    const y = ch + (ch * 0.6) * Math.sin(angle);
+                    const x = (window.innerWidth / 2) + (window.innerWidth * 0.35) * Math.cos(angle);
+                    const y = (window.innerHeight / 2) + (window.innerHeight * 0.3) * Math.sin(angle);
+                    
+                    // Logic: Is this box ME? (Rainbow) Is this box THE TURN? (Gold)
+                    const meClass = p.id === data.myId ? 'is-me' : '';
+                    const turnClass = p.id === data.activeId ? 'active-turn' : '';
+                    
                     area.innerHTML += \`
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
-                            <div class="player-box \${p.id === data.myId ? 'is-me' : ''} \${p.id === data.activeId ? 'active-turn' : ''}">
+                            <div class="player-box \${meClass} \${turnClass}">
                                 <div>\${p.id === data.myId ? 'YOU' : p.name}</div>
                                 <div style="color:#2ecc71;">£\${p.chips}</div>
-                                <div style="font-size:2em;">\${p.displayCards.join(' ')}</div>
+                                <div style="font-size:1.8em;">\${p.displayCards.join(' ')}</div>
                             </div>
                         </div>\`;
                 });
@@ -206,22 +225,21 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
     socket.on('join', (n) => { 
-        players[socket.id] = { name: n || "Player", hand: [], chips: 0, bet: 0, status: 'LOBBY' }; 
+        players[socket.id] = { name: n, hand: [], chips: 0, bet: 0, status: 'LOBBY' }; 
         playerOrder.push(socket.id); 
         broadcast(); 
     });
     socket.on('start_game', () => {
         if (socket.id !== playerOrder[0]) return;
         playerOrder.forEach(id => { players[id].chips = STARTING_CHIPS; players[id].status = 'ACTIVE'; });
-        dealerIndex = 0;
+        pickRandomDealer();
         startNewHand();
     });
     socket.on('reset_engine', () => {
         if (socket.id !== playerOrder[0]) return;
-        players = {}; playerOrder = []; gameStage = 'LOBBY'; dealerIndex = -1;
+        players = {}; playerOrder = []; gameStage = 'LOBBY';
         io.emit('force_refresh');
     });
-    socket.on('action', (d) => { /* Reuse previous action logic here */ });
     socket.on('disconnect', () => {
         playerOrder = playerOrder.filter(id => id !== socket.id);
         delete players[socket.id];
@@ -230,4 +248,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-http.listen(PORT, () => console.log('Server Ready'));
+http.listen(PORT, () => console.log('Server Live'));
