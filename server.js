@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +14,11 @@ let deck = [];
 let communityCards = [];
 let pot = 0;
 let currentBet = 0;
+
+// Serve the HTML file when someone visits the URL
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 function createDeck() {
     const suits = ['H', 'D', 'C', 'S'];
@@ -54,11 +60,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('action', (data) => {
-        // Validation: Is it actually this player's turn?
         if (socket.id !== playerOrder[turnIndex]) return;
-
         const player = players[socket.id];
-        console.log(`Action received: ${data.type} from ${player.name}`);
 
         if (data.type === 'fold') player.status = 'FOLDED';
         if (data.type === 'call') {
@@ -76,16 +79,15 @@ io.on('connection', (socket) => {
             currentBet = player.bet;
         }
 
-        // Move to next player
         turnIndex = (turnIndex + 1) % playerOrder.length;
         broadcastState();
     });
 
     socket.on('next_stage', () => {
         if (communityCards.length === 0) {
-            communityCards = [deck.pop(), deck.pop(), deck.pop()]; // Flop
+            communityCards = [deck.pop(), deck.pop(), deck.pop()];
         } else if (communityCards.length < 5) {
-            communityCards.push(deck.pop()); // Turn then River
+            communityCards.push(deck.pop());
         }
         currentBet = 0;
         Object.keys(players).forEach(id => players[id].bet = 0);
@@ -99,4 +101,5 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log('Server running on port ' + PORT));
