@@ -70,19 +70,18 @@ function broadcast() {
     });
 }
 
-// Timer Interval: Logic for auto-fold removed. Only blind updates remain.
 setInterval(() => {
     if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN') return;
     if (blindTimer > 0) blindTimer--;
     else { 
         SB *= 2; BB *= 2; blindTimer = BLIND_INTERVAL; 
-        debug(`SYSTEM: Blinds increased to ${SB}/${BB}`);
+        debug(`SYSTEM: Blinds up to ${SB}/${BB}`);
     }
     if (turnTimer > 0) turnTimer--;
 }, 1000);
 
 function pickRandomDealer() {
-    debug("HIGH CARD: Dealing for button...");
+    debug("HIGH CARD: Determining the first dealer...");
     let tempDeck = (function(){
         const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
         let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
@@ -97,12 +96,12 @@ function pickRandomDealer() {
         if (val > highVal) { highVal = val; winnerIdx = idx; }
     });
     dealerIndex = winnerIdx;
-    debug(`DEALER: ${players[playerOrder[dealerIndex]].name} starts as Button.`);
+    debug(`DEALER: ${players[playerOrder[dealerIndex]].name} wins the high card.`);
 }
 
 function startNewHand() {
     gameStage = 'PREFLOP';
-    debug("--- DEALING NEW HAND ---");
+    debug("--- STARTING NEW HAND ---");
     deck = (function(){
         const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
         let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
@@ -128,7 +127,7 @@ function startNewHand() {
 function handleAction(id, type, amount = 0) {
     if (id !== playerOrder[turnIndex] || gameStage === 'SHOWDOWN') return;
     let p = players[id];
-    debug(`ACT: ${p.name} -> ${type.toUpperCase()}`);
+    debug(`ACT: ${p.name} - ${type.toUpperCase()}`);
 
     if (type === 'fold') { p.status = 'FOLDED'; }
     else if (type === 'call') {
@@ -151,28 +150,23 @@ function nextStep() {
 
     let allMatched = active.every(id => players[id].bet === currentBet);
     
-    // Check if street is finished
     if (allMatched && playerOrder[turnIndex] === lastRaiser) {
         if (gameStage === 'PREFLOP') { 
             community = [deck.pop(), deck.pop(), deck.pop()]; 
             gameStage = 'FLOP';
-            debug(`STREET: FLOP ${community.join(' ')}`);
         }
         else if (gameStage === 'FLOP') { 
             community.push(deck.pop()); 
             gameStage = 'TURN';
-            debug(`STREET: TURN ${community[3]}`);
         }
         else if (gameStage === 'TURN') { 
             community.push(deck.pop()); 
             gameStage = 'RIVER';
-            debug(`STREET: RIVER ${community[4]}`);
         }
         else if (gameStage === 'RIVER') {
-            return showdown(); // Hand ends immediately after river betting matched
+            return showdown(); 
         }
         
-        // Reset betting for next street
         currentBet = 0;
         playerOrder.forEach(id => players[id].bet = 0);
         turnIndex = (dealerIndex + 1) % playerOrder.length;
@@ -204,7 +198,7 @@ function showdown(soleWinnerId = null) {
     let winAmt = Math.floor(pot / winners.length);
     winners.forEach(id => {
         players[id].chips += winAmt;
-        debug(`SHOWDOWN: ${players[id].name} wins £${winAmt}`);
+        debug(`WIN: ${players[id].name} collected £${winAmt}`);
     });
     
     setTimeout(() => {
@@ -266,9 +260,22 @@ app.get('/', (req, res) => {
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
-            let name = prompt("Enter Player Name:");
-            socket.emit('join', name);
-            socket.on('debug_msg', (m) => { const w = document.getElementById('debug-window'); w.innerHTML += '<div>'+m+'</div>'; w.scrollTop = w.scrollHeight; });
+            
+            let playerName = "";
+            while (!playerName || playerName.trim() === "") {
+                playerName = prompt("Please enter your name to join the game:");
+            }
+
+            socket.on('connect', () => {
+                socket.emit('join', playerName.trim());
+            });
+
+            socket.on('debug_msg', (m) => { 
+                const w = document.getElementById('debug-window'); 
+                w.innerHTML += '<div>'+m+'</div>'; 
+                w.scrollTop = w.scrollHeight; 
+            });
+
             socket.on('update', (data) => {
                 if (data.isHost) document.getElementById('debug-window').style.display = 'block';
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
@@ -286,7 +293,8 @@ app.get('/', (req, res) => {
                     document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
                 }
                 
-                const area = document.getElementById('seats'); area.innerHTML = '';
+                const area = document.getElementById('seats'); 
+                area.innerHTML = '';
                 const container = document.querySelector('.game-container');
                 const cw = container.offsetWidth / 2;
                 const ch = container.offsetHeight / 2;
@@ -294,18 +302,18 @@ app.get('/', (req, res) => {
                     const angle = (i / data.players.length) * 2 * Math.PI + (Math.PI / 2);
                     const x = cw + (container.offsetWidth * 0.4) * Math.cos(angle);
                     const y = ch + (container.offsetHeight * 0.4) * Math.sin(angle);
-                    area.innerHTML += \`
-                        <div class="player-seat" style="left: \${x}px; top: \${y}px;">
-                            <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''}">
-                                \${p.role ? '<div class="role-circle role-'+p.role+'">'+p.role+'</div>' : ''}
-                                <div style="font-size: 1.4em;">\${p.name}</div>
-                                <div style="font-size: 1.5em; color: #2ecc71;">£\${p.chips}</div>
-                                <div style="font-size: 2.8em; margin: 10px 0;">\${p.displayCards.join(' ')}</div>
+                    area.innerHTML += `
+                        <div class="player-seat" style="left: ${x}px; top: ${y}px;">
+                            <div class="player-box ${p.id === data.activeId ? 'active-turn' : ''}">
+                                ${p.role ? '<div class="role-circle role-'+p.role+'">'+p.role+'</div>' : ''}
+                                <div style="font-size: 1.4em;">${p.name}</div>
+                                <div style="font-size: 1.5em; color: #2ecc71;">£${p.chips}</div>
+                                <div style="font-size: 2.8em; margin: 10px 0;">${p.displayCards.join(' ')}</div>
                                 <div style="font-size: 1.1em; color: #f1c40f;">
-                                    \${p.status === 'FOLDED' ? '<span style="color:red">FOLDED</span>' : 'BET: £' + p.bet}
+                                    ${p.status === 'FOLDED' ? '<span style="color:red">FOLDED</span>' : 'BET: £' + p.bet}
                                 </div>
                             </div>
-                        </div>\`;
+                        </div>`;
                 });
             });
         </script>
