@@ -187,54 +187,35 @@ app.get('/', (req, res) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
             body { background: #0a0a0a; color: white; font-family: 'Arial Black', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-            
-            #ui-bar { width: 100%; padding: 10px; font-size: 1.2em; background: #111; text-align: center; border-bottom: 3px solid #333; box-sizing: border-box; }
-            
+            #ui-bar { width: 100%; padding: 15px; font-size: 1.5em; background: #111; text-align: center; border-bottom: 3px solid #333; box-sizing: border-box; }
             .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-            
-            .poker-table { position: relative; width: 90vw; height: 60vh; max-width: 1000px; max-height: 550px; background: radial-gradient(#2d5a27, #102e10); border: 15px solid #2b1d12; border-radius: 300px; box-shadow: inset 0 0 50px #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-            
-            #community { font-size: clamp(2em, 5vw, 4em); letter-spacing: 10px; margin-bottom: 10px; }
-            #pot-display { color: #f1c40f; font-size: clamp(1.5em, 4vw, 2.5em); font-weight: 900; }
-
-            .player-seat { position: absolute; width: clamp(120px, 20vw, 200px); transition: transform 0.2s; z-index: 5; }
-            .player-box { background: rgba(0, 0, 0, 0.9); border: 3px solid #444; padding: clamp(10px, 2vw, 20px); border-radius: 15px; text-align: center; position: relative; }
-            .active-turn { border-color: #f1c40f; box-shadow: 0 0 30px #f1c40f; transform: scale(1.1); z-index: 100; }
-            
-            .role-circle { position: absolute; top: -15px; right: -15px; width: 45px; height: 45px; border-radius: 50%; line-height: 45px; font-weight: 900; color: black; font-size: 1.2em; border: 3px solid #000; box-shadow: 0 5px 10px rgba(0,0,0,0.5); }
+            .poker-table { position: relative; width: 95vw; height: 65vh; max-width: 1000px; max-height: 550px; background: radial-gradient(#2d5a27, #102e10); border: 15px solid #2b1d12; border-radius: 300px; box-shadow: inset 0 0 50px #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+            #community { font-size: 4em; letter-spacing: 15px; margin-bottom: 10px; }
+            #pot-display { color: #f1c40f; font-size: 2.5em; font-weight: 900; }
+            .player-seat { position: absolute; width: 220px; transition: transform 0.2s; z-index: 5; transform: translate(-50%, -50%); }
+            .player-box { background: rgba(0, 0, 0, 0.95); border: 4px solid #444; padding: 25px; border-radius: 20px; text-align: center; position: relative; }
+            .active-turn { border-color: #f1c40f; box-shadow: 0 0 40px #f1c40f; transform: scale(1.15); z-index: 1000; }
+            .role-circle { position: absolute; top: -25px; right: -25px; width: 60px; height: 60px; border-radius: 50%; line-height: 60px; font-weight: 900; color: black; font-size: 1.5em; border: 4px solid #000; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); z-index: 1100; }
             .role-D { background: #ffffff; }
             .role-SB { background: #3498db; color: white; }
             .role-BB { background: #f1c40f; }
-
-            .controls { width: 100%; display: none; background: #000; padding: 15px 0; border-top: 5px solid #f1c40f; box-sizing: border-box; }
-            .controls-inner { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px; }
-            
-            button { padding: 15px 25px; cursor: pointer; font-weight: 900; border-radius: 10px; border: none; font-size: clamp(1em, 2vw, 1.3em); text-transform: uppercase; }
+            .controls { width: 100%; display: none; background: #000; padding: 25px 0; border-top: 8px solid #f1c40f; box-sizing: border-box; z-index: 2000; }
+            .controls-inner { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 15px; }
+            button { padding: 20px 40px; cursor: pointer; font-weight: 900; border-radius: 15px; border: none; font-size: 1.4em; text-transform: uppercase; }
             .btn-check { background: #7f8c8d; color: white; }
             .btn-call { background: #e67e22; color: white; }
             .btn-fold { background: #c0392b; color: white; }
             .btn-raise { background: #2980b9; color: white; }
-            
-            #start-btn { position: fixed; bottom: 80px; right: 20px; padding: 20px 40px; background: #27ae60; color: white; border-radius: 15px; font-size: 1.5em; z-index: 3000; display: none; box-shadow: 0 5px #1e8449; }
-            #timer-bar { height: 6px; background: #f1c40f; width: 0%; position: absolute; top: 0; transition: width 1s linear; }
-
-            #debug-window { position: fixed; top: 0; right: 0; width: 250px; height: 100vh; background: #000; color: #0f0; font-family: monospace; font-size: 12px; overflow-y: scroll; padding: 10px; display: none; border-left: 2px solid #333; z-index: 4000; }
-
-            @media (max-width: 600px) {
-                .poker-table { border-radius: 50px; width: 95vw; height: 50vh; border-width: 8px; }
-                .player-seat { width: 110px; }
-                .role-circle { width: 30px; height: 30px; line-height: 30px; font-size: 0.8em; top: -10px; right: -10px; }
-                #ui-bar { font-size: 1em; }
-                button { padding: 10px 15px; }
-            }
+            #start-btn { position: fixed; bottom: 30px; left: 30px; padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2em; z-index: 5000; }
+            #timer-bar { height: 10px; background: #f1c40f; width: 0%; position: absolute; top: 0; transition: width 1s linear; }
+            #debug-window { position: fixed; top: 0; right: 0; width: 320px; height: 100vh; background: #000; color: #0f0; font-family: monospace; font-size: 14px; overflow-y: scroll; padding: 15px; display: none; border-left: 3px solid #222; z-index: 4000; }
         </style>
     </head>
     <body>
         <div id="ui-bar">
             BLINDS: <span id="blinds"></span> | NEXT RAISE: <span id="b-timer"></span>s
         </div>
-        <div id="debug-window"><b>SERVER LOG</b><hr></div>
-        
+        <div id="debug-window"><b>SERVER STATUS</b><hr></div>
         <div class="game-container">
             <div class="poker-table">
                 <div id="community"></div>
@@ -242,7 +223,6 @@ app.get('/', (req, res) => {
                 <div id="seats"></div>
             </div>
         </div>
-
         <div id="controls" class="controls">
             <div id="timer-bar"></div>
             <div class="controls-inner">
@@ -252,9 +232,7 @@ app.get('/', (req, res) => {
                 <button class="btn-raise" onclick="socket.emit('action', {type:'raise', amt:100})">RAISE 100</button>
             </div>
         </div>
-        
         <button id="start-btn" onclick="socket.emit('start_game')">START GAME</button>
-
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
@@ -263,12 +241,10 @@ app.get('/', (req, res) => {
                 name = prompt("Enter Player Name:");
             }
             socket.emit('join', name.trim());
-
             socket.on('debug_msg', (msg) => {
                 const win = document.getElementById('debug-window');
                 win.innerHTML += '<div>' + msg + '</div>'; win.scrollTop = win.scrollHeight;
             });
-
             socket.on('update', (data) => {
                 if (data.isHost) document.getElementById('debug-window').style.display = 'block';
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
@@ -276,7 +252,6 @@ app.get('/', (req, res) => {
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
-                
                 const isMyTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if (isMyTurn) {
@@ -284,29 +259,25 @@ app.get('/', (req, res) => {
                     document.getElementById('call-btn').style.display = data.canCall ? 'inline-block' : 'none';
                     document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
                 }
-
                 const area = document.getElementById('seats');
                 area.innerHTML = '';
-                
                 const tableRect = document.querySelector('.poker-table').getBoundingClientRect();
                 const centerX = tableRect.width / 2;
                 const centerY = tableRect.height / 2;
                 const rx = centerX * 0.9;
                 const ry = centerY * 0.9;
-
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI + (Math.PI / 2);
                     const x = centerX + rx * Math.cos(angle);
                     const y = centerY + ry * Math.sin(angle);
-                    
                     area.innerHTML += \`
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''}">
                                 \${p.role ? '<div class="role-circle role-'+p.role+'">'+p.role+'</div>' : ''}
-                                <div style="font-size: 1.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">\${p.name}</div>
-                                <div style="font-size: 1.3em; color: #2ecc71;">£\${p.chips}</div>
-                                <div style="font-size: 2em; margin: 5px 0;">\${p.displayCards.join(' ')}</div>
-                                <div style="font-size: 0.9em; color: #f1c40f; font-weight: bold;">
+                                <div style="font-size: 1.8em; margin-bottom: 5px;">\${p.name}</div>
+                                <div style="font-size: 2em; color: #2ecc71;">£\${p.chips}</div>
+                                <div style="font-size: 3.5em; margin: 15px 0;">\${p.displayCards.join(' ')}</div>
+                                <div style="font-size: 1.4em; color: #f1c40f; font-weight: bold;">
                                     \${p.status === 'FOLDED' ? '<span style="color:red">FOLDED</span>' : 'BET: £' + p.bet}
                                 </div>
                             </div>
