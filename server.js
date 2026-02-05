@@ -17,7 +17,7 @@ let community = [];
 let deck = [];
 let pot = 0;
 let currentBet = 0;
-let dealerIndex = -1; // Set to -1 until high card draw finishes
+let dealerIndex = -1; 
 let turnIndex = 0;
 let gameStage = 'LOBBY'; 
 let blindTimer = BLIND_INTERVAL;
@@ -70,6 +70,7 @@ function broadcast() {
     });
 }
 
+// Timer Interval: Logic for auto-fold removed. Only blind updates remain.
 setInterval(() => {
     if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN') return;
     if (blindTimer > 0) blindTimer--;
@@ -78,14 +79,10 @@ setInterval(() => {
         debug(`SYSTEM: Blinds increased to ${SB}/${BB}`);
     }
     if (turnTimer > 0) turnTimer--;
-    else {
-        debug(`TIMEOUT: ${players[playerOrder[turnIndex]].name} folded.`);
-        handleAction(playerOrder[turnIndex], 'fold');
-    }
 }, 1000);
 
 function pickRandomDealer() {
-    debug("HIGH CARD: Dealing to determine dealer...");
+    debug("HIGH CARD: Dealing for button...");
     let tempDeck = (function(){
         const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
         let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
@@ -96,16 +93,16 @@ function pickRandomDealer() {
     playerOrder.forEach((id, idx) => {
         let card = tempDeck.pop();
         let val = cardValues[card.slice(0,-1)];
-        debug(`DRAW: ${players[id].name} got ${card}`);
+        debug(`DRAW: ${players[id].name} - ${card}`);
         if (val > highVal) { highVal = val; winnerIdx = idx; }
     });
     dealerIndex = winnerIdx;
-    debug(`DEALER: ${players[playerOrder[dealerIndex]].name} is the button.`);
+    debug(`DEALER: ${players[playerOrder[dealerIndex]].name} starts as Button.`);
 }
 
 function startNewHand() {
     gameStage = 'PREFLOP';
-    debug("--- NEW HAND ---");
+    debug("--- DEALING NEW HAND ---");
     deck = (function(){
         const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
         let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
@@ -131,7 +128,7 @@ function startNewHand() {
 function handleAction(id, type, amount = 0) {
     if (id !== playerOrder[turnIndex] || gameStage === 'SHOWDOWN') return;
     let p = players[id];
-    debug(`ACTION: ${p.name} - ${type.toUpperCase()}`);
+    debug(`ACT: ${p.name} -> ${type.toUpperCase()}`);
 
     if (type === 'fold') { p.status = 'FOLDED'; }
     else if (type === 'call') {
@@ -154,26 +151,25 @@ function nextStep() {
 
     let allMatched = active.every(id => players[id].bet === currentBet);
     
-    // Check if the betting round is over
+    // Check if street is finished
     if (allMatched && playerOrder[turnIndex] === lastRaiser) {
         if (gameStage === 'PREFLOP') { 
             community = [deck.pop(), deck.pop(), deck.pop()]; 
             gameStage = 'FLOP';
-            debug(`FLOP: ${community.join(' ')}`);
+            debug(`STREET: FLOP ${community.join(' ')}`);
         }
         else if (gameStage === 'FLOP') { 
             community.push(deck.pop()); 
             gameStage = 'TURN';
-            debug(`TURN: ${community[3]}`);
+            debug(`STREET: TURN ${community[3]}`);
         }
         else if (gameStage === 'TURN') { 
             community.push(deck.pop()); 
             gameStage = 'RIVER';
-            debug(`RIVER: ${community[4]}`);
+            debug(`STREET: RIVER ${community[4]}`);
         }
         else if (gameStage === 'RIVER') {
-            debug("STREET: River finished. Entering showdown.");
-            return showdown();
+            return showdown(); // Hand ends immediately after river betting matched
         }
         
         // Reset betting for next street
@@ -191,7 +187,7 @@ function nextStep() {
 
 function showdown(soleWinnerId = null) {
     gameStage = 'SHOWDOWN';
-    turnIndex = -1; // Stop actions
+    turnIndex = -1; 
     let winners = [];
     if (soleWinnerId) { winners = [soleWinnerId]; } 
     else {
@@ -208,7 +204,7 @@ function showdown(soleWinnerId = null) {
     let winAmt = Math.floor(pot / winners.length);
     winners.forEach(id => {
         players[id].chips += winAmt;
-        debug(`WINNER: ${players[id].name} takes £${winAmt}`);
+        debug(`SHOWDOWN: ${players[id].name} wins £${winAmt}`);
     });
     
     setTimeout(() => {
@@ -248,7 +244,7 @@ app.get('/', (req, res) => {
     </head>
     <body>
         <div id="ui-bar">BLINDS: <span id="blinds"></span> | NEXT RAISE: <span id="b-timer"></span>s</div>
-        <div id="debug-window"><b>SERVER LOG</b><hr></div>
+        <div id="debug-window"><b>ENGINE LOG</b><hr></div>
         <div class="game-container">
             <div class="poker-table">
                 <div id="community"></div>
@@ -270,7 +266,7 @@ app.get('/', (req, res) => {
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
-            let name = prompt("Name:");
+            let name = prompt("Enter Player Name:");
             socket.emit('join', name);
             socket.on('debug_msg', (m) => { const w = document.getElementById('debug-window'); w.innerHTML += '<div>'+m+'</div>'; w.scrollTop = w.scrollHeight; });
             socket.on('update', (data) => {
@@ -280,6 +276,7 @@ app.get('/', (req, res) => {
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
+                
                 const isMyTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if (isMyTurn) {
@@ -288,13 +285,15 @@ app.get('/', (req, res) => {
                     if (data.canCall) document.getElementById('call-btn').innerText = "CALL £" + data.callAmount;
                     document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
                 }
+                
                 const area = document.getElementById('seats'); area.innerHTML = '';
-                const cw = document.querySelector('.game-container').offsetWidth / 2;
-                const ch = document.querySelector('.game-container').offsetHeight / 2;
+                const container = document.querySelector('.game-container');
+                const cw = container.offsetWidth / 2;
+                const ch = container.offsetHeight / 2;
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI + (Math.PI / 2);
-                    const x = cw + (cw * 0.8) * Math.cos(angle);
-                    const y = ch + (ch * 0.8) * Math.sin(angle);
+                    const x = cw + (container.offsetWidth * 0.4) * Math.cos(angle);
+                    const y = ch + (container.offsetHeight * 0.4) * Math.sin(angle);
                     area.innerHTML += \`
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''}">
@@ -336,4 +335,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-http.listen(PORT, () => console.log('Server running on ' + PORT));
+http.listen(PORT, () => console.log('Engine ready on ' + PORT));
