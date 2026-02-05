@@ -3,30 +3,40 @@ const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
 
-// 1. THIS HANDLES THE "NOT FOUND" ERROR
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html>
-      <body style="background: #1a472a; color: white; text-align: center; font-family: sans-serif;">
+      <body style="background: #1a472a; color: white; text-align: center; font-family: sans-serif; padding: 20px;">
         <h1>Poker Table</h1>
-        <div id="status">Connecting...</div>
-        <div id="table" style="border: 2px solid #fff; padding: 20px; margin: 20px;">
-          <div id="community">Community: Waiting...</div>
-          <div id="players"></div>
+        <div id="table" style="border: 2px solid #fff; padding: 20px; margin: 20px; border-radius: 15px;">
+          <div id="community" style="font-size: 1.5em; margin-bottom: 20px; min-height: 40px;">Waiting...</div>
+          <div id="players" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;"></div>
         </div>
-        <button onclick="socket.emit('deal')">DEAL HAND</button>
-        <button onclick="socket.emit('next')">NEXT CARDS</button>
+        <button style="padding: 15px; background: #e74c3c; color: white; border: none; cursor: pointer;" onclick="socket.emit('deal')">NEW HAND</button>
+        <button style="padding: 15px; background: #3498db; color: white; border: none; cursor: pointer;" onclick="socket.emit('next')">DEAL NEXT CARD</button>
+        
         <script src="/socket.io/socket.io.js"></script>
         <script>
           const socket = io();
           const name = prompt("Name?") || "Player";
           socket.emit('join', name);
+
           socket.on('update', (data) => {
-            document.getElementById('status').innerText = "Game Active";
-            document.getElementById('community').innerText = "Cards: " + data.community.join(' ');
-            document.getElementById('players').innerHTML = Object.values(data.players)
-              .map(p => "<div>" + p.name + ": " + p.hand.join(' ') + "</div>").join('');
+            document.getElementById('community').innerText = "Community: " + (data.community.join(' ') || "Pre-Flop");
+            
+            const playerDiv = document.getElementById('players');
+            playerDiv.innerHTML = '';
+            
+            data.players.forEach(p => {
+                const isMe = p.id === socket.id;
+                playerDiv.innerHTML += \`
+                    <div style="border: 1px solid #fff; padding: 10px; background: rgba(0,0,0,0.2); min-width: 100px;">
+                        <b style="color: \${isMe ? '#f1c40f' : '#fff'}">\${p.name} \${isMe ? '(You)' : ''}</b><br>
+                        <span style="font-size: 1.3em;">\${p.displayCards.join(' ')}</span>
+                    </div>
+                \`;
+            });
           });
         </script>
       </body>
@@ -34,32 +44,67 @@ app.get('/', (req, res) => {
   `);
 });
 
-// 2. GAME LOGIC
-let state = { players: {}, community: [] };
-let deck = ['Ah', 'Kh', 'Qh', 'Jh', '10h', '9h', '8h', '7h', '6h', '5h', '4h', '3h', '2h'];
+let players = {};
+let community = [];
+let deck = [];
+
+function shuffle() {
+    const suits = ['♥', '♦', '♣', '♠'];
+    const vals = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+    let d = [];
+    for(let s of suits) for(let v of vals) d.push(v+s);
+    return d.sort(() => Math.random() - 0.5);
+}
+
+// THE FILTER: This is how we hide cards
+function getSafeState(socketId) {
+    return {
+        community: community,
+        players: Object.keys(players).map(id => ({
+            id: id,
+            name: players[id].name,
+            // If it's your ID, show cards. Otherwise, show back of cards.
+            displayCards: (id === socketId) ? players[id].hand : (players[id].hand.length ? ['🂠', '🂠'] : [])
+        }))
+    };
+}
+
+function broadcast() {
+    io.sockets.sockets.forEach((socket) => {
+        socket.emit('update', getSafeState(socket.id));
+    });
+}
 
 io.on('connection', (socket) => {
-  socket.on('join', (name) => {
-    state.players[socket.id] = { name: name, hand: [] };
-    io.emit('update', state);
-  });
-
-  socket.on('deal', () => {
-    state.community = [];
-    Object.keys(state.players).forEach(id => {
-      state.players[id].hand = [deck[Math.floor(Math.random()*deck.length)], deck[Math.floor(Math.random()*deck.length)]];
+    socket.on('join', (name) => {
+        players[socket.id] = { name: name, hand: [] };
+        broadcast();
     });
-    io.emit('update', state);
-  });
 
-  socket.on('next', () => {
-    state.community.push(deck[Math.floor(Math.random()*deck.length)]);
-    io.emit('update', state);
-  });
+    socket.on('deal', () => {
+        deck = shuffle();
+        community = [];
+        Object.keys(players).forEach(id => {
+            players[id].hand = [deck.pop(), deck.pop()];
+        });
+        broadcast();
+    });
+
+    socket.on('next', () => {
+        // RULE: Only allow 5 cards max (Flop 3, Turn 1, River 1)
+        if (community.length === 0) {
+            community = [deck.pop(), deck.pop(), deck.pop()];
+        } else if (community.length < 5) {
+            community.push(deck.pop());
+        }
+        broadcast();
+    });
+
+    socket.on('disconnect', () => {
+        delete players[socket.id];
+        broadcast();
+    });
 });
 
-// 3. START SERVER
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-  console.log('Server is up on port', PORT);
-});
+const PORT = process.env.PORT || 10000;
+http.listen(PORT, () => console.log('Ready on port ' + PORT));
