@@ -49,6 +49,11 @@ function broadcast() {
     const bbIdx = (dealerIndex + 2) % playerOrder.length;
 
     playerOrder.forEach(id => {
+        const me = players[id];
+        // Logic for which buttons to show
+        const canCheck = (currentBet === 0) || (gameStage === 'PREFLOP' && id === playerOrder[bbIdx] && currentBet === BB && me.bet === BB);
+        const canCall = (currentBet > me.bet);
+
         io.to(id).emit('update', {
             players: playerOrder.map((pid, idx) => ({
                 id: pid, name: players[pid].name, chips: players[pid].chips, 
@@ -57,7 +62,8 @@ function broadcast() {
                 displayCards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['🂠','🂠'] : [])
             })),
             community, pot, gameStage, activeId: playerOrder[turnIndex], currentBet, SB, BB, blindTimer, turnTimer,
-            isHost: id === playerOrder[0]
+            isHost: id === playerOrder[0],
+            canCheck, canCall
         });
     });
 }
@@ -105,19 +111,22 @@ function startNewHand() {
 function handleAction(id, type, amount = 0) {
     if (id !== playerOrder[turnIndex]) return;
     let p = players[id];
-    debug(`${p.name} performs ${type}`);
 
     if (type === 'fold') {
         p.status = 'FOLDED';
+    } else if (type === 'check') {
+        debug(`${p.name} checks`);
     } else if (type === 'call') {
         let diff = currentBet - p.bet;
         p.chips -= diff; p.bet += diff; pot += diff;
+        debug(`${p.name} calls`);
     } else if (type === 'raise') {
         let raiseTotal = currentBet + amount;
         let diff = raiseTotal - p.bet;
         p.chips -= diff; p.bet += raiseTotal; pot += diff;
         currentBet = raiseTotal;
         lastRaiser = id;
+        debug(`${p.name} raises to ${currentBet}`);
     }
     
     turnTimer = TURN_TIME;
@@ -126,13 +135,8 @@ function handleAction(id, type, amount = 0) {
 
 function nextStep() {
     let active = playerOrder.filter(id => players[id].status === 'ACTIVE');
-    
-    // Check if betting round is complete
-    // All active players must have matched the current bet AND everyone must have had a chance to act
     let allMatched = active.every(id => players[id].bet === currentBet);
-    let nextPlayerIdx = (turnIndex + 1) % playerOrder.length;
     
-    // Logic for ending round: if we've circled back to the person who made the last aggressive move
     if (allMatched && playerOrder[turnIndex] === lastRaiser) {
         if (gameStage === 'PREFLOP') { community = [deck.pop(), deck.pop(), deck.pop()]; gameStage = 'FLOP'; }
         else if (gameStage === 'FLOP') { community.push(deck.pop()); gameStage = 'TURN'; }
@@ -145,7 +149,7 @@ function nextStep() {
         while(players[playerOrder[turnIndex]].status !== 'ACTIVE') turnIndex = (turnIndex + 1) % playerOrder.length;
         lastRaiser = playerOrder[(turnIndex + playerOrder.length - 1) % playerOrder.length];
     } else {
-        turnIndex = nextPlayerIdx;
+        turnIndex = (turnIndex + 1) % playerOrder.length;
         if (players[playerOrder[turnIndex]].status !== 'ACTIVE') nextStep();
     }
     broadcast();
@@ -187,6 +191,10 @@ app.get('/', (req, res) => {
             #timer-bar { height: 6px; background: #f1c40f; width: 100%; position: absolute; top: 0; }
             #start-btn { position: fixed; bottom: 20px; left: 20px; padding: 15px 30px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 600; font-weight: bold; }
             button { padding: 12px 24px; margin: 0 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; }
+            .btn-check { background: #7f8c8d; color: white; }
+            .btn-call { background: #f39c12; color: white; }
+            .btn-fold { background: #c0392b; color: white; }
+            .btn-raise { background: #2980b9; color: white; }
         </style>
     </head>
     <body>
@@ -199,9 +207,10 @@ app.get('/', (req, res) => {
         </div>
         <div id="controls" class="controls">
             <div id="timer-bar"></div>
-            <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b; color:white;">FOLD</button>
-            <button id="check-call-btn" onclick="socket.emit('action', {type:'call'})"></button>
-            <button onclick="socket.emit('action', {type:'raise', amt:50})" style="background: #2980b9; color:white;">RAISE 50</button>
+            <button class="btn-fold" onclick="socket.emit('action', {type:'fold'})">FOLD</button>
+            <button id="check-btn" class="btn-check" onclick="socket.emit('action', {type:'check'})">CHECK</button>
+            <button id="call-btn" class="btn-call" onclick="socket.emit('action', {type:'call'})">CALL</button>
+            <button class="btn-raise" onclick="socket.emit('action', {type:'raise', amt:50})">RAISE 50</button>
         </div>
         <button id="start-btn" onclick="socket.emit('start_game')">START GAME</button>
 
@@ -224,11 +233,10 @@ app.get('/', (req, res) => {
                 
                 const isMyTurn = socket.id === data.activeId;
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
+                
                 if (isMyTurn) {
-                    const me = data.players.find(p => p.id === socket.id);
-                    const btn = document.getElementById('check-call-btn');
-                    btn.innerText = (data.currentBet === me.bet) ? "CHECK" : "CALL";
-                    btn.style.background = (data.currentBet === me.bet) ? "#7f8c8d" : "#f39c12";
+                    document.getElementById('check-btn').style.display = data.canCheck ? 'inline-block' : 'none';
+                    document.getElementById('call-btn').style.display = data.canCall ? 'inline-block' : 'none';
                 }
 
                 document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
@@ -277,4 +285,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-http.listen(PORT, () => console.log('Poker Engine Ready'));
+http.listen(PORT, () => console.log('Poker Engine Complete'));
