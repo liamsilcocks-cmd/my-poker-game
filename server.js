@@ -71,19 +71,13 @@ function broadcast() {
     });
 }
 
-// RESTRICTED TIMER LOGIC
 setInterval(() => {
-    // Timer only runs during active play stages
     if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN' || dealerIndex === -1) return;
-    
-    if (blindTimer > 0) {
-        blindTimer--;
-    } else { 
-        SB *= 2; BB *= 2; 
-        blindTimer = BLIND_INTERVAL; 
+    if (blindTimer > 0) blindTimer--;
+    else { 
+        SB *= 2; BB *= 2; blindTimer = BLIND_INTERVAL; 
         debug(`SYSTEM: Blinds up to ${SB}/${BB}`);
     }
-
     if (turnTimer > 0) turnTimer--;
 }, 1000);
 
@@ -182,7 +176,12 @@ function showdown(soleWinnerId = null) {
     }
     let winAmt = Math.floor(pot / winners.length);
     winners.forEach(id => { players[id].chips += winAmt; });
-    setTimeout(() => { dealerIndex = (dealerIndex + 1) % playerOrder.length; startNewHand(); }, 5000);
+    setTimeout(() => { 
+        if(gameStage === 'SHOWDOWN') {
+            dealerIndex = (dealerIndex + 1) % playerOrder.length; 
+            startNewHand(); 
+        }
+    }, 5000);
     broadcast();
 }
 
@@ -202,7 +201,6 @@ app.get('/', (req, res) => {
             .player-seat { position: absolute; width: 220px; transform: translate(-50%, -50%); z-index: 10; }
             .player-box { background: rgba(20, 20, 20, 0.95); border: 4px solid #555; padding: 15px; border-radius: 15px; text-align: center; transition: transform 0.3s ease; }
             .is-me { background: linear-gradient(180deg, #1a2a3a 0%, #0a0a0a 100%); border-color: #3498db; }
-            
             @keyframes rainbow {
                 0% { border-color: #ff0000; box-shadow: 0 0 20px #ff0000; }
                 17% { border-color: #ff8000; box-shadow: 0 0 20px #ff8000; }
@@ -213,7 +211,6 @@ app.get('/', (req, res) => {
                 100% { border-color: #ff0000; box-shadow: 0 0 20px #ff0000; }
             }
             .active-turn { animation: rainbow 2s infinite linear; transform: scale(1.1); z-index: 100; }
-
             .role-circle { position: absolute; top: -15px; right: -15px; width: 45px; height: 45px; border-radius: 50%; line-height: 45px; font-weight: 900; color: black; font-size: 1.2em; border: 3px solid #000; background: white; text-align: center; }
             .role-SB { background: #3498db; color: white; }
             .role-BB { background: #f1c40f; }
@@ -221,7 +218,8 @@ app.get('/', (req, res) => {
             .controls-inner { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px; }
             button { padding: 15px 25px; cursor: pointer; font-weight: 900; border-radius: 10px; border: none; font-size: 1.1em; text-transform: uppercase; }
             input[type="number"] { width: 100px; padding: 15px; font-size: 1.2em; border-radius: 10px; border: 2px solid #f1c40f; background: #222; color: white; text-align: center; }
-            #start-btn { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2.5em; z-index: 9000; border: 5px solid white; display: none; }
+            #start-btn { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); padding: 40px 80px; background: #27ae60; color: white; border-radius: 20px; font-size: 2.5em; z-index: 9999; border: 8px solid white; cursor: pointer; display: none; }
+            #reset-btn { position: fixed; bottom: 20px; right: 20px; padding: 10px 20px; background: #c0392b; color: white; border-radius: 10px; font-size: 1em; z-index: 9999; border: 2px solid white; cursor: pointer; display: none; }
             #debug-window { position: fixed; top: 0; right: 0; width: 350px; height: 100vh; background: rgba(0,0,0,0.9); color: #0f0; font-family: monospace; font-size: 13px; overflow-y: scroll; padding: 15px; display: none; border-left: 2px solid #333; z-index: 5000; }
             #timer-bar { height: 8px; background: #f1c40f; width: 0%; position: absolute; top: 0; transition: width 1s linear; }
         </style>
@@ -244,20 +242,30 @@ app.get('/', (req, res) => {
             </div>
         </div>
         <button id="start-btn" onclick="socket.emit('start_game')">START TOURNAMENT</button>
+        <button id="reset-btn" onclick="if(confirm('Reset EVERYTHING and kick all players?')) socket.emit('reset_engine')">RESET ENGINE</button>
+
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
             let pName = "";
             while (!pName || pName.trim() === "") { pName = prompt("Name:"); }
             socket.on('connect', () => { socket.emit('join', pName.trim()); });
+            
+            socket.on('force_refresh', () => { location.reload(); });
+
             socket.on('debug_msg', (m) => { const w = document.getElementById('debug-window'); w.innerHTML += '<div>'+m+'</div>'; w.scrollTop = w.scrollHeight; });
             socket.on('update', (data) => {
-                if (data.isHost) document.getElementById('debug-window').style.display = 'block';
+                if (data.isHost) {
+                    document.getElementById('debug-window').style.display = 'block';
+                    document.getElementById('reset-btn').style.display = 'block';
+                }
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
                 document.getElementById('b-timer').innerText = data.gameStage === 'LOBBY' ? "--" : data.blindTimer;
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
+                
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
+                
                 const isMyTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if (isMyTurn) {
@@ -294,10 +302,42 @@ app.get('/', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-    socket.on('join', (n) => { players[socket.id] = { name: n, hand: [], chips: 0, bet: 0, status: 'LOBBY' }; playerOrder.push(socket.id); broadcast(); });
-    socket.on('start_game', () => { if (socket.id !== playerOrder[0]) return; playerOrder.forEach(id => { players[id].chips = STARTING_CHIPS; players[id].status = 'ACTIVE'; }); pickRandomDealer(); startNewHand(); });
+    socket.on('join', (n) => { 
+        players[socket.id] = { name: n, hand: [], chips: 0, bet: 0, status: 'LOBBY' }; 
+        playerOrder.push(socket.id); 
+        broadcast(); 
+    });
+
+    socket.on('reset_engine', () => {
+        if (socket.id !== playerOrder[0]) return;
+        // Wipe server state
+        players = {};
+        playerOrder = [];
+        community = [];
+        deck = [];
+        pot = 0;
+        currentBet = 0;
+        dealerIndex = -1;
+        gameStage = 'LOBBY';
+        SB = 25;
+        BB = 50;
+        blindTimer = BLIND_INTERVAL;
+        // Force all clients to refresh to clear their local state/UI
+        io.emit('force_refresh');
+    });
+
+    socket.on('start_game', () => { 
+        if (socket.id !== playerOrder[0]) return; 
+        playerOrder.forEach(id => { players[id].chips = STARTING_CHIPS; players[id].status = 'ACTIVE'; }); 
+        pickRandomDealer(); 
+        startNewHand(); 
+    });
     socket.on('action', (d) => handleAction(socket.id, d.type, d.amt));
-    socket.on('disconnect', () => { playerOrder = playerOrder.filter(id => id !== socket.id); delete players[socket.id]; broadcast(); });
+    socket.on('disconnect', () => { 
+        playerOrder = playerOrder.filter(id => id !== socket.id); 
+        delete players[socket.id]; 
+        broadcast(); 
+    });
 });
 
 const PORT = process.env.PORT || 10000;
