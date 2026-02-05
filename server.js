@@ -57,6 +57,7 @@ function broadcast() {
         const callAmount = currentBet - me.bet;
 
         io.to(id).emit('update', {
+            myId: id,
             players: playerOrder.map((pid, idx) => ({
                 id: pid, name: players[pid].name, chips: players[pid].chips, 
                 bet: players[pid].bet, status: players[pid].status,
@@ -96,7 +97,7 @@ function pickRandomDealer() {
         if (val > highVal) { highVal = val; winnerIdx = idx; }
     });
     dealerIndex = winnerIdx;
-    debug(`DEALER: ${players[playerOrder[dealerIndex]].name} wins the high card.`);
+    debug(`DEALER: ${players[playerOrder[dealerIndex]].name} wins button.`);
 }
 
 function startNewHand() {
@@ -151,21 +152,10 @@ function nextStep() {
     let allMatched = active.every(id => players[id].bet === currentBet);
     
     if (allMatched && playerOrder[turnIndex] === lastRaiser) {
-        if (gameStage === 'PREFLOP') { 
-            community = [deck.pop(), deck.pop(), deck.pop()]; 
-            gameStage = 'FLOP';
-        }
-        else if (gameStage === 'FLOP') { 
-            community.push(deck.pop()); 
-            gameStage = 'TURN';
-        }
-        else if (gameStage === 'TURN') { 
-            community.push(deck.pop()); 
-            gameStage = 'RIVER';
-        }
-        else if (gameStage === 'RIVER') {
-            return showdown(); 
-        }
+        if (gameStage === 'PREFLOP') { community = [deck.pop(), deck.pop(), deck.pop()]; gameStage = 'FLOP'; }
+        else if (gameStage === 'FLOP') { community.push(deck.pop()); gameStage = 'TURN'; }
+        else if (gameStage === 'TURN') { community.push(deck.pop()); gameStage = 'RIVER'; }
+        else if (gameStage === 'RIVER') { return showdown(); }
         
         currentBet = 0;
         playerOrder.forEach(id => players[id].bet = 0);
@@ -194,17 +184,9 @@ function showdown(soleWinnerId = null) {
             }
         });
     }
-
     let winAmt = Math.floor(pot / winners.length);
-    winners.forEach(id => {
-        players[id].chips += winAmt;
-        debug(`WIN: ${players[id].name} collected £${winAmt}`);
-    });
-    
-    setTimeout(() => {
-        dealerIndex = (dealerIndex + 1) % playerOrder.length;
-        startNewHand();
-    }, 5000);
+    winners.forEach(id => { players[id].chips += winAmt; debug(`WIN: ${players[id].name} +£${winAmt}`); });
+    setTimeout(() => { dealerIndex = (dealerIndex + 1) % playerOrder.length; startNewHand(); }, 5000);
     broadcast();
 }
 
@@ -222,8 +204,9 @@ app.get('/', (req, res) => {
             #community { font-size: 3.5em; letter-spacing: 12px; margin-bottom: 10px; }
             #pot-display { color: #f1c40f; font-size: 2.2em; font-weight: 900; }
             .player-seat { position: absolute; width: 220px; transform: translate(-50%, -50%); z-index: 10; }
-            .player-box { background: rgba(20, 20, 20, 0.95); border: 3px solid #555; padding: 15px; border-radius: 15px; text-align: center; }
-            .active-turn { border-color: #f1c40f; box-shadow: 0 0 30px #f1c40f; transform: scale(1.05); }
+            .player-box { background: rgba(20, 20, 20, 0.95); border: 3px solid #555; padding: 15px; border-radius: 15px; text-align: center; transition: all 0.3s ease; }
+            .is-me { background: linear-gradient(180deg, #1a2a3a 0%, #0a0a0a 100%); border-color: #3498db !important; box-shadow: 0 0 15px rgba(52, 152, 219, 0.3); }
+            .active-turn { border-color: #f1c40f !important; box-shadow: 0 0 30px #f1c40f !important; transform: scale(1.05); }
             .role-circle { position: absolute; top: -15px; right: -15px; width: 45px; height: 45px; border-radius: 50%; line-height: 45px; font-weight: 900; color: black; font-size: 1.2em; border: 3px solid #000; background: white; text-align: center; }
             .role-SB { background: #3498db; color: white; }
             .role-BB { background: #f1c40f; }
@@ -240,10 +223,7 @@ app.get('/', (req, res) => {
         <div id="ui-bar">BLINDS: <span id="blinds"></span> | NEXT RAISE: <span id="b-timer"></span>s</div>
         <div id="debug-window"><b>ENGINE LOG</b><hr></div>
         <div class="game-container">
-            <div class="poker-table">
-                <div id="community"></div>
-                <div id="pot-display">POT: £0</div>
-            </div>
+            <div class="poker-table"><div id="community"></div><div id="pot-display">POT: £0</div></div>
             <div id="seats"></div>
         </div>
         <div id="controls" class="controls">
@@ -260,22 +240,10 @@ app.get('/', (req, res) => {
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
-            
-            let playerName = "";
-            while (!playerName || playerName.trim() === "") {
-                playerName = prompt("Please enter your name to join the game:");
-            }
-
-            socket.on('connect', () => {
-                socket.emit('join', playerName.trim());
-            });
-
-            socket.on('debug_msg', (m) => { 
-                const w = document.getElementById('debug-window'); 
-                w.innerHTML += '<div>'+m+'</div>'; 
-                w.scrollTop = w.scrollHeight; 
-            });
-
+            let pName = "";
+            while (!pName || pName.trim() === "") { pName = prompt("Name:"); }
+            socket.on('connect', () => { socket.emit('join', pName.trim()); });
+            socket.on('debug_msg', (m) => { const w = document.getElementById('debug-window'); w.innerHTML += '<div>'+m+'</div>'; w.scrollTop = w.scrollHeight; });
             socket.on('update', (data) => {
                 if (data.isHost) document.getElementById('debug-window').style.display = 'block';
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
@@ -283,7 +251,6 @@ app.get('/', (req, res) => {
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
-                
                 const isMyTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if (isMyTurn) {
@@ -292,28 +259,25 @@ app.get('/', (req, res) => {
                     if (data.canCall) document.getElementById('call-btn').innerText = "CALL £" + data.callAmount;
                     document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
                 }
-                
-                const area = document.getElementById('seats'); 
-                area.innerHTML = '';
-                const container = document.querySelector('.game-container');
-                const cw = container.offsetWidth / 2;
-                const ch = container.offsetHeight / 2;
+                const area = document.getElementById('seats'); area.innerHTML = '';
+                const cw = document.querySelector('.game-container').offsetWidth / 2;
+                const ch = document.querySelector('.game-container').offsetHeight / 2;
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI + (Math.PI / 2);
-                    const x = cw + (container.offsetWidth * 0.4) * Math.cos(angle);
-                    const y = ch + (container.offsetHeight * 0.4) * Math.sin(angle);
-                    area.innerHTML += `
-                        <div class="player-seat" style="left: ${x}px; top: ${y}px;">
-                            <div class="player-box ${p.id === data.activeId ? 'active-turn' : ''}">
-                                ${p.role ? '<div class="role-circle role-'+p.role+'">'+p.role+'</div>' : ''}
-                                <div style="font-size: 1.4em;">${p.name}</div>
-                                <div style="font-size: 1.5em; color: #2ecc71;">£${p.chips}</div>
-                                <div style="font-size: 2.8em; margin: 10px 0;">${p.displayCards.join(' ')}</div>
-                                <div style="font-size: 1.1em; color: #f1c40f;">
-                                    ${p.status === 'FOLDED' ? '<span style="color:red">FOLDED</span>' : 'BET: £' + p.bet}
-                                </div>
+                    const x = cw + (cw * 0.8) * Math.cos(angle);
+                    const y = ch + (ch * 0.8) * Math.sin(angle);
+                    const isMeClass = p.id === data.myId ? 'is-me' : '';
+                    const activeClass = p.id === data.activeId ? 'active-turn' : '';
+                    area.innerHTML += \`
+                        <div class="player-seat" style="left: \${x}px; top: \${y}px;">
+                            <div class="player-box \${isMeClass} \${activeClass}">
+                                \${p.role ? '<div class="role-circle role-'+p.role+'">'+p.role+'</div>' : ''}
+                                <div style="font-size: 1.4em;">\${p.id === data.myId ? 'YOU' : p.name}</div>
+                                <div style="font-size: 1.5em; color: #2ecc71;">£\${p.chips}</div>
+                                <div style="font-size: 2.8em; margin: 10px 0;">\${p.displayCards.join(' ')}</div>
+                                <div style="font-size: 1.1em; color: #f1c40f;">\${p.status === 'FOLDED' ? 'FOLDED' : 'BET: £'+p.bet}</div>
                             </div>
-                        </div>`;
+                        </div>\`;
                 });
             });
         </script>
@@ -323,24 +287,11 @@ app.get('/', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-    socket.on('join', (n) => {
-        players[socket.id] = { name: n, hand: [], chips: 0, bet: 0, status: 'LOBBY' };
-        playerOrder.push(socket.id);
-        broadcast();
-    });
-    socket.on('start_game', () => {
-        if (socket.id !== playerOrder[0]) return;
-        playerOrder.forEach(id => { players[id].chips = STARTING_CHIPS; players[id].status = 'ACTIVE'; });
-        pickRandomDealer();
-        startNewHand();
-    });
+    socket.on('join', (n) => { players[socket.id] = { name: n, hand: [], chips: 0, bet: 0, status: 'LOBBY' }; playerOrder.push(socket.id); broadcast(); });
+    socket.on('start_game', () => { if (socket.id !== playerOrder[0]) return; playerOrder.forEach(id => { players[id].chips = STARTING_CHIPS; players[id].status = 'ACTIVE'; }); pickRandomDealer(); startNewHand(); });
     socket.on('action', (d) => handleAction(socket.id, d.type, d.amt));
-    socket.on('disconnect', () => {
-        playerOrder = playerOrder.filter(id => id !== socket.id);
-        delete players[socket.id];
-        broadcast();
-    });
+    socket.on('disconnect', () => { playerOrder = playerOrder.filter(id => id !== socket.id); delete players[socket.id]; broadcast(); });
 });
 
 const PORT = process.env.PORT || 10000;
-http.listen(PORT, () => console.log('Engine ready on ' + PORT));
+http.listen(PORT, () => console.log('Port: ' + PORT));
