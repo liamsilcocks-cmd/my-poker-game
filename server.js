@@ -187,7 +187,7 @@ app.get('/', (req, res) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
             body { background: #0a0a0a; color: white; font-family: 'Arial Black', sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-            #ui-bar { width: 100%; padding: 15px; font-size: 1.5em; background: #111; text-align: center; border-bottom: 3px solid #333; box-sizing: border-box; }
+            #ui-bar { width: 100%; padding: 15px; font-size: 1.5em; background: #111; text-align: center; border-bottom: 3px solid #333; box-sizing: border-box; z-index: 6000; position: relative; }
             .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
             .poker-table { position: relative; width: 95vw; height: 65vh; max-width: 1000px; max-height: 550px; background: radial-gradient(#2d5a27, #102e10); border: 15px solid #2b1d12; border-radius: 300px; box-shadow: inset 0 0 50px #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
             #community { font-size: 4em; letter-spacing: 15px; margin-bottom: 10px; }
@@ -206,7 +206,7 @@ app.get('/', (req, res) => {
             .btn-call { background: #e67e22; color: white; }
             .btn-fold { background: #c0392b; color: white; }
             .btn-raise { background: #2980b9; color: white; }
-            #start-btn { position: fixed; bottom: 30px; left: 30px; padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2em; z-index: 5000; }
+            #start-btn { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2.5em; z-index: 9000; display: none; border: 5px solid white; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
             #timer-bar { height: 10px; background: #f1c40f; width: 0%; position: absolute; top: 0; transition: width 1s linear; }
             #debug-window { position: fixed; top: 0; right: 0; width: 320px; height: 100vh; background: #000; color: #0f0; font-family: monospace; font-size: 14px; overflow-y: scroll; padding: 15px; display: none; border-left: 3px solid #222; z-index: 4000; }
         </style>
