@@ -7,7 +7,7 @@ const io = require('socket.io')(http);
 let STARTING_CHIPS = 6000;
 let SB = 25;
 let BB = 50;
-let BLIND_INTERVAL = 15; 
+let BLIND_INTERVAL = 30; // UPDATED: 30 Seconds
 let TURN_TIME = 15; 
 
 // --- STATE ---
@@ -53,6 +53,7 @@ function broadcast() {
         if (!me) return;
         const canCheck = (currentBet === 0) || (gameStage === 'PREFLOP' && id === playerOrder[bbIdx] && currentBet === BB && me.bet === BB);
         const canCall = (currentBet > me.bet);
+        const callAmount = currentBet - me.bet;
 
         io.to(id).emit('update', {
             players: playerOrder.map((pid, idx) => ({
@@ -63,7 +64,7 @@ function broadcast() {
             })),
             community, pot, gameStage, activeId: playerOrder[turnIndex], currentBet, SB, BB, blindTimer, turnTimer,
             isHost: id === playerOrder[0],
-            canCheck, canCall
+            canCheck, canCall, callAmount
         });
     });
 }
@@ -80,6 +81,31 @@ setInterval(() => {
         else handleAction(playerOrder[turnIndex], 'fold');
     }
 }, 1000);
+
+function pickRandomDealer() {
+    debug("Dealing for high card to determine Dealer...");
+    let tempDeck = (function(){
+        const suits=['♥','♦','♣','♠'], vals=Object.keys(cardValues);
+        let d=[]; for(let s of suits) for(let v of vals) d.push(v+s);
+        return d.sort(()=>Math.random()-0.5);
+    })();
+    
+    let highVal = -1;
+    let winnerIdx = 0;
+    
+    playerOrder.forEach((id, idx) => {
+        let card = tempDeck.pop();
+        let val = cardValues[card.slice(0,-1)];
+        debug(`${players[id].name} dealt ${card}`);
+        if (val > highVal) {
+            highVal = val;
+            winnerIdx = idx;
+        }
+    });
+    
+    dealerIndex = winnerIdx;
+    debug(`${players[playerOrder[dealerIndex]].name} wins high card and is Dealer.`);
+}
 
 function startNewHand() {
     gameStage = 'PREFLOP';
@@ -119,10 +145,9 @@ function handleAction(id, type, amount = 0) {
         let diff = currentBet - p.bet;
         p.chips -= diff; p.bet += diff; pot += diff;
     } else if (type === 'raise') {
-        let raiseTotal = currentBet + amount;
-        let diff = raiseTotal - p.bet;
-        p.chips -= diff; p.bet += raiseTotal; pot += diff;
-        currentBet = raiseTotal;
+        let diff = amount - p.bet;
+        p.chips -= diff; p.bet = amount; pot += diff;
+        currentBet = amount;
         lastRaiser = id;
     }
     
@@ -201,12 +226,16 @@ app.get('/', (req, res) => {
             .role-BB { background: #f1c40f; }
             .controls { width: 100%; display: none; background: #000; padding: 25px 0; border-top: 8px solid #f1c40f; box-sizing: border-box; z-index: 2000; }
             .controls-inner { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 15px; }
-            button { padding: 20px 40px; cursor: pointer; font-weight: 900; border-radius: 15px; border: none; font-size: 1.4em; text-transform: uppercase; }
+            
+            button { padding: 15px 30px; cursor: pointer; font-weight: 900; border-radius: 15px; border: none; font-size: 1.2em; text-transform: uppercase; }
+            input[type="number"] { width: 120px; padding: 15px; font-size: 1.5em; border-radius: 10px; border: 2px solid #f1c40f; background: #222; color: white; text-align: center; }
+            
             .btn-check { background: #7f8c8d; color: white; }
             .btn-call { background: #e67e22; color: white; }
             .btn-fold { background: #c0392b; color: white; }
             .btn-raise { background: #2980b9; color: white; }
-            #start-btn { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2.5em; z-index: 9000; display: none; border: 5px solid white; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+            
+            #start-btn { position: fixed; top: 120px; left: 50%; transform: translateX(-50%); padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2.5em; z-index: 9000; display: none; border: 5px solid white; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
             #timer-bar { height: 10px; background: #f1c40f; width: 0%; position: absolute; top: 0; transition: width 1s linear; }
             #debug-window { position: fixed; top: 0; right: 0; width: 320px; height: 100vh; background: #000; color: #0f0; font-family: monospace; font-size: 14px; overflow-y: scroll; padding: 15px; display: none; border-left: 3px solid #222; z-index: 4000; }
         </style>
@@ -229,10 +258,11 @@ app.get('/', (req, res) => {
                 <button class="btn-fold" onclick="socket.emit('action', {type:'fold'})">FOLD</button>
                 <button id="check-btn" class="btn-check" onclick="socket.emit('action', {type:'check'})">CHECK</button>
                 <button id="call-btn" class="btn-call" onclick="socket.emit('action', {type:'call'})">CALL</button>
-                <button class="btn-raise" onclick="socket.emit('action', {type:'raise', amt:100})">RAISE 100</button>
+                <input type="number" id="bet-amt" value="100">
+                <button class="btn-raise" onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})">RAISE TO</button>
             </div>
         </div>
-        <button id="start-btn" onclick="socket.emit('start_game')">START GAME</button>
+        <button id="start-btn" onclick="socket.emit('start_game')">START TOURNAMENT</button>
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
@@ -252,11 +282,13 @@ app.get('/', (req, res) => {
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
+                
                 const isMyTurn = socket.id === data.activeId && data.gameStage !== 'SHOWDOWN';
                 document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
                 if (isMyTurn) {
                     document.getElementById('check-btn').style.display = data.canCheck ? 'inline-block' : 'none';
                     document.getElementById('call-btn').style.display = data.canCall ? 'inline-block' : 'none';
+                    if (data.canCall) document.getElementById('call-btn').innerText = "CALL £" + data.callAmount;
                     document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
                 }
                 const area = document.getElementById('seats');
@@ -299,6 +331,7 @@ io.on('connection', (socket) => {
     socket.on('start_game', () => {
         if (socket.id !== playerOrder[0]) return;
         playerOrder.forEach(id => { players[id].chips = STARTING_CHIPS; players[id].status = 'ACTIVE'; });
+        pickRandomDealer(); // TRIGGER RANDOM DEALER
         startNewHand();
     });
     socket.on('action', (d) => handleAction(socket.id, d.type, d.amt));
