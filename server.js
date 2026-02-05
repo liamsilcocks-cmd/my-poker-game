@@ -398,7 +398,8 @@ function broadcast() {
     });
 }
 
-// Timer Loop
+// Timer Loop - DISABLED FOR DEVELOPMENT
+/*
 setInterval(() => {
     if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN') return;
     
@@ -428,6 +429,7 @@ setInterval(() => {
     
     broadcast();
 }, 1000);
+*/
 
 app.get('/', (req, res) => {
     res.send(`
@@ -438,7 +440,7 @@ app.get('/', (req, res) => {
             body { background: #050505; color: white; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
             #ui-bar { background: #111; padding: 15px; text-align: center; border-bottom: 2px solid #444; }
             .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
-            .poker-table { width: 600px; height: 300px; background: green; border: 10px solid #2b1d12; border-radius: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+            .poker-table { width: 600px; height: 300px; background: #1a5c1a; border: 10px solid #8b4513; border-radius: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
             
             .player-seat { position: absolute; width: 180px; transform: translate(-50%, -50%); }
             .player-box { background: #222; border: 3px solid #555; padding: 10px; border-radius: 10px; text-align: center; }
@@ -469,8 +471,7 @@ app.get('/', (req, res) => {
         <div id="ui-bar">
             BLINDS: <span id="blinds"></span> | 
             POT: £<span id="pot"></span> | 
-            STAGE: <span id="stage"></span> |
-            TIMER: <span id="timer"></span>s
+            STAGE: <span id="stage"></span>
         </div>
         
         <div id="host-layer">
@@ -496,8 +497,11 @@ app.get('/', (req, res) => {
         <script src="/socket.io/socket.io.js"></script>
         <script>
             const socket = io();
-            const pName = prompt("Enter your name:") || "Player";
-            socket.emit('join', pName);
+            let pName = prompt("Enter your name:");
+            while (!pName || pName.trim() === '') {
+                pName = prompt("Please enter your name:");
+            }
+            socket.emit('join', pName.trim());
 
             socket.on('force_refresh', () => location.reload());
             
@@ -511,7 +515,6 @@ app.get('/', (req, res) => {
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
                 document.getElementById('pot').innerText = data.pot;
                 document.getElementById('stage').innerText = data.gameStage;
-                document.getElementById('timer').innerText = data.turnTimer;
                 document.getElementById('community').innerText = data.community.join(' ');
 
                 // Host Controls
@@ -546,9 +549,10 @@ app.get('/', (req, res) => {
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${meClass} \${turnClass} \${statusClass}">
                                 \${dealerChip}<b>\${p.id === data.myId ? 'YOU' : p.name}</b><br>
-                                £\${p.chips} \${p.bet > 0 ? '(bet: £'+p.bet+')' : ''}<br>
+                                <span style="color: #2ecc71; font-size: 1.2em;">£\${p.chips}</span><br>
+                                \${p.bet > 0 ? '<span style="color: #e74c3c;">BET: £'+p.bet+'</span><br>' : ''}
                                 <span style="font-size:1.5em;">\${p.displayCards.join(' ')}</span><br>
-                                <small>\${p.status}</small>
+                                <small style="color: #95a5a6;">\${p.status}</small>
                             </div>
                         </div>\`;
                 });
