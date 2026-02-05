@@ -71,13 +71,19 @@ function broadcast() {
     });
 }
 
+// RESTRICTED TIMER LOGIC
 setInterval(() => {
-    if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN') return;
-    if (blindTimer > 0) blindTimer--;
-    else { 
-        SB *= 2; BB *= 2; blindTimer = BLIND_INTERVAL; 
+    // Timer only runs during active play stages
+    if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN' || dealerIndex === -1) return;
+    
+    if (blindTimer > 0) {
+        blindTimer--;
+    } else { 
+        SB *= 2; BB *= 2; 
+        blindTimer = BLIND_INTERVAL; 
         debug(`SYSTEM: Blinds up to ${SB}/${BB}`);
     }
+
     if (turnTimer > 0) turnTimer--;
 }, 1000);
 
@@ -248,7 +254,7 @@ app.get('/', (req, res) => {
             socket.on('update', (data) => {
                 if (data.isHost) document.getElementById('debug-window').style.display = 'block';
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
-                document.getElementById('b-timer').innerText = data.blindTimer;
+                document.getElementById('b-timer').innerText = data.gameStage === 'LOBBY' ? "--" : data.blindTimer;
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
