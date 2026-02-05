@@ -23,6 +23,7 @@ let gameStage = 'LOBBY';
 let blindTimer = BLIND_INTERVAL;
 let turnTimer = TURN_TIME;
 let lastRaiser = null;
+let actionCount = 0;  // Track how many players have acted this betting round
 let sidePots = [];
 
 const cardValues = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
@@ -132,6 +133,7 @@ function startNewHand() {
     gameStage = 'PREFLOP';
     turnTimer = TURN_TIME;
     lastRaiser = bbIdx;
+    actionCount = 0;  // Reset action counter for new hand
     
     broadcast();
 }
@@ -155,11 +157,19 @@ function checkBettingRoundComplete() {
         return;
     }
     
-    // Check if everyone has acted and matched the bet
-    const allMatched = activePlayers.every(id => players[id].bet === currentBet);
-    const lastRaiserActed = lastRaiser === null || turnIndex === lastRaiser;
+    if (activePlayers.length === 1) {
+        // Only one player can act, advance immediately
+        advanceStage();
+        return;
+    }
     
-    if (allMatched && lastRaiserActed) {
+    // Check if everyone has matched the current bet
+    const allMatched = activePlayers.every(id => players[id].bet === currentBet);
+    
+    // Betting round is complete when:
+    // 1. Everyone has matched the current bet AND
+    // 2. Everyone has had at least one action this round
+    if (allMatched && actionCount >= activePlayers.length) {
         advanceStage();
     } else {
         nextPlayer();
@@ -177,6 +187,7 @@ function advanceStage() {
     });
     currentBet = 0;
     lastRaiser = null;
+    actionCount = 0;  // Reset action counter for new betting round
     
     // Set turn back to left of dealer
     turnIndex = (dealerIndex + 1) % playerOrder.length;
@@ -318,6 +329,7 @@ function handleAction(socket, action) {
     }
     
     const player = players[socket.id];
+    actionCount++;  // Increment action counter
     
     if (action.type === 'fold') {
         log(player.name + ' folds');
@@ -352,6 +364,7 @@ function handleAction(socket, action) {
         player.bet = raiseTotal;
         currentBet = raiseTotal;
         lastRaiser = turnIndex;
+        actionCount = 1;  // Reset counter when someone raises - everyone else needs to act again
         
         log(player.name + ' raises to ' + raiseTotal);
         
@@ -452,7 +465,7 @@ app.get('/', (req, res) => {
             
             .dealer-chip { background: white; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 14px; }
             .sb-chip { background: #3498db; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 12px; }
-            .bb-chip { background: #e74c3c; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 12px; }
+            .bb-chip { background: #f1c40f; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 12px; }
             
             @keyframes rainbow {
                 0% { border-color: red; } 50% { border-color: lime; } 100% { border-color: red; }
