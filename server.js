@@ -151,27 +151,40 @@ function nextPlayer() {
 function checkBettingRoundComplete() {
     const activePlayers = getPlayersInHand().filter(id => players[id].status === 'ACTIVE');
     
+    log('--- CHECK BETTING ROUND ---');
+    log('Active players: ' + activePlayers.length);
+    log('Action count: ' + actionCount);
+    log('Current bet: ' + currentBet);
+    
     if (activePlayers.length === 0) {
         // Everyone all-in or folded, go to showdown
+        log('No active players, advancing');
         advanceStage();
         return;
     }
     
     if (activePlayers.length === 1) {
         // Only one player can act, advance immediately
+        log('Only 1 active player, advancing');
         advanceStage();
         return;
     }
     
     // Check if everyone has matched the current bet
     const allMatched = activePlayers.every(id => players[id].bet === currentBet);
+    log('All matched: ' + allMatched);
+    activePlayers.forEach(id => {
+        log(players[id].name + ' bet: ' + players[id].bet + ' (needs: ' + currentBet + ')');
+    });
     
     // Betting round is complete when:
     // 1. Everyone has matched the current bet AND
     // 2. Everyone has had at least one action this round
     if (allMatched && actionCount >= activePlayers.length) {
+        log('Round complete! Advancing stage');
         advanceStage();
     } else {
+        log('Round continues, next player');
         nextPlayer();
         broadcast();
     }
