@@ -186,13 +186,13 @@ app.get('/', (req, res) => {
     <head>
         <style>
             body { background: #0a0a0a; color: white; font-family: 'Arial Black', sans-serif; margin: 0; overflow: hidden; }
-            .poker-table { position: relative; width: 1000px; height: 550px; background: radial-gradient(#2d5a27, #102e10); border: 20px solid #2b1d12; border-radius: 300px; margin: 60px auto; box-shadow: inset 0 0 100px #000; }
+            .poker-table { position: relative; width: 1000px; height: 550px; background: radial-gradient(#2d5a27, #102e10); border: 20px solid #2b1d12; border-radius: 300px; margin: 80px auto; box-shadow: inset 0 0 100px #000; }
             
             .player-seat { position: absolute; width: 220px; transform: translate(-50%, -50%); transition: transform 0.2s; }
             .player-box { background: rgba(20, 20, 20, 0.95); border: 4px solid #444; padding: 25px; border-radius: 20px; text-align: center; position: relative; }
             .active-turn { border-color: #f1c40f; box-shadow: 0 0 40px #f1c40f; transform: scale(1.15); z-index: 1000; }
             
-            .role-circle { position: absolute; top: -25px; right: -25px; width: 60px; height: 60px; border-radius: 50%; line-height: 60px; font-weight: 900; color: black; font-size: 1.5em; border: 4px solid #000; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); }
+            .role-circle { position: absolute; top: -25px; right: -25px; width: 60px; height: 60px; border-radius: 50%; line-height: 60px; font-weight: 900; color: black; font-size: 1.5em; border: 4px solid #000; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8); z-index: 1100; }
             .role-D { background: #ffffff; }
             .role-SB { background: #3498db; color: white; }
             .role-BB { background: #f1c40f; }
@@ -206,12 +206,17 @@ app.get('/', (req, res) => {
             .btn-fold { background: #c0392b; color: white; }
             .btn-raise { background: #2980b9; color: white; }
             
+            #ui-bar { position: fixed; top: 0; left: 0; width: 100%; padding: 20px; font-size: 2em; background: rgba(0,0,0,0.8); z-index: 1500; text-align: center; border-bottom: 2px solid #333; }
             #pot-display { color: #f1c40f; font-size: 3em; font-weight: 900; margin-top: 30px; text-shadow: 2px 2px 10px #000; }
             #community { font-size: 4em; letter-spacing: 15px; margin-top: 180px; }
-            #start-btn { position: fixed; bottom: 30px; left: 30px; padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2em; }
+            #start-btn { position: fixed; bottom: 30px; left: 30px; padding: 30px 60px; background: #27ae60; color: white; border-radius: 20px; font-size: 2em; z-index: 3000; display: none; }
+            #timer-bar { height: 10px; background: #f1c40f; width: 100%; position: absolute; top: 0; }
         </style>
     </head>
     <body>
+        <div id="ui-bar">
+            BLINDS: <span id="blinds"></span> | NEXT RAISE: <span id="b-timer"></span>s
+        </div>
         <div id="debug-window"><b>SERVER STATUS</b><hr></div>
         <div class="poker-table">
             <div id="community"></div>
@@ -219,6 +224,7 @@ app.get('/', (req, res) => {
             <div id="seats"></div>
         </div>
         <div id="controls" class="controls">
+            <div id="timer-bar"></div>
             <button class="btn-fold" onclick="socket.emit('action', {type:'fold'})">FOLD</button>
             <button id="check-btn" class="btn-check" onclick="socket.emit('action', {type:'check'})">CHECK</button>
             <button id="call-btn" class="btn-call" onclick="socket.emit('action', {type:'call'})">CALL</button>
@@ -242,6 +248,8 @@ app.get('/', (req, res) => {
 
             socket.on('update', (data) => {
                 if (data.isHost) document.getElementById('debug-window').style.display = 'block';
+                document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
+                document.getElementById('b-timer').innerText = data.blindTimer;
                 document.getElementById('pot-display').innerText = "POT: £" + data.pot;
                 document.getElementById('community').innerText = data.community.join(' ');
                 document.getElementById('start-btn').style.display = (data.gameStage === 'LOBBY' && data.isHost) ? 'block' : 'none';
@@ -251,6 +259,7 @@ app.get('/', (req, res) => {
                 if (isMyTurn) {
                     document.getElementById('check-btn').style.display = data.canCheck ? 'inline-block' : 'none';
                     document.getElementById('call-btn').style.display = data.canCall ? 'inline-block' : 'none';
+                    document.getElementById('timer-bar').style.width = (data.turnTimer / 15 * 100) + "%";
                 }
 
                 const area = document.getElementById('seats');
@@ -298,4 +307,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 10000;
-http.listen(PORT, () => console.log('Engine Live'));
+http.listen(PORT, () => console.log('Engine Ready'));
