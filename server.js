@@ -581,12 +581,25 @@ app.get('/', (req, res) => {
             #controls button { margin: 5px; padding: 15px 30px; font-size: 16px; cursor: pointer; }
             #controls input { padding: 15px; font-size: 16px; }
             
-            #activity-log { position: fixed; bottom: 20px; left: 20px; width: 350px; height: 300px; background: rgba(0,0,0,0.85); color: #ecf0f1; font-family: monospace; padding: 10px; overflow-y: scroll; border: 2px solid #34495e; border-radius: 5px; font-size: 12px; }
+            #activity-log { position: fixed; bottom: 20px; left: 20px; width: 350px; height: 300px; background: rgba(0,0,0,0.85); color: #ecf0f1; font-family: monospace; padding: 10px; overflow-y: scroll; border: 2px solid #34495e; border-radius: 5px; font-size: 12px; z-index: 10000; }
             #activity-log .log-entry { margin: 3px 0; padding: 2px 0; border-bottom: 1px solid #2c3e50; }
             #activity-log .log-win { color: #2ecc71; font-weight: bold; }
             #activity-log .log-action { color: #3498db; }
             #activity-log .log-bet { color: #e67e22; }
             #activity-log .log-fold { color: #95a5a6; }
+            
+            #log-close-btn { position: absolute; top: 5px; right: 5px; background: #c0392b; color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; border-radius: 3px; font-size: 14px; }
+            #log-close-btn:hover { background: #e74c3c; }
+            
+            #show-log-btn { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; background: #34495e; color: white; border: 2px solid #ecf0f1; font-weight: bold; border-radius: 10px; cursor: pointer; font-size: 14px; z-index: 5000; display: none; }
+            #show-log-btn:hover { background: #2c3e50; }
+            
+            /* Mobile adjustments */
+            @media (max-width: 768px) {
+                #activity-log { display: none; }
+                #show-log-btn { display: block; }
+                #activity-log.visible { display: block; width: 90%; left: 5%; bottom: 10px; height: 400px; }
+            }
         </style>
     </head>
     <body>
@@ -619,7 +632,10 @@ app.get('/', (req, res) => {
             <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value) || 100})" style="background: #e67e22;">RAISE</button>
         </div>
         
+        <button id="show-log-btn" onclick="toggleLog()">SHOW LOG</button>
+        
         <div id="activity-log">
+            <button id="log-close-btn" onclick="toggleLog()">X</button>
             <b>ACTIVITY LOG</b>
             <hr style="margin: 5px 0;">
             <div id="log-entries"></div>
@@ -633,6 +649,12 @@ app.get('/', (req, res) => {
                 pName = prompt("Please enter your name:");
             }
             socket.emit('join', pName.trim());
+            
+            // Toggle activity log visibility (mobile-friendly)
+            function toggleLog() {
+                const log = document.getElementById('activity-log');
+                log.classList.toggle('visible');
+            }
 
             // Show start button immediately for first player
             socket.on('connect', () => {
@@ -719,7 +741,7 @@ app.get('/', (req, res) => {
                     area.innerHTML += \`
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${meClass} \${turnClass} \${statusClass}">
-                                \${chips ? chips + '<br>' : ''}<b>\${p.id === data.myId ? 'YOU' : p.name}</b><br>
+                                \${chips ? chips + '<br>' : ''}<b>\${p.id === data.myId ? 'You are: ' + p.name : p.name}</b><br>
                                 <span style="color: #2ecc71; font-size: 1.2em;">£\${p.chips}</span><br>
                                 \${p.bet > 0 ? '<span style="color: #e74c3c;">BET: £'+p.bet+'</span><br>' : ''}
                                 <span style="font-size:1.5em;">\${p.displayCards.join(' ')}</span><br>
