@@ -592,12 +592,20 @@ app.get('/', (req, res) => {
             #log-close-btn { position: absolute; top: 5px; right: 5px; background: #c0392b; color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; border-radius: 3px; font-size: 14px; }
             #log-close-btn:hover { background: #e74c3c; }
             
-            #show-log-btn { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; background: #34495e; color: white; border: 2px solid #ecf0f1; font-weight: bold; border-radius: 10px; cursor: pointer; font-size: 14px; z-index: 5000; display: block; }
+            #show-log-btn { position: fixed; top: 80px; left: 20px; padding: 10px 20px; background: #34495e; color: white; border: 2px solid #ecf0f1; font-weight: bold; border-radius: 10px; cursor: pointer; font-size: 14px; z-index: 5000; display: block; }
             #show-log-btn:hover { background: #2c3e50; }
             
             /* Mobile adjustments - make log bigger on mobile */
             @media (max-width: 768px) {
-                #activity-log.visible { width: 90%; left: 5%; bottom: 10px; height: 400px; }
+                #activity-log.visible { width: 90%; left: 5%; bottom: 10px; height: 60vh; max-height: 400px; }
+            }
+            
+            /* Mobile landscape - fix positioning */
+            @media (max-width: 768px) and (orientation: landscape) {
+                #activity-log.visible { height: 50vh; max-height: 300px; }
+                #show-log-btn { top: 60px; left: 10px; padding: 8px 15px; font-size: 12px; }
+                .player-seat { width: 140px !important; }
+                .poker-table { width: 500px; height: 250px; }
             }
         </style>
     </head>
