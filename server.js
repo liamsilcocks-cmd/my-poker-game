@@ -600,12 +600,12 @@ app.get('/', (req, res) => {
                 #activity-log.visible { width: 90%; left: 5%; bottom: 10px; height: 60vh; max-height: 400px; }
             }
             
-            /* Mobile landscape - fix positioning */
+            /* Mobile landscape - fix positioning without breaking table */
             @media (max-width: 768px) and (orientation: landscape) {
                 #activity-log.visible { height: 50vh; max-height: 300px; }
                 #show-log-btn { top: 60px; left: 10px; padding: 8px 15px; font-size: 12px; }
                 .player-seat { width: 140px !important; }
-                .poker-table { width: 500px; height: 250px; }
+                .player-box { padding: 5px; font-size: 0.9em; }
             }
         </style>
     </head>
@@ -650,23 +650,26 @@ app.get('/', (req, res) => {
 
         <script src="/socket.io/socket.io.js"></script>
         <script>
-            const socket = io();
-            let pName = prompt("Enter your name:");
-            while (!pName || pName.trim() === '') {
-                pName = prompt("Please enter your name:");
-            }
-            socket.emit('join', pName.trim());
+            let socket; // Make socket global so onclick handlers can access it
             
             // Toggle activity log visibility (mobile-friendly)
             function toggleLog() {
                 const log = document.getElementById('activity-log');
                 log.classList.toggle('visible');
             }
-
-            // Show start button immediately for first player
-            socket.on('connect', () => {
-                // Will be updated properly when server sends update
-            });
+            
+            window.onload = function() {
+                socket = io();
+                let pName = prompt("Enter your name:");
+                while (!pName || pName.trim() === '') {
+                    pName = prompt("Please enter your name:");
+                }
+                socket.emit('join', pName.trim());
+            
+                // Show start button immediately for first player
+                socket.on('connect', () => {
+                    // Will be updated properly when server sends update
+                });
 
             socket.on('force_refresh', () => location.reload());
             
@@ -757,6 +760,7 @@ app.get('/', (req, res) => {
                         </div>\`;
                 });
             });
+            }; // End of window.onload
         </script>
     </body>
     </html>
