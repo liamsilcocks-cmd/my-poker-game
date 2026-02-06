@@ -23,7 +23,7 @@ let gameStage = 'LOBBY';
 let blindTimer = BLIND_INTERVAL;
 let turnTimer = TURN_TIME;
 let lastRaiser = null;
-let actionCount = 0;  // Track how many players have acted this betting round
+let actionCount = 0; 
 let sidePots = [];
 
 const cardValues = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
@@ -69,14 +69,12 @@ function startNewHand() {
     log('=== NEW HAND ===');
     activityLog('--- NEW HAND ---', 'action');
     
-    // Reset state
     community = [];
     pot = 0;
     currentBet = 0;
     lastRaiser = null;
     sidePots = [];
     
-    // Move dealer
     const active = getActivePlayers();
     if (active.length < 2) {
         log('Not enough players, ending tournament');
@@ -90,26 +88,20 @@ function startNewHand() {
         dealerIndex = (dealerIndex + 1) % playerOrder.length;
     }
     
-    log('Dealer: ' + players[playerOrder[dealerIndex]].name);
-    
-    // Reset all players for new hand
     playerOrder.forEach(id => {
         players[id].bet = 0;
         players[id].hand = [];
+        players[id].lastAction = ""; // Clear last action
         if (players[id].status === 'ACTIVE') {
             players[id].roundBet = 0;
         }
     });
     
-    // Create and shuffle deck
     deck = createDeck();
-    
-    // Deal 2 cards to each active player
     active.forEach(id => {
         players[id].hand = [dealCard(), dealCard()];
     });
     
-    // Post blinds
     const sbIdx = (dealerIndex + 1) % playerOrder.length;
     const bbIdx = (dealerIndex + 2) % playerOrder.length;
     
@@ -121,21 +113,18 @@ function startNewHand() {
     
     sbPlayer.chips -= sbAmt;
     sbPlayer.bet = sbAmt;
+    sbPlayer.lastAction = "SB: " + sbAmt;
     pot += sbAmt;
     
     bbPlayer.chips -= bbAmt;
     bbPlayer.bet = bbAmt;
+    bbPlayer.lastAction = "BB: " + bbAmt;
     pot += bbAmt;
     currentBet = bbAmt;
     
     if (sbPlayer.chips === 0) sbPlayer.status = 'ALL_IN';
     if (bbPlayer.chips === 0) bbPlayer.status = 'ALL_IN';
     
-    log('SB: ' + sbPlayer.name + ' posts ' + sbAmt);
-    log('BB: ' + bbPlayer.name + ' posts ' + bbAmt);
-    activityLog('Blinds: ' + sbPlayer.name + ' (£' + sbAmt + ') / ' + bbPlayer.name + ' (£' + bbAmt + ')', 'bet');
-    
-    // Set first action to left of BB
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     while (players[playerOrder[turnIndex]].status !== 'ACTIVE') {
         turnIndex = (turnIndex + 1) % playerOrder.length;
@@ -144,7 +133,7 @@ function startNewHand() {
     gameStage = 'PREFLOP';
     turnTimer = TURN_TIME;
     lastRaiser = bbIdx;
-    actionCount = 0;  // Reset action counter for new hand
+    actionCount = 0; 
     
     broadcast();
 }
@@ -153,7 +142,7 @@ function nextPlayer() {
     const initialTurn = turnIndex;
     do {
         turnIndex = (turnIndex + 1) % playerOrder.length;
-        if (turnIndex === initialTurn) break; // Prevent infinite loop
+        if (turnIndex === initialTurn) break;
     } while (players[playerOrder[turnIndex]].status !== 'ACTIVE');
     
     turnTimer = TURN_TIME;
@@ -162,58 +151,31 @@ function nextPlayer() {
 function checkBettingRoundComplete() {
     const activePlayers = getPlayersInHand().filter(id => players[id].status === 'ACTIVE');
     
-    log('--- CHECK BETTING ROUND ---');
-    log('Active players: ' + activePlayers.length);
-    log('Action count: ' + actionCount);
-    log('Current bet: ' + currentBet);
-    
-    if (activePlayers.length === 0) {
-        // Everyone all-in or folded, go to showdown
-        log('No active players, advancing');
+    if (activePlayers.length === 0 || activePlayers.length === 1) {
         advanceStage();
         return;
     }
     
-    if (activePlayers.length === 1) {
-        // Only one player can act, advance immediately
-        log('Only 1 active player, advancing');
-        advanceStage();
-        return;
-    }
-    
-    // Check if everyone has matched the current bet
     const allMatched = activePlayers.every(id => players[id].bet === currentBet);
-    log('All matched: ' + allMatched);
-    activePlayers.forEach(id => {
-        log(players[id].name + ' bet: ' + players[id].bet + ' (needs: ' + currentBet + ')');
-    });
     
-    // Betting round is complete when:
-    // 1. Everyone has matched the current bet AND
-    // 2. Everyone has had at least one action this round
     if (allMatched && actionCount >= activePlayers.length) {
-        log('Round complete! Advancing stage');
         advanceStage();
     } else {
-        log('Round continues, next player');
         nextPlayer();
         broadcast();
     }
 }
 
 function advanceStage() {
-    log('Advancing from ' + gameStage);
-    
-    // Move bets to pot
     playerOrder.forEach(id => {
         pot += players[id].bet;
         players[id].bet = 0;
+        players[id].lastAction = ""; // Reset labels for next street
     });
     currentBet = 0;
     lastRaiser = null;
-    actionCount = 0;  // Reset action counter for new betting round
+    actionCount = 0; 
     
-    // Set turn back to left of dealer
     turnIndex = (dealerIndex + 1) % playerOrder.length;
     while (players[playerOrder[turnIndex]].status !== 'ACTIVE') {
         turnIndex = (turnIndex + 1) % playerOrder.length;
@@ -222,38 +184,23 @@ function advanceStage() {
     const playersInHand = getPlayersInHand();
     
     if (playersInHand.length === 1) {
-        // Only one player left, they win
         const winner = playersInHand[0];
         players[winner].chips += pot;
-        log(players[winner].name + ' wins ' + pot);
         pot = 0;
-        
-        setTimeout(() => {
-            startNewHand();
-        }, 3000);
+        setTimeout(() => { startNewHand(); }, 3000);
         return;
     }
     
     if (gameStage === 'PREFLOP') {
-        // Deal flop
         community = [dealCard(), dealCard(), dealCard()];
         gameStage = 'FLOP';
-        log('FLOP: ' + community.join(' '));
-        activityLog('FLOP: ' + community.join(' '), 'action');
     } else if (gameStage === 'FLOP') {
-        // Deal turn
         community.push(dealCard());
         gameStage = 'TURN';
-        log('TURN: ' + community[3]);
-        activityLog('TURN: ' + community[3], 'action');
     } else if (gameStage === 'TURN') {
-        // Deal river
         community.push(dealCard());
         gameStage = 'RIVER';
-        log('RIVER: ' + community[4]);
-        activityLog('RIVER: ' + community[4], 'action');
     } else if (gameStage === 'RIVER') {
-        // Showdown
         gameStage = 'SHOWDOWN';
         performShowdown();
         return;
@@ -264,18 +211,12 @@ function advanceStage() {
 }
 
 function performShowdown() {
-    log('=== SHOWDOWN ===');
-    
     const playersInHand = getPlayersInHand();
     let winners = [];
     let bestScore = -1;
     
     playersInHand.forEach(id => {
         const score = evaluateHand(players[id].hand, community);
-        const highCardName = score.highCard ? getCardName(score.highCard) : '';
-        const handDesc = highCardName ? score.name + ' (' + highCardName + ' high)' : score.name;
-        log(players[id].name + ': ' + handDesc + ' (score: ' + score.rank + ')');
-        
         if (score.rank > bestScore) {
             bestScore = score.rank;
             winners = [id];
@@ -287,185 +228,92 @@ function performShowdown() {
     const winAmt = Math.floor(pot / winners.length);
     winners.forEach(id => {
         players[id].chips += winAmt;
-        const score = evaluateHand(players[id].hand, community);
-        const highCardName = score.highCard ? getCardName(score.highCard) : '';
-        const handDesc = highCardName ? score.name + ' (' + highCardName + ' high)' : score.name;
-        log(players[id].name + ' wins ' + winAmt);
-        activityLog(players[id].name + ' wins £' + winAmt + ' with ' + handDesc, 'win');
+        players[id].lastAction = "WINNER";
     });
     
     pot = 0;
-    
-    // Eliminate broke players
     playerOrder.forEach(id => {
-        if (players[id].chips === 0) {
-            players[id].status = 'ELIMINATED';
-            log(players[id].name + ' ELIMINATED');
-        }
+        if (players[id].chips === 0) players[id].status = 'ELIMINATED';
     });
     
     gameStage = 'SHOWDOWN';
     broadcast();
-    
-    // Don't auto-start next hand - wait for host to click CONTINUE
 }
 
 function evaluateHand(hand, board) {
     const cards = [...hand, ...board];
     const counts = {};
     const suitCounts = {};
-    
     cards.forEach(c => {
         const rank = c.slice(0, -1);
         const suit = c.slice(-1);
         counts[rank] = (counts[rank] || 0) + 1;
         suitCounts[suit] = (suitCounts[suit] || 0) + 1;
     });
-    
     const values = cards.map(c => cardValues[c.slice(0, -1)]).sort((a, b) => b - a);
     const uniqueValues = [...new Set(values)].sort((a, b) => b - a);
     const isFlush = Object.values(suitCounts).some(c => c >= 5);
     const straightInfo = checkStraight(values);
     const isStraight = straightInfo.isStraight;
     const straightHigh = straightInfo.highCard;
-    
     const pairs = Object.entries(counts).filter(([k,v]) => v === 2).map(([k,v]) => cardValues[k]).sort((a,b) => b-a);
     const trips = Object.entries(counts).filter(([k,v]) => v === 3).map(([k,v]) => cardValues[k]).sort((a,b) => b-a);
     const quads = Object.entries(counts).filter(([k,v]) => v === 4).map(([k,v]) => cardValues[k]).sort((a,b) => b-a);
     
-    // Get kickers (cards not used in the main hand)
-    const getKickers = (usedValues, count = 5) => {
-        return uniqueValues.filter(v => !usedValues.includes(v)).slice(0, count);
-    };
-    
-    if (isFlush && isStraight) {
-        return { rank: 8000000 + straightHigh, name: 'Straight Flush', highCard: straightHigh };
-    }
-    if (quads.length > 0) {
-        const kicker = getKickers(quads, 1)[0] || 0;
-        return { rank: 7000000 + quads[0] * 100 + kicker, name: 'Four of a Kind', highCard: quads[0] };
-    }
-    if (trips.length > 0 && pairs.length > 0) {
-        return { rank: 6000000 + trips[0] * 100 + pairs[0], name: 'Full House', highCard: trips[0] };
-    }
-    if (isFlush) {
-        const flushCards = uniqueValues.slice(0, 5);
-        const score = flushCards.reduce((acc, v, i) => acc + v * Math.pow(100, 4-i), 0);
-        return { rank: 5000000 + score, name: 'Flush', highCard: flushCards[0] };
-    }
-    if (isStraight) {
-        return { rank: 4000000 + straightHigh, name: 'Straight', highCard: straightHigh };
-    }
-    if (trips.length > 0) {
-        const kickers = getKickers(trips, 2);
-        const kickerScore = (kickers[0] || 0) * 100 + (kickers[1] || 0);
-        return { rank: 3000000 + trips[0] * 10000 + kickerScore, name: 'Three of a Kind', highCard: trips[0] };
-    }
-    if (pairs.length >= 2) {
-        const kicker = getKickers(pairs.slice(0,2), 1)[0] || 0;
-        return { rank: 2000000 + pairs[0] * 10000 + pairs[1] * 100 + kicker, name: 'Two Pair', highCard: pairs[0] };
-    }
-    if (pairs.length === 1) {
-        const kickers = getKickers(pairs, 3);
-        const kickerScore = (kickers[0] || 0) * 10000 + (kickers[1] || 0) * 100 + (kickers[2] || 0);
-        return { rank: 1000000 + pairs[0] * 100000 + kickerScore, name: 'Pair', highCard: pairs[0] };
-    }
-    
-    // High card
-    const topFive = uniqueValues.slice(0, 5);
-    const score = topFive.reduce((acc, v, i) => acc + v * Math.pow(100, 4-i), 0);
-    return { rank: score, name: 'High Card', highCard: topFive[0] };
+    const getKickers = (usedValues, count = 5) => uniqueValues.filter(v => !usedValues.includes(v)).slice(0, count);
+
+    if (isFlush && isStraight) return { rank: 8000000 + straightHigh, name: 'Straight Flush' };
+    if (quads.length > 0) return { rank: 7000000 + quads[0] * 100, name: 'Four of a Kind' };
+    if (trips.length > 0 && pairs.length > 0) return { rank: 6000000 + trips[0] * 100 + pairs[0], name: 'Full House' };
+    if (isFlush) return { rank: 5000000 + uniqueValues[0], name: 'Flush' };
+    if (isStraight) return { rank: 4000000 + straightHigh, name: 'Straight' };
+    if (trips.length > 0) return { rank: 3000000 + trips[0], name: 'Three of a Kind' };
+    if (pairs.length >= 2) return { rank: 2000000 + pairs[0] * 100 + pairs[1], name: 'Two Pair' };
+    if (pairs.length === 1) return { rank: 1000000 + pairs[0], name: 'Pair' };
+    return { rank: values[0], name: 'High Card' };
 }
 
 function checkStraight(values) {
     const unique = [...new Set(values)].sort((a, b) => b - a);
-    
-    // Check for regular straights (5 consecutive cards)
     for (let i = 0; i < unique.length - 4; i++) {
-        if (unique[i] - unique[i + 4] === 4) {
-            return { isStraight: true, highCard: unique[i] };
-        }
+        if (unique[i] - unique[i + 4] === 4) return { isStraight: true, highCard: unique[i] };
     }
-    
-    // Check for A-2-3-4-5 (wheel/bicycle)
     if (unique.includes(14) && unique.includes(5) && unique.includes(4) && unique.includes(3) && unique.includes(2)) {
-        return { isStraight: true, highCard: 5 }; // In A-2-3-4-5, the 5 is the high card
+        return { isStraight: true, highCard: 5 };
     }
-    
     return { isStraight: false, highCard: 0 };
 }
 
 function handleAction(socket, action) {
-    log('ACTION received: ' + action.type + ' from socket: ' + socket.id);
-    log('Current gameStage: ' + gameStage);
-    log('Current turnIndex: ' + turnIndex);
-    log('Player at turnIndex: ' + (playerOrder[turnIndex] || 'NONE'));
-    log('Is it their turn? ' + (playerOrder[turnIndex] === socket.id));
-    
-    if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN' || gameStage === 'DEALER_SELECTION') {
-        log('Game not active, ignoring action');
-        return;
-    }
-    
-    if (playerOrder[turnIndex] !== socket.id) {
-        log('Not your turn! Current turn: ' + players[playerOrder[turnIndex]].name);
-        return;
-    }
+    if (['LOBBY', 'SHOWDOWN'].includes(gameStage)) return;
+    if (playerOrder[turnIndex] !== socket.id) return;
     
     const player = players[socket.id];
-    actionCount++;  // Increment action counter
+    actionCount++; 
     
     if (action.type === 'fold') {
-        log(player.name + ' folds');
-        activityLog(player.name + ' folds', 'fold');
         player.status = 'FOLDED';
         player.hand = [];
+        player.lastAction = "FOLD";
         checkBettingRoundComplete();
-        
     } else if (action.type === 'call') {
         const callAmt = Math.min(currentBet - player.bet, player.chips);
         player.chips -= callAmt;
         player.bet += callAmt;
-        log(player.name + ' calls ' + callAmt + ' (total bet: ' + player.bet + ')');
-        if (callAmt === 0) {
-            activityLog(player.name + ' checks', 'action');
-        } else {
-            activityLog(player.name + ' calls £' + callAmt, 'action');
-        }
-        
-        if (player.chips === 0) {
-            player.status = 'ALL_IN';
-            log(player.name + ' is ALL IN');
-            activityLog(player.name + ' is ALL IN!', 'bet');
-        }
-        
+        player.lastAction = (callAmt === 0 && currentBet === 0) ? "CHECK" : "CALL " + callAmt;
+        if (player.chips === 0) player.status = 'ALL_IN';
         checkBettingRoundComplete();
-        
     } else if (action.type === 'raise') {
         const raiseTotal = Math.min(action.amt, player.chips + player.bet);
         const raiseAmt = raiseTotal - player.bet;
-        
-        if (raiseTotal <= currentBet) {
-            log('Raise must be higher than current bet');
-            broadcast();
-            return;
-        }
-        
+        if (raiseTotal <= currentBet) return;
         player.chips -= raiseAmt;
         player.bet = raiseTotal;
         currentBet = raiseTotal;
+        player.lastAction = "RAISE " + raiseTotal;
         lastRaiser = turnIndex;
-        actionCount = 1;  // Reset counter when someone raises - everyone else needs to act again
-        
-        log(player.name + ' raises to ' + raiseTotal);
-        activityLog(player.name + ' raises to £' + raiseTotal, 'bet');
-        
-        if (player.chips === 0) {
-            player.status = 'ALL_IN';
-            log(player.name + ' is ALL IN');
-            activityLog(player.name + ' is ALL IN!', 'bet');
-        }
-        
+        actionCount = 1; 
+        if (player.chips === 0) player.status = 'ALL_IN';
         checkBettingRoundComplete();
     }
 }
@@ -474,73 +322,41 @@ function broadcast() {
     playerOrder.forEach((id) => {
         const me = players[id];
         if (!me) return;
-        
-        const isHost = (id === playerOrder[0]);
-        
-        // Calculate SB and BB positions
         const sbIdx = dealerIndex >= 0 ? (dealerIndex + 1) % playerOrder.length : -1;
         const bbIdx = dealerIndex >= 0 ? (dealerIndex + 2) % playerOrder.length : -1;
 
         io.to(id).emit('update', {
             myId: id,
-            isHost: isHost,
+            isHost: (id === playerOrder[0]),
             players: playerOrder.map((pid, idx) => ({
                 id: pid, 
                 name: players[pid].name, 
                 chips: players[pid].chips, 
                 bet: players[pid].bet, 
                 status: players[pid].status,
+                lastAction: players[pid].lastAction || "",
                 isDealer: idx === dealerIndex,
                 isSB: idx === sbIdx,
                 isBB: idx === bbIdx,
                 displayCards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['🂠','🂠'] : [])
             })),
-            community, 
-            pot, 
-            gameStage, 
-            activeId: playerOrder[turnIndex], 
-            currentBet, 
-            SB, 
-            BB, 
-            blindTimer, 
-            turnTimer,
+            community, pot, gameStage, activeId: playerOrder[turnIndex], currentBet, SB, BB, blindTimer, turnTimer,
             callAmount: Math.min(currentBet - me.bet, me.chips)
         });
     });
 }
 
-// Timer Loop - DISABLED FOR DEVELOPMENT
-/*
-setInterval(() => {
-    if (gameStage === 'LOBBY' || gameStage === 'SHOWDOWN') return;
-    
-    if (blindTimer > 0) {
-        blindTimer--;
-        if (blindTimer === 0) {
-            SB *= 2;
-            BB *= 2;
-            blindTimer = BLIND_INTERVAL;
-            log('BLINDS INCREASED: ' + SB + '/' + BB);
-        }
-    }
-    
-    if (turnTimer > 0) {
-        turnTimer--;
-        if (turnTimer === 0) {
-            // Auto-fold on timeout
-            const currentPlayer = players[playerOrder[turnIndex]];
-            if (currentPlayer && currentPlayer.status === 'ACTIVE') {
-                log(currentPlayer.name + ' timed out - auto fold');
-                currentPlayer.status = 'FOLDED';
-                currentPlayer.hand = [];
-                checkBettingRoundComplete();
-            }
-        }
-    }
-    
-    broadcast();
-}, 1000);
-*/
+io.on('connection', (socket) => {
+    socket.on('join', (name) => {
+        players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', lastAction: "" };
+        if (!playerOrder.includes(socket.id)) playerOrder.push(socket.id);
+        broadcast();
+    });
+    socket.on('start_game', () => { if(playerOrder[0] === socket.id) startNewHand(); });
+    socket.on('next_hand', () => { if(playerOrder[0] === socket.id) startNewHand(); });
+    socket.on('action', (data) => handleAction(socket, data));
+    socket.on('disconnect', () => { delete players[socket.id]; playerOrder = playerOrder.filter(id => id !== socket.id); broadcast(); });
+});
 
 app.get('/', (req, res) => {
     res.send(`
@@ -548,339 +364,136 @@ app.get('/', (req, res) => {
     <html>
     <head>
         <title>SYFM Poker</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
             body { background: #050505; color: white; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-            #title { font-size: 2.5em; font-weight: bold; color: #f1c40f; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 10px 0; text-align: center; background: #111; padding: 15px; border-bottom: 2px solid #444; }
-            #ui-bar { background: #111; padding: 15px; text-align: center; border-bottom: 2px solid #444; }
-            .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
-            .poker-table { width: 600px; height: 300px; background: #1a5c1a; border: 10px solid #8b4513; border-radius: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
             
-            #table-info { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 8px 20px; border-radius: 10px; font-size: 0.9em; white-space: nowrap; }
-            
-            .player-seat { position: absolute; width: 180px; transform: translate(-50%, -50%); }
-            .player-box { background: #222; border: 3px solid #555; padding: 10px; border-radius: 10px; text-align: center; position: relative; }
-            
-            .dealer-chip { background: white; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); }
-            .sb-chip { background: #3498db; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; position: absolute; top: -12px; left: 20%; }
-            .bb-chip { background: #f1c40f; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; position: absolute; top: -12px; right: 20%; }
-            
-            @keyframes rainbow {
-                0% { border-color: red; } 50% { border-color: lime; } 100% { border-color: red; }
-            }
-            .is-me { animation: rainbow 2s infinite linear; }
-            
-            .active-turn { border: 5px solid #f1c40f !important; box-shadow: 0 0 20px #f1c40f; }
-            .folded { opacity: 0.3; }
-            .all-in { border-color: red !important; }
+            #header-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 15px; background: #111; border-bottom: 1px solid #333; }
+            #title { font-size: 1.2em; font-weight: bold; color: #f1c40f; }
+            #ui-bar { font-size: 0.8em; color: #ccc; }
 
-            #host-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
-            .host-btn { pointer-events: auto; cursor: pointer; border: 3px solid white; font-weight: bold; border-radius: 10px; }
-            #start-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background: #27ae60; color: white; font-size: 2em; display: none; box-shadow: 0 0 30px rgba(39, 174, 96, 0.8); }
-            #reset-btn { position: absolute; bottom: 100px; right: 20px; padding: 10px 20px; background: #c0392b; color: white; display: none; }
-            #debug-window { position: absolute; top: 70px; right: 20px; width: 300px; height: 200px; background: rgba(0,0,0,0.9); color: lime; font-family: monospace; padding: 10px; overflow-y: scroll; display: none; font-size: 11px; border: 1px solid #333; white-space: pre-wrap; word-wrap: break-word; }
+            .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+            .poker-table { width: 550px; height: 260px; background: #1a5c1a; border: 8px solid #5d2e0c; border-radius: 130px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; box-shadow: inset 0 0 50px rgba(0,0,0,0.5); }
             
-            #controls { background: #111; padding: 20px; display: none; border-top: 3px solid #f1c40f; text-align: center; }
-            #controls button { margin: 5px; padding: 15px 30px; font-size: 16px; cursor: pointer; }
-            #controls input { padding: 15px; font-size: 16px; }
+            #community { font-size: 2.5em; letter-spacing: 5px; }
+
+            .player-seat { position: absolute; width: 130px; transform: translate(-50%, -50%); z-index: 10; }
+            .player-box { background: #222; border: 2px solid #444; padding: 5px; border-radius: 8px; text-align: center; font-size: 0.8em; }
             
-            #activity-log { position: fixed; bottom: 20px; left: 20px; width: 350px; height: 300px; background: rgba(0,0,0,0.85); color: #ecf0f1; font-family: monospace; padding: 10px; overflow-y: scroll; border: 2px solid #34495e; border-radius: 5px; font-size: 12px; z-index: 10000; display: none; }
-            #activity-log.visible { display: block; }
-            #activity-log .log-entry { margin: 3px 0; padding: 2px 0; border-bottom: 1px solid #2c3e50; }
-            #activity-log .log-win { color: #2ecc71; font-weight: bold; }
-            #activity-log .log-action { color: #3498db; }
-            #activity-log .log-bet { color: #e67e22; }
-            #activity-log .log-fold { color: #95a5a6; }
-            
-            #log-close-btn { position: absolute; top: 5px; right: 5px; background: #c0392b; color: white; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; border-radius: 3px; font-size: 14px; }
-            #log-close-btn:hover { background: #e74c3c; }
-            
-            #show-log-btn { position: fixed; top: 80px; left: 20px; padding: 10px 20px; background: #34495e; color: white; border: 2px solid #ecf0f1; font-weight: bold; border-radius: 10px; cursor: pointer; font-size: 14px; z-index: 5000; display: block; }
-            #show-log-btn:hover { background: #2c3e50; }
-            
-            /* Mobile adjustments - make log bigger on mobile */
-            @media (max-width: 768px) {
-                #activity-log.visible { width: 90%; left: 5%; bottom: 10px; height: 60vh; max-height: 400px; }
-            }
-            
-            /* Mobile landscape - major layout fixes */
-            @media (max-width: 768px) and (orientation: landscape) {
-                #title { font-size: 1.5em; padding: 8px; margin: 0; }
-                #ui-bar { display: none; } /* Hide top bar, info now in table */
-                #activity-log.visible { height: 50vh; max-height: 300px; }
-                #show-log-btn { top: 10px; left: 10px; padding: 6px 12px; font-size: 11px; }
-                
-                .poker-table { width: 500px; height: 250px; border-radius: 125px; }
-                #table-info { top: 15px; font-size: 0.75em; padding: 5px 15px; }
-                
-                .player-seat { width: 120px !important; }
-                .player-box { padding: 5px; font-size: 0.75em; }
-                .player-box b { font-size: 0.9em; }
-                .player-box span { font-size: 0.85em !important; }
-                .player-box small { font-size: 0.7em !important; }
-                
-                .dealer-chip, .sb-chip, .bb-chip { width: 20px; height: 20px; font-size: 11px; }
-                
-                #controls { padding: 10px; }
-                #controls button { padding: 10px 15px; font-size: 13px; margin: 2px; }
-                #controls input { padding: 10px; font-size: 13px; width: 80px; }
-                
-                #host-layer #start-btn { font-size: 1.3em; padding: 20px 40px; }
-                #host-layer #reset-btn { bottom: 60px; right: 10px; padding: 8px 15px; font-size: 13px; }
-                #host-layer #continue-btn { font-size: 1.2em; padding: 15px 35px; }
+            /* Action text inside the table */
+            .action-label { position: absolute; color: #f1c40f; font-weight: bold; font-size: 0.85em; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+
+            .active-turn { border-color: #f1c40f !important; box-shadow: 0 0 10px #f1c40f; }
+            .folded { opacity: 0.4; }
+
+            #controls { background: #111; padding: 10px; border-top: 2px solid #f1c40f; text-align: center; z-index: 100; }
+            #controls button { margin: 2px; padding: 12px 20px; font-size: 14px; cursor: pointer; color: white; border: none; border-radius: 5px; font-weight: bold; }
+            #controls input { padding: 10px; width: 70px; }
+
+            @media (orientation: landscape) {
+                .game-container { align-items: flex-start; padding-top: 20px; } /* Move table up */
+                .poker-table { width: 480px; height: 200px; }
+                .player-seat { width: 100px; }
+                .player-box { font-size: 0.7em; }
+                #controls { padding: 5px; }
+                #controls button { padding: 8px 15px; font-size: 12px; }
             }
         </style>
     </head>
     <body>
-        <div id="title">SYFM POKER</div>
-        
-        <div id="ui-bar">
-            BLINDS: <span id="blinds"></span> | 
-            POT: £<span id="pot"></span> | 
-            STAGE: <span id="stage"></span>
+        <div id="header-row">
+            <div id="title">SYFM POKER</div>
+            <div id="ui-bar">
+                BLINDS: <span id="blinds">--</span> | 
+                POT: £<span id="pot">0</span> | 
+                STAGE: <span id="stage">LOBBY</span>
+            </div>
         </div>
         
-        <div id="host-layer">
-            <button id="start-btn" class="host-btn" onclick="socket.emit('start_game')">START TOURNAMENT</button>
-            <button id="continue-btn" class="host-btn" onclick="socket.emit('next_hand')" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 20px 50px; background: #27ae60; color: white; font-size: 1.5em; display: none; box-shadow: 0 0 30px rgba(39, 174, 96, 0.8); border-radius: 10px;">CONTINUE</button>
-            <button id="reset-btn" class="host-btn" onclick="socket.emit('reset_engine')">RESET ENGINE</button>
-            <div id="debug-window"><b>ENGINE LOG</b><hr></div>
-        </div>
-
         <div class="game-container">
             <div class="poker-table">
-                <div id="table-info">
-                    BLINDS: <span id="blinds2"></span> | POT: £<span id="pot2"></span> | STAGE: <span id="stage2"></span>
-                </div>
-                <div id="community" style="font-size: 3em; margin-top: 30px;"></div>
+                <div id="community"></div>
             </div>
             <div id="seats"></div>
         </div>
 
-        <div id="controls">
+        <div id="controls" style="display:none;">
             <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
-            <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;"></button>
-            <input type="number" id="bet-amt" placeholder="Amount" style="width: 100px;">
-            <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value) || 100})" style="background: #e67e22;">RAISE</button>
+            <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;">CHECK/CALL</button>
+            <input type="number" id="bet-amt" value="100">
+            <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
         </div>
-        
-        <button id="show-log-btn" onclick="toggleLog()">SHOW LOG</button>
-        
-        <div id="activity-log">
-            <button id="log-close-btn" onclick="toggleLog()">X</button>
-            <b>ACTIVITY LOG</b>
-            <hr style="margin: 5px 0;">
-            <div id="log-entries"></div>
-        </div>
+
+        <button id="start-btn" onclick="socket.emit('start_game')" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; background:green; color:white; display:none;">START TOURNAMENT</button>
 
         <script src="/socket.io/socket.io.js"></script>
         <script>
-            let socket; // Make socket global so onclick handlers can access it
+            let socket = io();
+            let myId = "";
             
-            // Toggle activity log visibility (mobile-friendly)
-            function toggleLog() {
-                const log = document.getElementById('activity-log');
-                log.classList.toggle('visible');
-            }
-            
-            window.onload = function() {
-                socket = io();
-                let pName = prompt("Enter your name:");
-                while (!pName || pName.trim() === '') {
-                    pName = prompt("Please enter your name:");
-                }
-                socket.emit('join', pName.trim());
-            
-                // Show start button immediately for first player
-                socket.on('connect', () => {
-                    // Will be updated properly when server sends update
-                });
-
-            socket.on('force_refresh', () => location.reload());
-            
-            socket.on('debug_msg', m => {
-                const d = document.getElementById('debug-window');
-                d.innerHTML += '<div>' + new Date().toLocaleTimeString() + ' - ' + m + '</div>';
-                d.scrollTop = d.scrollHeight;
-            });
-            
-            socket.on('activity_log', data => {
-                const logDiv = document.getElementById('log-entries');
-                const entry = document.createElement('div');
-                entry.className = 'log-entry log-' + data.type;
-                entry.textContent = data.msg;
-                logDiv.appendChild(entry);
-                
-                // Auto-scroll to bottom
-                const activityLog = document.getElementById('activity-log');
-                activityLog.scrollTop = activityLog.scrollHeight;
-                
-                // Keep only last 50 entries
-                while (logDiv.children.length > 50) {
-                    logDiv.removeChild(logDiv.firstChild);
-                }
-            });
+            window.onload = () => {
+                let name = prompt("Name:");
+                socket.emit('join', name || "Guest");
+            };
 
             socket.on('update', data => {
-                console.log('Update received:', {
-                    isHost: data.isHost,
-                    gameStage: data.gameStage,
-                    myId: data.myId
-                });
-                
+                myId = data.myId;
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
                 document.getElementById('pot').innerText = data.pot;
                 document.getElementById('stage').innerText = data.gameStage;
-                document.getElementById('blinds2').innerText = data.SB + "/" + data.BB;
-                document.getElementById('pot2').innerText = data.pot;
-                document.getElementById('stage2').innerText = data.gameStage;
                 document.getElementById('community').innerText = data.community.join(' ');
-
-                // Host Controls
-                if(data.isHost) {
-                    const shouldShow = (data.gameStage === 'LOBBY');
-                    const shouldShowContinue = (data.gameStage === 'SHOWDOWN');
-                    console.log('I am host! Start button should show:', shouldShow);
-                    document.getElementById('start-btn').style.display = shouldShow ? 'block' : 'none';
-                    document.getElementById('continue-btn').style.display = shouldShowContinue ? 'block' : 'none';
-                    document.getElementById('reset-btn').style.display = 'block';
-                    document.getElementById('debug-window').style.display = 'block';
-                } else {
-                    console.log('I am NOT host');
-                }
-
-                // Player Controls
-                const isMyTurn = socket.id === data.activeId && 
-                                data.gameStage !== 'LOBBY' && 
-                                data.gameStage !== 'SHOWDOWN' && 
-                                data.gameStage !== 'DEALER_SELECTION';
-                document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
-                if(isMyTurn) {
+                
+                document.getElementById('start-btn').style.display = (data.isHost && data.gameStage === 'LOBBY') ? 'block' : 'none';
+                document.getElementById('controls').style.display = (socket.id === data.activeId) ? 'block' : 'none';
+                if(socket.id === data.activeId) {
                     document.getElementById('call-btn').innerText = data.callAmount > 0 ? "CALL £" + data.callAmount : "CHECK";
-                    document.getElementById('bet-amt').value = Math.max(data.currentBet * 2, 100);
                 }
 
-                // Render Players
-                const area = document.getElementById('seats'); 
-                area.innerHTML = '';
+                const seats = document.getElementById('seats');
+                seats.innerHTML = "";
+                
                 data.players.forEach((p, i) => {
-                    const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
-                    const x = (window.innerWidth/2) + 350 * Math.cos(angle);
-                    const y = (window.innerHeight/2) + 180 * Math.sin(angle);
+                    const angle = (i / data.players.length) * Math.PI * 2;
+                    const rx = 300, ry = 150; // Ellipse radius for box positions (outside table)
+                    const ix = 220, iy = 100; // Ellipse radius for action text (inside table)
                     
-                    const meClass = p.id === data.myId ? 'is-me' : '';
-                    const turnClass = p.id === data.activeId && data.gameStage !== 'LOBBY' ? 'active-turn' : '';
-                    const statusClass = p.status === 'FOLDED' ? 'folded' : (p.status === 'ALL_IN' ? 'all-in' : '');
-                    const dealerChip = p.isDealer ? '<span class="dealer-chip">D</span>' : '';
-                    const sbChip = p.isSB ? '<span class="sb-chip">SB</span>' : '';
-                    const bbChip = p.isBB ? '<span class="bb-chip">BB</span>' : '';
-                    
-                    area.innerHTML += \`
-                        <div class="player-seat" style="left: \${x}px; top: \${y}px;">
-                            <div class="player-box \${meClass} \${turnClass} \${statusClass}">
-                                \${dealerChip}\${sbChip}\${bbChip}
-                                <b>\${p.id === data.myId ? 'You are: ' + p.name : p.name}</b><br>
-                                <span style="color: #2ecc71; font-size: 1.2em;">£\${p.chips}</span><br>
-                                \${p.bet > 0 ? '<span style="color: #e74c3c;">BET: £'+p.bet+'</span><br>' : ''}
-                                <span style="font-size:1.5em;">\${p.displayCards.join(' ')}</span><br>
-                                <small style="color: #95a5a6;">\${p.status}</small>
-                            </div>
-                        </div>\`;
+                    const x = 50 + (Math.cos(angle) * 45); 
+                    const y = 50 + (Math.sin(angle) * 40);
+
+                    // Player Box
+                    const seat = document.createElement('div');
+                    seat.className = "player-seat";
+                    seat.style.left = x + "%";
+                    seat.style.top = y + "%";
+                    seat.innerHTML = \`
+                        <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''} \${p.status === 'FOLDED' ? 'folded' : ''}">
+                            <b>\${p.name}</b><br>
+                            £\${p.chips}<br>
+                            <small>\${p.displayCards.join(' ')}</small>
+                        </div>
+                    \`;
+                    seats.appendChild(seat);
+
+                    // Action Label (Inside table)
+                    if(p.lastAction) {
+                        const lx = 50 + (Math.cos(angle) * 30);
+                        const ly = 50 + (Math.sin(angle) * 20);
+                        const label = document.createElement('div');
+                        label.className = "action-label";
+                        label.style.left = lx + "%";
+                        label.style.top = ly + "%";
+                        label.style.transform = "translate(-50%, -50%)";
+                        label.innerText = p.lastAction;
+                        seats.appendChild(label);
+                    }
                 });
             });
-            }; // End of window.onload
         </script>
     </body>
     </html>
     `);
 });
 
-io.on('connection', (socket) => {
-    socket.on('join', (n) => {
-        players[socket.id] = { 
-            name: n, 
-            hand: [], 
-            chips: 0, 
-            bet: 0, 
-            status: 'LOBBY' 
-        };
-        playerOrder.push(socket.id);
-        log(n + ' joined');
-        broadcast();
-    });
-    
-    socket.on('start_game', () => {
-        if(socket.id !== playerOrder[0]) return;
-        if(gameStage !== 'LOBBY') return;
-        
-        log('=== TOURNAMENT START ===');
-        playerOrder.forEach(id => { 
-            players[id].chips = STARTING_CHIPS; 
-            players[id].status = 'ACTIVE'; 
-        });
-        
-        // Deal one card to each player to determine initial dealer (high card)
-        deck = createDeck();
-        let highCard = { value: 0, playerId: null, card: '' };
-        
-        playerOrder.forEach(id => {
-            const card = dealCard();
-            const value = cardValues[card.slice(0, -1)];
-            players[id].hand = [card]; // Temporarily show the card
-            log(players[id].name + ' draws ' + card + ' (value: ' + value + ')');
-            
-            if (value > highCard.value) {
-                highCard = { value, playerId: id, card };
-            }
-        });
-        
-        dealerIndex = playerOrder.indexOf(highCard.playerId);
-        log(players[highCard.playerId].name + ' has high card ' + highCard.card + ' - IS DEALER');
-        
-        gameStage = 'DEALER_SELECTION';
-        broadcast();
-        
-        // Clear the cards after 3 seconds and start first hand
-        setTimeout(() => {
-            playerOrder.forEach(id => { players[id].hand = []; });
-            blindTimer = BLIND_INTERVAL;
-            startNewHand();
-        }, 3000);
-    });
-    
-    socket.on('next_hand', () => {
-        if(socket.id !== playerOrder[0]) return;
-        if(gameStage !== 'SHOWDOWN') return;
-        
-        log('=== NEXT HAND ===');
-        startNewHand();
-    });
-    
-    socket.on('reset_engine', () => {
-        if(socket.id !== playerOrder[0]) return;
-        log('ENGINE RESET');
-        players = {}; 
-        playerOrder = [];
-        gameStage = 'LOBBY';
-        dealerIndex = -1;
-        SB = 25;
-        BB = 50;
-        io.emit('force_refresh');
-    });
-    
-    socket.on('action', (action) => {
-        handleAction(socket, action);
-    });
-    
-    socket.on('disconnect', () => {
-        const p = players[socket.id];
-        if (p) {
-            log(p.name + ' disconnected');
-            p.status = 'ELIMINATED';
-        }
-        playerOrder = playerOrder.filter(id => id !== socket.id);
-        delete players[socket.id];
-        broadcast();
-    });
+http.listen(3000, () => {
+    console.log('Poker Server running on port 3000');
 });
-
-http.listen(10000, () => console.log("Poker Server Running on http://localhost:10000"));
