@@ -547,8 +547,10 @@ app.get('/', (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
+        <title>SYFM Poker</title>
         <style>
             body { background: #050505; color: white; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+            #title { font-size: 2.5em; font-weight: bold; color: #f1c40f; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 10px 0; text-align: center; background: #111; padding: 15px; border-bottom: 2px solid #444; }
             #ui-bar { background: #111; padding: 15px; text-align: center; border-bottom: 2px solid #444; }
             .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
             .poker-table { width: 600px; height: 300px; background: #1a5c1a; border: 10px solid #8b4513; border-radius: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
@@ -588,6 +590,8 @@ app.get('/', (req, res) => {
         </style>
     </head>
     <body>
+        <div id="title">SYFM POKER</div>
+        
         <div id="ui-bar">
             BLINDS: <span id="blinds"></span> | 
             POT: £<span id="pot"></span> | 
