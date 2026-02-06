@@ -596,9 +596,15 @@ app.get('/', (req, res) => {
             
             /* Mobile adjustments */
             @media (max-width: 768px) {
-                #activity-log { display: none; }
+                #activity-log { display: none !important; }
+                #activity-log.visible { display: block !important; width: 90%; left: 5%; bottom: 10px; height: 400px; }
                 #show-log-btn { display: block; }
-                #activity-log.visible { display: block; width: 90%; left: 5%; bottom: 10px; height: 400px; }
+            }
+            
+            /* Desktop - hide the show log button and close X */
+            @media (min-width: 769px) {
+                #show-log-btn { display: none; }
+                #log-close-btn { display: none; }
             }
         </style>
     </head>
