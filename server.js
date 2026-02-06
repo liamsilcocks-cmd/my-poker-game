@@ -553,14 +553,16 @@ app.get('/', (req, res) => {
             #title { font-size: 2.5em; font-weight: bold; color: #f1c40f; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); margin: 10px 0; text-align: center; background: #111; padding: 15px; border-bottom: 2px solid #444; }
             #ui-bar { background: #111; padding: 15px; text-align: center; border-bottom: 2px solid #444; }
             .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
-            .poker-table { width: 600px; height: 300px; background: #1a5c1a; border: 10px solid #8b4513; border-radius: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+            .poker-table { width: 600px; height: 300px; background: #1a5c1a; border: 10px solid #8b4513; border-radius: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
+            
+            #table-info { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 8px 20px; border-radius: 10px; font-size: 0.9em; white-space: nowrap; }
             
             .player-seat { position: absolute; width: 180px; transform: translate(-50%, -50%); }
-            .player-box { background: #222; border: 3px solid #555; padding: 10px; border-radius: 10px; text-align: center; }
+            .player-box { background: #222; border: 3px solid #555; padding: 10px; border-radius: 10px; text-align: center; position: relative; }
             
-            .dealer-chip { background: white; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 14px; }
-            .sb-chip { background: #3498db; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 12px; }
-            .bb-chip { background: #f1c40f; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-block; font-weight: bold; line-height: 24px; margin: 2px; font-size: 12px; }
+            .dealer-chip { background: white; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); }
+            .sb-chip { background: #3498db; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; position: absolute; top: -12px; left: 20%; }
+            .bb-chip { background: #f1c40f; color: black; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; position: absolute; top: -12px; right: 20%; }
             
             @keyframes rainbow {
                 0% { border-color: red; } 50% { border-color: lime; } 100% { border-color: red; }
@@ -600,12 +602,31 @@ app.get('/', (req, res) => {
                 #activity-log.visible { width: 90%; left: 5%; bottom: 10px; height: 60vh; max-height: 400px; }
             }
             
-            /* Mobile landscape - fix positioning without breaking table */
+            /* Mobile landscape - major layout fixes */
             @media (max-width: 768px) and (orientation: landscape) {
+                #title { font-size: 1.5em; padding: 8px; margin: 0; }
+                #ui-bar { display: none; } /* Hide top bar, info now in table */
                 #activity-log.visible { height: 50vh; max-height: 300px; }
-                #show-log-btn { top: 60px; left: 10px; padding: 8px 15px; font-size: 12px; }
-                .player-seat { width: 140px !important; }
-                .player-box { padding: 5px; font-size: 0.9em; }
+                #show-log-btn { top: 10px; left: 10px; padding: 6px 12px; font-size: 11px; }
+                
+                .poker-table { width: 500px; height: 250px; border-radius: 125px; }
+                #table-info { top: 15px; font-size: 0.75em; padding: 5px 15px; }
+                
+                .player-seat { width: 120px !important; }
+                .player-box { padding: 5px; font-size: 0.75em; }
+                .player-box b { font-size: 0.9em; }
+                .player-box span { font-size: 0.85em !important; }
+                .player-box small { font-size: 0.7em !important; }
+                
+                .dealer-chip, .sb-chip, .bb-chip { width: 20px; height: 20px; font-size: 11px; }
+                
+                #controls { padding: 10px; }
+                #controls button { padding: 10px 15px; font-size: 13px; margin: 2px; }
+                #controls input { padding: 10px; font-size: 13px; width: 80px; }
+                
+                #host-layer #start-btn { font-size: 1.3em; padding: 20px 40px; }
+                #host-layer #reset-btn { bottom: 60px; right: 10px; padding: 8px 15px; font-size: 13px; }
+                #host-layer #continue-btn { font-size: 1.2em; padding: 15px 35px; }
             }
         </style>
     </head>
@@ -627,7 +648,10 @@ app.get('/', (req, res) => {
 
         <div class="game-container">
             <div class="poker-table">
-                <div id="community" style="font-size: 3em;"></div>
+                <div id="table-info">
+                    BLINDS: <span id="blinds2"></span> | POT: £<span id="pot2"></span> | STAGE: <span id="stage2"></span>
+                </div>
+                <div id="community" style="font-size: 3em; margin-top: 30px;"></div>
             </div>
             <div id="seats"></div>
         </div>
@@ -706,6 +730,9 @@ app.get('/', (req, res) => {
                 document.getElementById('blinds').innerText = data.SB + "/" + data.BB;
                 document.getElementById('pot').innerText = data.pot;
                 document.getElementById('stage').innerText = data.gameStage;
+                document.getElementById('blinds2').innerText = data.SB + "/" + data.BB;
+                document.getElementById('pot2').innerText = data.pot;
+                document.getElementById('stage2').innerText = data.gameStage;
                 document.getElementById('community').innerText = data.community.join(' ');
 
                 // Host Controls
@@ -746,12 +773,12 @@ app.get('/', (req, res) => {
                     const dealerChip = p.isDealer ? '<span class="dealer-chip">D</span>' : '';
                     const sbChip = p.isSB ? '<span class="sb-chip">SB</span>' : '';
                     const bbChip = p.isBB ? '<span class="bb-chip">BB</span>' : '';
-                    const chips = dealerChip + sbChip + bbChip;
                     
                     area.innerHTML += \`
                         <div class="player-seat" style="left: \${x}px; top: \${y}px;">
                             <div class="player-box \${meClass} \${turnClass} \${statusClass}">
-                                \${chips ? chips + '<br>' : ''}<b>\${p.id === data.myId ? 'You are: ' + p.name : p.name}</b><br>
+                                \${dealerChip}\${sbChip}\${bbChip}
+                                <b>\${p.id === data.myId ? 'You are: ' + p.name : p.name}</b><br>
                                 <span style="color: #2ecc71; font-size: 1.2em;">£\${p.chips}</span><br>
                                 \${p.bet > 0 ? '<span style="color: #e74c3c;">BET: £'+p.bet+'</span><br>' : ''}
                                 <span style="font-size:1.5em;">\${p.displayCards.join(' ')}</span><br>
