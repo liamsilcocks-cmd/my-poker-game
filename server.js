@@ -60,7 +60,6 @@ function startNewHand() {
     
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     gameStage = 'PREFLOP';
-    activityLog("--- NEW HAND ---");
     broadcast();
 }
 
@@ -70,16 +69,13 @@ function handleAction(socket, action) {
     
     if (action.type === 'fold') {
         p.status = 'FOLDED';
-        activityLog(`${p.name} folded`);
     } else if (action.type === 'call') {
         const amt = currentBet - p.bet;
         p.chips -= amt; p.bet += amt; pot += amt;
-        activityLog(`${p.name} called/checked`);
     } else if (action.type === 'raise') {
         const total = action.amt;
         const diff = total - p.bet;
         p.chips -= diff; p.bet = total; pot += diff; currentBet = total;
-        activityLog(`${p.name} raised to £${total}`);
     }
     
     const inHand = getPlayersInHand().filter(id => players[id].status === 'ACTIVE');
@@ -88,7 +84,6 @@ function handleAction(socket, action) {
     if (inHand.length <= 1 || allMatched) {
         advanceStage();
     } else {
-        // Move to next active player
         do {
             turnIndex = (turnIndex + 1) % playerOrder.length;
         } while (players[playerOrder[turnIndex]].status !== 'ACTIVE');
@@ -115,7 +110,7 @@ function showdown() {
     gameStage = 'SHOWDOWN';
     const winners = getPlayersInHand();
     const winAmt = Math.floor(pot / winners.length);
-    winners.forEach(id => { players[id].chips += winAmt; activityLog(`${players[id].name} wins £${winAmt}`); });
+    winners.forEach(id => { players[id].chips += winAmt; });
     broadcast();
 }
 
@@ -152,42 +147,46 @@ app.get('/', (req, res) => {
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
-            body { background: #000; color: white; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+            body { background: #000; color: white; font-family: sans-serif; margin: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
             
-            #blinds-overlay { position: fixed; top: 10px; left: 10px; font-size: 12px; color: #aaa; z-index: 50; pointer-events: none; }
-            #pot-display { position: fixed; top: 10px; right: 10px; font-size: 18px; color: #2ecc71; font-weight: bold; z-index: 50; }
+            /* Overlays */
+            #blinds-overlay { position: fixed; top: 5px; left: 5px; font-size: 11px; color: #888; z-index: 100; }
+            #pot-display { position: fixed; top: 5px; right: 5px; font-size: 16px; color: #2ecc71; font-weight: bold; z-index: 100; }
 
-            .game-container { position: relative; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+            .game-container { position: relative; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 0; }
             
-            .poker-table { width: 85vw; height: 40vh; max-width: 700px; background: #1a5c1a; border: 8px solid #4d260a; border-radius: 200px; position: relative; display: flex; justify-content: center; align-items: center; }
+            /* Narrower side-to-side Table */
+            .poker-table { width: 55vw; height: 40vh; max-width: 450px; background: #1a5c1a; border: 6px solid #4d260a; border-radius: 180px; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; }
             
-            #table-logo { position: absolute; font-size: 4vw; font-weight: bold; color: rgba(255,255,255,0.1); text-transform: uppercase; letter-spacing: 5px; pointer-events: none; }
+            #table-logo { font-size: 14px; font-weight: bold; color: rgba(255,255,255,0.1); text-transform: uppercase; margin-bottom: 10px; }
+            #community { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; }
+            
+            /* Status text INSIDE table */
+            #action-guide { font-size: 11px; color: #f1c40f; font-weight: bold; text-align: center; max-width: 80%; }
 
-            #community { position: absolute; display: flex; justify-content: center; align-items: center; z-index: 5; }
-            
-            .card { background: white; color: black; border: 2px solid #000; border-radius: 5px; padding: 4px 6px; margin: 2px; font-weight: bold; font-size: 1.8em; min-width: 45px; display: inline-flex; justify-content: center; align-items: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+            .card { background: white; color: black; border: 1px solid #000; border-radius: 4px; padding: 2px 4px; margin: 1px; font-weight: bold; font-size: 1.4em; min-width: 32px; display: inline-flex; justify-content: center; align-items: center; }
             .card.red { color: #d63031; }
             .card.hidden { background: #2980b9; color: #2980b9; }
-            .gap { width: 15px; }
+            .gap { width: 10px; }
 
-            #action-guide { margin-top: 10px; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 8px; font-size: 13px; color: #f1c40f; border: 1px solid #444; }
-
+            /* Player Seats - Tighter to table */
             .player-seat { position: absolute; transform: translate(-50%, -50%); z-index: 10; text-align: center; }
-            .player-box { background: #111; border: 2px solid #444; padding: 6px; border-radius: 8px; font-size: 11px; min-width: 95px; }
-            .active-turn { border-color: #f1c40f !important; box-shadow: 0 0 12px #f1c40f; }
-            .card-row { display: flex; justify-content: center; gap: 3px; margin: 3px 0; }
-            .card-small { background: white; color: black; border-radius: 3px; border: 1px solid #000; font-size: 1.1em; padding: 1px 3px; font-weight: bold; min-width: 25px; }
+            .player-box { background: #111; border: 2px solid #444; padding: 4px; border-radius: 6px; font-size: 10px; min-width: 80px; }
+            .active-turn { border-color: #f1c40f !important; box-shadow: 0 0 8px #f1c40f; }
+            .card-row { display: flex; justify-content: center; gap: 2px; margin: 2px 0; }
+            .card-small { background: white; color: black; border-radius: 2px; border: 1px solid #000; font-size: 1em; padding: 1px 2px; font-weight: bold; min-width: 22px; }
 
-            #controls { background: #111; padding: 15px; border-top: 2px solid #333; text-align: center; display: none; width: 100%; box-sizing: border-box; }
-            #controls button { padding: 14px 22px; font-size: 14px; margin: 3px; border: none; border-radius: 5px; color: white; font-weight: bold; }
-            #controls input { padding: 12px; width: 70px; background: #000; color: #fff; border: 1px solid #444; text-align: center; font-size: 16px; }
+            /* Mobile-Fixed Controls */
+            #controls { background: #111; padding: 8px; border-top: 2px solid #333; display: none; justify-content: center; align-items: center; gap: 5px; width: 100%; z-index: 200; }
+            #controls button { flex: 1; padding: 12px 0; font-size: 13px; border: none; border-radius: 4px; color: white; font-weight: bold; max-width: 100px; }
+            #controls input { width: 60px; padding: 10px 0; background: #000; color: #fff; border: 1px solid #444; text-align: center; font-size: 14px; }
 
-            #footer-btns { position: fixed; bottom: 90px; right: 10px; display: flex; gap: 5px; z-index: 100; }
-            .tool-btn { padding: 6px 12px; font-size: 11px; background: #333; color: white; border: none; border-radius: 4px; }
+            #reset-btn { position: fixed; bottom: 60px; right: 5px; padding: 5px 10px; font-size: 10px; background: #c0392b; color: white; border: none; border-radius: 3px; z-index: 100; }
 
             @media (orientation: landscape) {
-                .poker-table { height: 45vh; }
-                #controls { padding: 10px; }
+                .poker-table { height: 50vh; width: 50vw; }
+                #controls { padding: 5px; }
+                #controls button { padding: 10px 0; }
             }
         </style>
     </head>
@@ -199,16 +198,13 @@ app.get('/', (req, res) => {
             <div class="poker-table" id="table-main">
                 <div id="table-logo">SYFM POKER</div>
                 <div id="community"></div>
+                <div id="action-guide"></div>
             </div>
-            <div id="action-guide"></div>
             <div id="seats"></div>
-            
-            <div id="footer-btns">
-                <button id="reset-btn" class="tool-btn" style="display:none; background:#c0392b" onclick="socket.emit('reset_engine')">RESET ENGINE</button>
-            </div>
+            <button id="reset-btn" style="display:none" onclick="socket.emit('reset_engine')">RESET</button>
         </div>
 
-        <button id="start-btn" onclick="socket.emit('start_game')" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px 40px; background:#2980b9; color:white; border:none; border-radius:8px; display:none; z-index:1000; font-weight:bold; font-size:18px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">START / NEXT HAND</button>
+        <button id="start-btn" onclick="socket.emit('start_game')" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:15px 30px; background:#2980b9; color:white; border:none; border-radius:6px; display:none; z-index:1000; font-weight:bold;">START GAME</button>
 
         <div id="controls">
             <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
@@ -220,7 +216,7 @@ app.get('/', (req, res) => {
         <script src="/socket.io/socket.io.js"></script>
         <script>
             let socket = io();
-            const name = prompt("Enter Name:") || "Guest";
+            const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
 
             function formatCard(c, isSmall = false) {
@@ -247,16 +243,17 @@ app.get('/', (req, res) => {
                 
                 const guide = document.getElementById('action-guide');
                 const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN');
-                if (data.gameStage === 'SHOWDOWN') guide.innerText = "Hand Finished - Host: Click Next Hand";
+                
+                if (data.gameStage === 'SHOWDOWN') guide.innerText = "Showdown - Host click Start";
                 else if (isMyTurn) {
-                    guide.innerText = data.callAmt > 0 ? "Call £"+data.callAmt+" or Fold/Raise" : "Check or Raise";
+                    guide.innerText = data.callAmt > 0 ? "Your Turn: £"+data.callAmt : "Your Turn: Check";
                     document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL £"+data.callAmt : "CHECK";
                 } else if (data.gameStage !== 'LOBBY') {
                     const activeP = data.players.find(p => p.id === data.activeId);
                     guide.innerText = activeP ? "Waiting for " + activeP.name : "";
                 }
 
-                document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
+                document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
 
                 const area = document.getElementById('seats');
                 area.innerHTML = '';
@@ -266,8 +263,10 @@ app.get('/', (req, res) => {
 
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
-                    const x = centerX + (rect.width/1.6) * Math.cos(angle);
-                    const y = centerY + (rect.height/1.1) * Math.sin(angle);
+                    // Tighter positioning: reduced multipliers from 1.6/1.1 to 1.3/1.0
+                    const x = centerX + (rect.width/1.3) * Math.cos(angle);
+                    const y = centerY + (rect.height/1.0) * Math.sin(angle);
+                    
                     const seat = document.createElement('div');
                     seat.className = "player-seat";
                     seat.style.left = x + "px"; seat.style.top = y + "px";
@@ -275,7 +274,7 @@ app.get('/', (req, res) => {
                     const cardsHtml = p.cards.map(c => formatCard(c, true)).join('');
                     seat.innerHTML = \`
                         <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''}">
-                            <b style="color:#f1c40f">\${p.name} \${p.id === data.myId ? '(You)' : ''}</b><br>
+                            <b style="color:#f1c40f">\${p.name}</b><br>
                             <div class="card-row">\${cardsHtml}</div>
                             \${p.chips}
                             \${p.bet > 0 ? '<div style="color:cyan; font-weight:bold;">£'+p.bet+'</div>' : ''}
