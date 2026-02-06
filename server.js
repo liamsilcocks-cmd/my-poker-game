@@ -61,7 +61,7 @@ function startNewHand() {
     
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     gameStage = 'PREFLOP';
-    activityLog("--- NEW HAND ---");
+    activityLog("--- NEW HAND STARTED ---");
     broadcast();
 }
 
@@ -83,10 +83,6 @@ function handleAction(socket, action) {
         activityLog(`${p.name} raised to £${total}`);
     }
     
-    nextTurn();
-}
-
-function nextTurn() {
     const inHand = getPlayersInHand().filter(id => players[id].status === 'ACTIVE');
     if (inHand.length <= 1 || inHand.every(id => players[id].bet === currentBet)) {
         advanceStage();
@@ -102,12 +98,11 @@ function advanceStage() {
     currentBet = 0;
     if (getPlayersInHand().length <= 1) return showdown();
 
-    if (gameStage === 'PREFLOP') { community = [deck.pop(), deck.pop(), deck.pop()]; gameStage = 'FLOP'; }
-    else if (gameStage === 'FLOP') { community.push(deck.pop()); gameStage = 'TURN'; }
-    else if (gameStage === 'TURN') { community.push(deck.pop()); gameStage = 'RIVER'; }
+    if (gameStage === 'PREFLOP') { community = [deck.pop(), deck.pop(), deck.pop()]; gameStage = 'FLOP'; activityLog(`FLOP: ${community.join(' ')}`); }
+    else if (gameStage === 'FLOP') { community.push(deck.pop()); gameStage = 'TURN'; activityLog(`TURN: ${community[3]}`); }
+    else if (gameStage === 'TURN') { community.push(deck.pop()); gameStage = 'RIVER'; activityLog(`RIVER: ${community[4]}`); }
     else return showdown();
 
-    activityLog(`${gameStage}: ${community.join(' ')}`);
     turnIndex = (dealerIndex + 1) % playerOrder.length;
     while (players[playerOrder[turnIndex]].status !== 'ACTIVE') turnIndex = (turnIndex + 1) % playerOrder.length;
     broadcast();
@@ -140,13 +135,14 @@ function broadcast() {
 
 io.on('connection', (socket) => {
     socket.on('join', (name) => {
-        players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'LOBBY' };
+        players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE' };
         playerOrder.push(socket.id);
         broadcast();
     });
     socket.on('start_game', () => startNewHand());
     socket.on('action', (data) => handleAction(socket, data));
-    socket.on('disconnect', () => { delete players[socket.id]; playerOrder = playerOrder.filter(i => i !== socket.id); broadcast(); });
+    socket.on('reset_engine', () => { if(playerOrder[0] === socket.id) { players={}; playerOrder=[]; io.emit('force_refresh'); } });
+    socket.on('disconnect', () => { delete players[socket.id]; playerOrder = playerOrder.filter(id => id !== socket.id); broadcast(); });
 });
 
 app.get('/', (req, res) => {
@@ -156,157 +152,151 @@ app.get('/', (req, res) => {
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
-            body { background: #000; color: white; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-            #top-bar { display: flex; justify-content: space-between; padding: 10px; background: #111; font-weight: bold; font-size: 14px; }
+            body { background: #050505; color: white; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+            #header { display: flex; justify-content: space-between; padding: 10px; background: #111; border-bottom: 2px solid #333; font-size: 13px; }
             
-            #main-layout { display: flex; flex: 1; overflow: hidden; }
+            .game-container { position: relative; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
             
-            /* Table Area */
-            #table-container { flex: 2.5; position: relative; background: #0a2e0a; display: flex; align-items: center; justify-content: center; }
-            .felt { width: 85%; height: 65%; border: 8px solid #4d260a; border-radius: 200px; background: #1a5c1a; position: relative; }
+            /* Narrowed Table */
+            .poker-table { width: 65vw; height: 45vh; max-width: 600px; background: #1a5c1a; border: 8px solid #5d2e0c; border-radius: 150px; position: relative; }
             
-            /* Cards */
-            .card { display: inline-block; background: white; border-radius: 3px; padding: 2px 4px; margin: 2px; font-weight: bold; font-size: 16px; border: 1px solid #999; }
-            .card.red { color: #d63031; }
-            .card.black { color: #2d3436; }
+            #community { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 100%; display: flex; justify-content: center; align-items: center; }
+            
+            /* Card Styling */
+            .card { background: white; color: black; border: 1px solid #000; border-radius: 4px; padding: 2px 4px; margin: 2px; font-weight: bold; font-size: 1.2em; min-width: 30px; display: inline-block; text-align: center; }
+            .card.red { color: red; }
             .card.hidden { background: #2980b9; color: #2980b9; }
+            .gap { width: 15px; }
 
-            /* Player Boxes */
-            .player-box { position: absolute; width: 90px; text-align: center; transform: translate(-50%, -50%); z-index: 5; }
-            .name-tag { background: #333; font-size: 10px; padding: 2px; border-radius: 4px 4px 0 0; border: 1px solid #555; border-bottom: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            .card-area { background: #222; border: 2px solid #555; padding: 5px 0; min-height: 25px; display: flex; justify-content: center; }
-            .chip-tag { background: #111; font-size: 11px; padding: 2px; border-radius: 0 0 4px 4px; border: 1px solid #555; border-top: none; display: block; color: #2ecc71; }
-            .active-turn .card-area { border-color: #f1c40f; box-shadow: 0 0 8px #f1c40f; }
+            #action-guide { position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 10px; font-size: 12px; color: #f1c40f; white-space: nowrap; }
 
-            /* Betting labels */
-            .bet-tag { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); color: #f1c40f; font-weight: bold; font-size: 11px; }
+            .player-seat { position: absolute; width: 100px; transform: translate(-50%, -50%); z-index: 10; text-align: center; }
+            .player-box { background: #222; border: 2px solid #555; padding: 5px; border-radius: 8px; font-size: 11px; }
+            .active-turn { border-color: #f1c40f !important; box-shadow: 0 0 10px #f1c40f; }
 
-            /* UI Panel */
-            #side-panel { flex: 1; display: flex; flex-direction: column; background: #1a1a1a; padding: 8px; border-left: 2px solid #333; }
-            #activity-log { flex: 1; font-size: 11px; overflow-y: auto; background: #000; border: 1px solid #333; padding: 5px; margin-bottom: 8px; }
-            #debug-engine { height: 60px; font-family: monospace; font-size: 9px; color: lime; overflow-y: auto; background: #050505; border: 1px solid #222; margin-bottom: 8px; display: none; }
-            
-            #controls { display: none; grid-template-columns: 1fr 1fr; gap: 4px; }
-            #controls button { padding: 12px 2px; font-size: 12px; font-weight: bold; color: white; border: none; border-radius: 4px; cursor: pointer; }
-            #controls input { width: 100%; padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; text-align: center; }
+            #controls { background: #111; padding: 10px; border-top: 2px solid #333; text-align: center; display: none; }
+            #controls button { padding: 12px 18px; font-size: 14px; margin: 3px; border: none; border-radius: 5px; color: white; font-weight: bold; }
+            #controls input { padding: 10px; width: 60px; background: #000; color: #fff; border: 1px solid #444; }
 
-            #guide-text { color: #f1c40f; font-size: 12px; margin-bottom: 8px; text-align: center; font-weight: bold; min-height: 14px; }
+            #activity-log { position: fixed; bottom: 80px; left: 10px; width: 220px; height: 120px; background: rgba(0,0,0,0.85); border: 1px solid #444; font-size: 10px; padding: 5px; overflow-y: scroll; display: none; }
+            #debug-window { position: fixed; top: 60px; right: 10px; width: 200px; height: 120px; background: rgba(0,0,0,0.8); color: lime; font-family: monospace; font-size: 9px; padding: 5px; overflow-y: scroll; border: 1px solid #333; display: none; }
+            #log-toggle { position: fixed; bottom: 85px; right: 10px; padding: 5px; font-size: 10px; background: #444; color: white; border: none; }
+            .reset-btn { position: fixed; top: 10px; right: 10px; background: #c0392b; color: white; font-size: 10px; border: none; padding: 5px; border-radius: 3px; }
 
-            @media (max-height: 500px) { /* Landscape Fixes */
-                .felt { height: 80%; width: 90%; }
-                .player-box { width: 80px; }
+            @media (orientation: landscape) {
+                .poker-table { height: 40vh; width: 60vw; }
             }
         </style>
     </head>
     <body>
-        <div id="top-bar">
-            <div>You are player: <span id="my-name-display" style="color:#f1c40f">...</span></div>
-            <div>POT: <span id="pot-display" style="color:#2ecc71">£0</span></div>
+        <div id="header">
+            <div>You are player: <span id="my-name" style="color:#f1c40f">...</span></div>
+            <div>POT: £<span id="pot">0</span></div>
+        </div>
+        
+        <div class="game-container">
+            <div class="poker-table" id="table-main">
+                <div id="community"></div>
+                <div id="action-guide"></div>
+            </div>
+            <div id="seats"></div>
+            <div id="debug-window"><b>ENGINE LOG</b><hr></div>
+            <div id="activity-log"></div>
+            <button id="log-toggle" onclick="let l=document.getElementById('activity-log'); l.style.display=l.style.display==='block'?'none':'block'">LOG</button>
+            <button id="reset-btn" class="reset-btn" style="display:none" onclick="socket.emit('reset_engine')">RESET ENGINE</button>
         </div>
 
-        <div id="main-layout">
-            <div id="table-container">
-                <div class="felt">
-                    <div id="community-cards" style="position:absolute; top:45%; left:50%; transform:translate(-50%,-50%); width:100%; text-align:center;"></div>
-                </div>
-                <div id="player-area"></div>
-            </div>
+        <button id="start-btn" onclick="socket.emit('start_game')" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; background:blue; color:white; border:none; border-radius:5px; display:none; z-index:1000;">START / NEXT HAND</button>
 
-            <div id="side-panel">
-                <div id="debug-engine"><b>ENGINE LOG</b><hr></div>
-                <div id="activity-log"></div>
-                <div id="guide-text"></div>
-                
-                <div id="controls">
-                    <button onclick="socket.emit('action',{type:'fold'})" style="background:#c0392b">FOLD</button>
-                    <button id="call-btn" onclick="socket.emit('action',{type:'call'})" style="background:#27ae60">CHECK</button>
-                    <input type="number" id="raise-amt" value="100">
-                    <button onclick="socket.emit('action',{type:'raise', amt:parseInt(document.getElementById('raise-amt').value)})" style="background:#e67e22; grid-column: span 2;">RAISE</button>
-                </div>
-
-                <button id="host-btn" onclick="socket.emit('start_game')" style="display:none; margin-top:5px; padding:12px; background:#2980b9; color:white; border:none; border-radius:4px; font-weight:bold;">START / NEXT HAND</button>
-            </div>
+        <div id="controls">
+            <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
+            <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;">CHECK</button>
+            <input type="number" id="bet-amt" value="100">
+            <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
         </div>
 
         <script src="/socket.io/socket.io.js"></script>
         <script>
-            const socket = io();
-            const name = prompt("Enter Name") || "Player";
+            let socket = io();
+            const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
 
-            function getCardHTML(card) {
-                if (card === '?') return '<div class="card hidden">?</div>';
-                const suit = card.slice(-1);
-                const val = card.slice(0, -1);
-                const colorClass = (suit === '♥' || suit === '♦') ? 'red' : 'black';
-                return \`<div class="card \${colorClass}">\${val}\${suit}</div>\`;
+            function formatCard(c) {
+                if (c === '?') return '<div class="card hidden">?</div>';
+                const isRed = c.includes('♥') || c.includes('♦');
+                return \`<div class="card \${isRed ? 'red' : ''}">\${c}</div>\`;
             }
 
             socket.on('update', data => {
-                document.getElementById('my-name-display').innerText = data.myName;
-                document.getElementById('pot-display').innerText = "£" + data.pot;
+                document.getElementById('my-name').innerText = data.myName;
+                document.getElementById('pot').innerText = data.pot;
                 
-                const comm = document.getElementById('community-cards');
-                comm.innerHTML = data.community.map(c => getCardHTML(c)).join('');
-
-                document.getElementById('debug-engine').style.display = data.isHost ? 'block' : 'none';
-                document.getElementById('host-btn').style.display = (data.isHost && (data.gameStage === 'LOBBY' || data.gameStage === 'SHOWDOWN')) ? 'block' : 'none';
-
-                const guide = document.getElementById('guide-text');
-                const isMyTurn = data.activeId === data.myId && data.gameStage !== 'SHOWDOWN';
+                // Community Card Rendering with Gaps
+                const comm = document.getElementById('community');
+                let html = '';
+                if(data.community.length >= 3) {
+                    html += formatCard(data.community[0]) + formatCard(data.community[1]) + formatCard(data.community[2]);
+                    if(data.community[3]) html += '<div class="gap"></div>' + formatCard(data.community[3]);
+                    if(data.community[4]) html += '<div class="gap"></div>' + formatCard(data.community[4]);
+                }
+                comm.innerHTML = html;
                 
+                document.getElementById('debug-window').style.display = data.isHost ? 'block' : 'none';
+                document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
+                document.getElementById('start-btn').style.display = (data.isHost && (data.gameStage === 'LOBBY' || data.gameStage === 'SHOWDOWN')) ? 'block' : 'none';
+                
+                const guide = document.getElementById('action-guide');
+                const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN');
                 if (data.gameStage === 'SHOWDOWN') {
-                    guide.innerText = "Hand Finished - Host click Next Hand";
+                    guide.innerText = "Hand Finished.";
                 } else if (isMyTurn) {
-                    guide.innerText = data.callAmt > 0 ? "YOUR TURN: Call £" + data.callAmt : "YOUR TURN: Check or Raise";
+                    guide.innerText = data.callAmt > 0 ? "Options: Call £"+data.callAmt+", Fold, or Raise" : "Options: Check or Raise";
                     document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL £"+data.callAmt : "CHECK";
-                } else if (data.gameStage !== 'LOBBY') {
+                } else {
                     const activeP = data.players.find(p => p.id === data.activeId);
                     guide.innerText = activeP ? "Waiting for " + activeP.name + "..." : "";
                 }
 
-                document.getElementById('controls').style.display = isMyTurn ? 'grid' : 'none';
+                document.getElementById('controls').style.display = isMyTurn ? 'block' : 'none';
 
-                const area = document.getElementById('player-area');
+                const area = document.getElementById('seats');
                 area.innerHTML = '';
-                const positions = [
-                    {t:'88%', l:'50%'}, {t:'65%', l:'12%'}, {t:'25%', l:'15%'}, 
-                    {t:'8%', l:'50%'}, {t:'25%', l:'85%'}, {t:'65%', l:'88%'}
-                ];
+                const rect = document.getElementById('table-main').getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
 
                 data.players.forEach((p, i) => {
-                    const pos = positions[i % positions.length];
-                    const div = document.createElement('div');
-                    div.className = 'player-box' + (p.id === data.activeId ? ' active-turn' : '');
-                    div.style.top = pos.t; div.style.left = pos.l;
+                    const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
+                    const x = centerX + (rect.width/1.6) * Math.cos(angle);
+                    const y = centerY + (rect.height/1.3) * Math.sin(angle);
+                    const seat = document.createElement('div');
+                    seat.className = "player-seat";
+                    seat.style.left = x + "px"; seat.style.top = y + "px";
                     
-                    let cardsHTML = p.cards.map(c => getCardHTML(c)).join('');
+                    const cardsHtml = p.cards.map(c => formatCard(c)).join('');
                     
-                    div.innerHTML = \`
-                        \${p.bet > 0 ? '<div class="bet-tag">£'+p.bet+'</div>' : ''}
-                        <span class="name-tag">\${p.name}</span>
-                        <div class="card-area">\${cardsHTML}</div>
-                        <span class="chip-tag">\${p.chips}</span>
-                    \`;
-                    area.appendChild(div);
+                    seat.innerHTML = \`
+                        <div class="player-box \${p.id === data.activeId ? 'active-turn' : ''}">
+                            <b style="color:#f1c40f">\${p.name}</b><br>
+                            <div style="margin:4px 0">\${cardsHtml}</div>
+                            \${p.chips}
+                            \${p.bet > 0 ? '<div style="color:cyan">£'+p.bet+'</div>' : ''}
+                        </div>\`;
+                    area.appendChild(seat);
                 });
             });
 
-            socket.on('activity_log', d => {
-                const logDiv = document.getElementById('activity-log');
-                const entry = document.createElement('div');
-                entry.style.padding = "2px 0";
-                entry.style.borderBottom = "1px solid #222";
-                entry.innerText = d.msg;
-                logDiv.appendChild(entry);
-                logDiv.scrollTop = logDiv.scrollHeight;
+            socket.on('activity_log', data => {
+                const log = document.getElementById('activity-log');
+                log.innerHTML += '<div>' + data.msg + '</div>';
+                log.scrollTop = log.scrollHeight;
             });
-
             socket.on('debug_msg', m => {
-                const d = document.getElementById('debug-engine');
+                const d = document.getElementById('debug-window');
                 d.innerHTML += '<div>' + m + '</div>';
                 d.scrollTop = d.scrollHeight;
             });
+            socket.on('force_refresh', () => location.reload());
         </script>
     </body>
     </html>
