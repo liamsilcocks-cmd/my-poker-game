@@ -84,7 +84,7 @@ function handleAction(socket, action) {
         const total = action.amt;
         const diff = total - p.bet;
         p.chips -= diff; p.bet = total; pot += diff; currentBet = total;
-        playersActedThisRound.clear(); // Everyone must react to the new raise
+        playersActedThisRound.clear();
         playersActedThisRound.add(socket.id);
         activityLog(`${p.name} raised to £${total}`);
     }
@@ -170,38 +170,325 @@ app.get('/', (req, res) => {
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
-            body { background: #000; color: white; font-family: sans-serif; margin: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-            #blinds-overlay { position: fixed; top: 10px; left: 10px; font-size: 11px; color: #888; z-index: 100; }
-            #pot-display { position: fixed; top: 10px; right: 10px; font-size: 18px; color: #2ecc71; font-weight: bold; z-index: 100; }
-            .game-area { position: relative; flex: 1; width: 100vw; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-            .poker-table { width: 50vw; height: 35vh; max-width: 400px; max-height: 250px; background: #1a5c1a; border: 6px solid #4d260a; border-radius: 150px; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1; box-shadow: inset 0 0 20px #000; }
-            #table-logo { font-size: 12px; font-weight: bold; color: rgba(255,255,255,0.1); text-transform: uppercase; margin-bottom: 5px; }
-            #community { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; }
-            #action-guide { font-size: 11px; color: #f1c40f; text-align: center; font-weight: bold; }
-            .card { background: white; color: black; border: 1px solid #000; border-radius: 4px; padding: 2px 4px; margin: 1px; font-weight: bold; font-size: 1.3em; min-width: 30px; display: inline-flex; justify-content: center; align-items: center; }
+            * { box-sizing: border-box; }
+            body { 
+                background: #000; 
+                color: white; 
+                font-family: sans-serif; 
+                margin: 0; 
+                padding: 0;
+                overflow: hidden; 
+                height: 100vh;
+                height: 100dvh; /* Dynamic viewport height for mobile */
+                display: flex; 
+                flex-direction: column;
+                position: fixed;
+                width: 100%;
+            }
+            
+            /* Top info bar - compact in landscape */
+            #top-bar {
+                display: flex;
+                justify-content: space-between;
+                padding: 4px 8px;
+                background: rgba(0,0,0,0.5);
+                z-index: 100;
+                flex-shrink: 0;
+            }
+            #blinds-overlay { 
+                font-size: 11px; 
+                color: #888; 
+            }
+            #pot-display { 
+                font-size: 16px; 
+                color: #2ecc71; 
+                font-weight: bold; 
+            }
+            
+            /* Main game area - uses all available space */
+            .game-area { 
+                position: relative; 
+                flex: 1; 
+                overflow: hidden; 
+                display: flex; 
+                justify-content: center; 
+                align-items: center;
+                min-height: 0; /* Important for flex shrinking */
+            }
+            
+            /* Poker table - scales to available space */
+            .poker-table { 
+                width: min(50vw, 400px);
+                height: min(30vh, 200px);
+                background: #1a5c1a; 
+                border: 4px solid #4d260a; 
+                border-radius: 100px; 
+                position: relative; 
+                display: flex; 
+                flex-direction: column; 
+                justify-content: center; 
+                align-items: center; 
+                z-index: 1; 
+                box-shadow: inset 0 0 15px #000;
+            }
+            
+            /* Landscape mobile adjustments */
+            @media (max-height: 500px) and (orientation: landscape) {
+                #top-bar {
+                    padding: 2px 8px;
+                }
+                #pot-display {
+                    font-size: 14px;
+                }
+                #blinds-overlay {
+                    font-size: 10px;
+                }
+                .poker-table {
+                    width: min(45vw, 350px);
+                    height: min(25vh, 150px);
+                    border-width: 3px;
+                    border-radius: 80px;
+                }
+                #table-logo {
+                    font-size: 10px !important;
+                    margin-bottom: 2px !important;
+                }
+                #action-guide {
+                    font-size: 10px !important;
+                }
+                .card {
+                    font-size: 1.1em !important;
+                    min-width: 25px !important;
+                    padding: 1px 3px !important;
+                }
+                .player-box {
+                    font-size: 9px !important;
+                    padding: 3px !important;
+                    min-width: 70px !important;
+                }
+                .card-small {
+                    font-size: 0.9em !important;
+                    min-width: 18px !important;
+                }
+            }
+            
+            #table-logo { 
+                font-size: 11px; 
+                font-weight: bold; 
+                color: rgba(255,255,255,0.1); 
+                text-transform: uppercase; 
+                margin-bottom: 3px; 
+            }
+            #community { 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                margin-bottom: 6px; 
+            }
+            #action-guide { 
+                font-size: 11px; 
+                color: #f1c40f; 
+                text-align: center; 
+                font-weight: bold; 
+            }
+            
+            .card { 
+                background: white; 
+                color: black; 
+                border: 1px solid #000; 
+                border-radius: 4px; 
+                padding: 2px 4px; 
+                margin: 1px; 
+                font-weight: bold; 
+                font-size: 1.3em; 
+                min-width: 30px; 
+                display: inline-flex; 
+                justify-content: center; 
+                align-items: center; 
+            }
             .card.red { color: #d63031; }
             .card.hidden { background: #2980b9; color: #2980b9; }
-            .player-seat { position: absolute; z-index: 10; transform: translate(-50%, -50%); }
-            .player-box { background: #111; border: 2px solid #444; padding: 5px; border-radius: 6px; font-size: 10px; min-width: 85px; text-align: center; position: relative; }
-            .active-turn { border-color: #f1c40f; box-shadow: 0 0 10px #f1c40f; }
-            .card-row { display: flex; justify-content: center; gap: 2px; margin: 2px 0; }
-            .card-small { background: white; color: black; border-radius: 2px; border: 1px solid #000; font-size: 1em; padding: 1px 2px; font-weight: bold; min-width: 20px; }
-            .disc { position: absolute; top: -10px; right: -10px; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border: 1px solid black; }
+            
+            .player-seat { 
+                position: absolute; 
+                z-index: 10; 
+                transform: translate(-50%, -50%); 
+            }
+            .player-box { 
+                background: #111; 
+                border: 2px solid #444; 
+                padding: 4px; 
+                border-radius: 6px; 
+                font-size: 10px; 
+                min-width: 80px; 
+                text-align: center; 
+                position: relative; 
+            }
+            .active-turn { 
+                border-color: #f1c40f; 
+                box-shadow: 0 0 8px #f1c40f; 
+            }
+            .card-row { 
+                display: flex; 
+                justify-content: center; 
+                gap: 2px; 
+                margin: 2px 0; 
+            }
+            .card-small { 
+                background: white; 
+                color: black; 
+                border-radius: 2px; 
+                border: 1px solid #000; 
+                font-size: 1em; 
+                padding: 1px 2px; 
+                font-weight: bold; 
+                min-width: 20px; 
+            }
+            
+            .disc { 
+                position: absolute; 
+                top: -8px; 
+                right: -8px; 
+                width: 16px; 
+                height: 16px; 
+                border-radius: 50%; 
+                font-size: 9px; 
+                font-weight: bold; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                border: 1px solid black; 
+            }
             .disc.d { background: white; color: black; }
             .disc.sb { background: #e74c3c; color: white; }
             .disc.bb { background: #3498db; color: white; }
-            #controls { background: #111; padding: 10px; border-top: 2px solid #333; display: none; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; }
-            #controls button { flex: 1; padding: 15px 0; font-size: 14px; border: none; border-radius: 4px; color: white; font-weight: bold; max-width: 110px; }
-            #controls input { width: 65px; background: #000; color: #fff; border: 1px solid #444; text-align: center; font-size: 16px; }
-            #debug-window { position: fixed; top: 40px; right: 10px; width: 180px; height: 100px; background: rgba(0,0,0,0.8); color: lime; font-family: monospace; font-size: 9px; padding: 5px; overflow-y: scroll; border: 1px solid #333; display: none; z-index: 200; }
-            #activity-log { position: fixed; bottom: 80px; left: 10px; width: 200px; height: 100px; background: rgba(0,0,0,0.8); border: 1px solid #444; font-size: 10px; padding: 5px; overflow-y: scroll; display: none; z-index: 200; }
-            #footer-btns { position: fixed; bottom: 85px; right: 10px; display: flex; gap: 5px; z-index: 200; }
-            .tool-btn { padding: 5px 10px; font-size: 10px; background: #333; color: white; border: none; border-radius: 3px; }
+            
+            /* Controls - fixed at bottom, visible on mobile landscape */
+            #controls { 
+                background: #111; 
+                padding: 8px; 
+                border-top: 2px solid #333; 
+                display: none; 
+                justify-content: center; 
+                gap: 6px; 
+                width: 100%; 
+                flex-shrink: 0;
+                position: relative;
+                z-index: 101;
+            }
+            
+            @media (max-height: 500px) and (orientation: landscape) {
+                #controls {
+                    padding: 6px;
+                    gap: 4px;
+                }
+                #controls button {
+                    padding: 10px 0 !important;
+                    font-size: 12px !important;
+                    max-width: 90px !important;
+                }
+                #controls input {
+                    width: 55px !important;
+                    font-size: 14px !important;
+                    padding: 8px 2px !important;
+                }
+            }
+            
+            #controls button { 
+                flex: 1; 
+                padding: 12px 0; 
+                font-size: 13px; 
+                border: none; 
+                border-radius: 4px; 
+                color: white; 
+                font-weight: bold; 
+                max-width: 100px;
+                cursor: pointer;
+            }
+            #controls input { 
+                width: 60px; 
+                background: #000; 
+                color: #fff; 
+                border: 1px solid #444; 
+                text-align: center; 
+                font-size: 15px;
+                border-radius: 4px;
+                padding: 10px 2px;
+            }
+            
+            #debug-window { 
+                position: fixed; 
+                top: 30px; 
+                right: 10px; 
+                width: 180px; 
+                height: 100px; 
+                background: rgba(0,0,0,0.9); 
+                color: lime; 
+                font-family: monospace; 
+                font-size: 9px; 
+                padding: 5px; 
+                overflow-y: scroll; 
+                border: 1px solid #333; 
+                display: none; 
+                z-index: 200; 
+            }
+            #activity-log { 
+                position: fixed; 
+                bottom: 60px; 
+                left: 10px; 
+                width: 180px; 
+                height: 90px; 
+                background: rgba(0,0,0,0.9); 
+                border: 1px solid #444; 
+                font-size: 10px; 
+                padding: 5px; 
+                overflow-y: scroll; 
+                display: none; 
+                z-index: 200; 
+            }
+            
+            #footer-btns { 
+                position: fixed; 
+                bottom: 4px; 
+                right: 4px; 
+                display: flex; 
+                gap: 4px; 
+                z-index: 102; 
+            }
+            .tool-btn { 
+                padding: 4px 8px; 
+                font-size: 10px; 
+                background: #333; 
+                color: white; 
+                border: none; 
+                border-radius: 3px;
+                cursor: pointer;
+            }
+            
+            #start-btn {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                padding: 15px 30px;
+                background: #2980b9;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                display: none;
+                z-index: 1000;
+                font-weight: bold;
+                font-size: 16px;
+                cursor: pointer;
+            }
         </style>
     </head>
     <body>
-        <div id="blinds-overlay">Blinds: <span id="blinds-info">--/--</span></div>
-        <div id="pot-display">£<span id="pot">0</span></div>
+        <div id="top-bar">
+            <div id="blinds-overlay">Blinds: <span id="blinds-info">--/--</span></div>
+            <div id="pot-display">£<span id="pot">0</span></div>
+        </div>
+        
         <div class="game-area">
             <div id="debug-window"><b>DEBUG</b><hr></div>
             <div id="activity-log"><b>LOG</b><hr></div>
@@ -211,60 +498,85 @@ app.get('/', (req, res) => {
                 <div id="action-guide"></div>
             </div>
             <div id="seats"></div>
-            <div id="footer-btns">
-                <button class="tool-btn" onclick="let l=document.getElementById('activity-log'); l.style.display=l.style.display==='block'?'none':'block'">LOG</button>
-                <button id="reset-btn" class="tool-btn" style="display:none; background:#c0392b" onclick="socket.emit('reset_engine')">RESET</button>
-            </div>
         </div>
-        <button id="start-btn" onclick="socket.emit('start_game')" style="position:fixed; top:40%; left:50%; transform:translate(-50%,-50%); padding:15px 30px; background:#2980b9; color:white; border:none; border-radius:6px; display:none; z-index:1000; font-weight:bold;">START</button>
+        
         <div id="controls">
             <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
             <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;">CHECK</button>
             <input type="number" id="bet-amt" value="100">
             <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
         </div>
+        
+        <div id="footer-btns">
+            <button class="tool-btn" onclick="let l=document.getElementById('activity-log'); l.style.display=l.style.display==='block'?'none':'block'">LOG</button>
+            <button id="reset-btn" class="tool-btn" style="display:none; background:#c0392b" onclick="socket.emit('reset_engine')">RESET</button>
+        </div>
+        
+        <button id="start-btn" onclick="socket.emit('start_game')">START</button>
+        
         <script src="/socket.io/socket.io.js"></script>
         <script>
             let socket = io();
             const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
+            
             function formatCard(c, isSmall = false) {
                 if (c === '?') return \`<div class="card \${isSmall ? 'card-small' : ''} hidden">?</div>\`;
                 const isRed = c.includes('♥') || c.includes('♦');
                 return \`<div class="card \${isSmall ? 'card-small' : ''} \${isRed ? 'red' : ''}">\${c}</div>\`;
             }
+            
             socket.on('update', data => {
                 document.getElementById('pot').innerText = data.pot;
                 document.getElementById('blinds-info').innerText = data.SB + "/" + data.BB;
+                
                 const comm = document.getElementById('community');
                 let html = '';
                 if(data.community.length >= 3) {
                     html += formatCard(data.community[0]) + formatCard(data.community[1]) + formatCard(data.community[2]);
-                    if(data.community[3]) html += '<div style="width:10px"></div>' + formatCard(data.community[3]);
-                    if(data.community[4]) html += '<div style="width:10px"></div>' + formatCard(data.community[4]);
+                    if(data.community[3]) html += '<div style="width:8px"></div>' + formatCard(data.community[3]);
+                    if(data.community[4]) html += '<div style="width:8px"></div>' + formatCard(data.community[4]);
                 }
                 comm.innerHTML = html;
+                
                 document.getElementById('debug-window').style.display = data.isHost ? 'block' : 'none';
                 document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
                 document.getElementById('start-btn').style.display = (data.isHost && (data.gameStage === 'LOBBY' || data.gameStage === 'SHOWDOWN')) ? 'block' : 'none';
+                
                 const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN');
                 const guide = document.getElementById('action-guide');
                 guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : "WAITING...");
+                
                 document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
                 if(isMyTurn) document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL £"+data.callAmt : "CHECK";
                 
                 const area = document.getElementById('seats');
                 area.innerHTML = '';
-                const vW = window.innerWidth, vH = window.innerHeight;
-                const cX = vW / 2, cY = vH / 2 - 30;
-                const rX = Math.min(vW * 0.38, 300), rY = Math.min(vH * 0.28, 180);
+                
+                // Calculate positioning based on actual viewport
+                const vW = window.innerWidth;
+                const vH = window.innerHeight;
+                const topBarHeight = document.getElementById('top-bar').offsetHeight;
+                const controlsHeight = isMyTurn ? document.getElementById('controls').offsetHeight : 0;
+                const availableHeight = vH - topBarHeight - controlsHeight;
+                
+                const cX = vW / 2;
+                const cY = topBarHeight + (availableHeight / 2);
+                
+                // Adjust ellipse size based on viewport and orientation
+                const isLandscape = vW > vH;
+                const rX = isLandscape ? Math.min(vW * 0.38, 300) : Math.min(vW * 0.38, 250);
+                const rY = isLandscape ? Math.min(availableHeight * 0.32, 140) : Math.min(availableHeight * 0.28, 180);
 
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
-                    const x = cX + rX * Math.cos(angle), y = cY + rY * Math.sin(angle);
+                    const x = cX + rX * Math.cos(angle);
+                    const y = cY + rY * Math.sin(angle);
+                    
                     const seat = document.createElement('div');
                     seat.className = "player-seat";
-                    seat.style.left = x + "px"; seat.style.top = y + "px";
+                    seat.style.left = x + "px";
+                    seat.style.top = y + "px";
                     
                     let disc = '';
                     if(p.isDealer) disc = '<div class="disc d">D</div>';
@@ -283,16 +595,19 @@ app.get('/', (req, res) => {
                     area.appendChild(seat);
                 });
             });
+            
             socket.on('activity_log', data => {
                 const log = document.getElementById('activity-log');
                 log.innerHTML += '<div>' + data.msg + '</div>';
                 log.scrollTop = log.scrollHeight;
             });
+            
             socket.on('debug_msg', m => {
                 const d = document.getElementById('debug-window');
                 d.innerHTML += '<div>' + m + '</div>';
                 d.scrollTop = d.scrollHeight;
             });
+            
             socket.on('force_refresh', () => location.reload());
         </script>
     </body>
