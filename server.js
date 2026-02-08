@@ -328,6 +328,10 @@ function showdown() {
         players[winnerId].chips += pot;
         log(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
         activityLog(`${players[winnerId].name} wins £${pot}`);
+        setTimeout(() => {
+            gameStage = 'LOBBY';
+            broadcast();
+        }, 3000);
         broadcast();
         return;
     }
@@ -363,6 +367,13 @@ function showdown() {
     });
     
     log(`============ HAND COMPLETE ============`);
+    
+    // Reset to LOBBY after 3 seconds for next hand
+    setTimeout(() => {
+        gameStage = 'LOBBY';
+        broadcast();
+    }, 3000);
+    
     broadcast();
 }
 
@@ -390,6 +401,7 @@ io.on('connection', (socket) => {
         playerOrder.push(socket.id);
         log(`➕ ${name} joined the game (${playerOrder.length} players total)`);
         activityLog(`${name} joined`);
+        gameStage = 'LOBBY'; // Ensure we're in LOBBY when players join
         broadcast();
     });
     socket.on('start_game', () => startNewHand());
@@ -512,9 +524,26 @@ app.get('/', (req, res) => {
                     padding: 3px !important;
                     min-width: 70px !important;
                 }
+                .player-box.my-seat {
+                    border-width: 2px !important;
+                }
                 .card-small {
                     font-size: 0.9em !important;
                     min-width: 18px !important;
+                }
+                #controls {
+                    padding: 6px;
+                    gap: 4px;
+                }
+                #controls button {
+                    padding: 10px 0 !important;
+                    font-size: 12px !important;
+                    max-width: 90px !important;
+                }
+                #controls input {
+                    width: 55px !important;
+                    font-size: 14px !important;
+                    padding: 8px 2px !important;
                 }
             }
             
