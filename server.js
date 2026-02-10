@@ -692,6 +692,16 @@ app.get('/', (req, res) => {
                 border-radius: 3px;
                 cursor: pointer;
             }
+            #fullscreen-btn {
+                background: #9b59b6;
+                position: fixed;
+                top: 40px;
+                left: 8px;
+                z-index: 103;
+                padding: 6px 12px;
+                font-size: 11px;
+                font-weight: bold;
+            }
             
             #start-btn {
                 position: fixed;
@@ -773,6 +783,8 @@ app.get('/', (req, res) => {
             <div id="pot-display">£<span id="pot">0</span></div>
         </div>
         
+        <button id="fullscreen-btn" class="tool-btn" onclick="toggleFullscreen()">FULLSCREEN</button>
+        
         <div class="game-area">
             <div id="debug-window"><b>🔧 DEBUG LOG</b><hr></div>
             <div id="activity-log"><b>📋 ACTIVITY</b><hr></div>
@@ -853,6 +865,47 @@ app.get('/', (req, res) => {
         
         <script src="/socket.io/socket.io.js"></script>
         <script>
+            // Fullscreen function
+            function toggleFullscreen() {
+                if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                    // Enter fullscreen
+                    const elem = document.documentElement;
+                    if (elem.requestFullscreen) {
+                        elem.requestFullscreen();
+                    } else if (elem.webkitRequestFullscreen) { // Safari
+                        elem.webkitRequestFullscreen();
+                    } else if (elem.mozRequestFullScreen) { // Firefox
+                        elem.mozRequestFullScreen();
+                    } else if (elem.msRequestFullscreen) { // IE/Edge
+                        elem.msRequestFullscreen();
+                    }
+                    document.getElementById('fullscreen-btn').innerText = 'EXIT FULLSCREEN';
+                } else {
+                    // Exit fullscreen
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) { // Safari
+                        document.webkitExitFullscreen();
+                    } else if (document.mozCancelFullScreen) { // Firefox
+                        document.mozCancelFullScreen();
+                    } else if (document.msExitFullscreen) { // IE/Edge
+                        document.msExitFullscreen();
+                    }
+                    document.getElementById('fullscreen-btn').innerText = 'FULLSCREEN';
+                }
+            }
+            
+            // Listen for fullscreen changes
+            document.addEventListener('fullscreenchange', updateFullscreenButton);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+            document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+            document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+            
+            function updateFullscreenButton() {
+                const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+                document.getElementById('fullscreen-btn').innerText = isFullscreen ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
+            }
+            
             let socket = io();
             const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
