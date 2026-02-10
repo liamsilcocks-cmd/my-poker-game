@@ -20,6 +20,8 @@ let turnIndex = 0;
 let gameStage = 'LOBBY'; 
 let lastRaiser = null;
 let playersActedThisRound = new Set();
+let turnTimer = null;
+let turnTimeRemaining = 30;
 
 const suits = ['♠','♥','♦','♣'];
 const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
@@ -27,6 +29,52 @@ const rankValues = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':
 
 function log(msg) { io.emit('debug_msg', msg); }
 function activityLog(msg) { io.emit('activity_log', { msg }); }
+
+function startTurnTimer() {
+    if (turnTimer) clearInterval(turnTimer);
+    turnTimeRemaining = 30;
+    
+    turnTimer = setInterval(() => {
+        turnTimeRemaining--;
+        broadcast();
+        
+        if (turnTimeRemaining <= 0) {
+            clearInterval(turnTimer);
+            const currentPlayer = players[playerOrder[turnIndex]];
+            
+            // Auto-fold the player
+            log(`⏰ TIME OUT! ${currentPlayer.name} auto-folded`);
+            activityLog(`${currentPlayer.name} timed out and folded`);
+            
+            currentPlayer.status = 'FOLDED';
+            playersActedThisRound.add(playerOrder[turnIndex]);
+            
+            const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
+            const allActed = activeInHand.every(id => playersActedThisRound.has(id));
+            const allMatched = activeInHand.every(id => players[id].bet === currentBet);
+
+            if (activeInHand.length <= 1 || (allActed && allMatched)) {
+                advanceStage();
+            } else {
+                let nextIdx = turnIndex;
+                do {
+                    nextIdx = (nextIdx + 1) % playerOrder.length;
+                } while (players[playerOrder[nextIdx]].status !== 'ACTIVE');
+                turnIndex = nextIdx;
+                startTurnTimer();
+                broadcast();
+            }
+        }
+    }, 1000);
+}
+
+function stopTurnTimer() {
+    if (turnTimer) {
+        clearInterval(turnTimer);
+        turnTimer = null;
+    }
+    turnTimeRemaining = 30;
+}
 
 function createDeck() {
     const d = [];
@@ -203,6 +251,7 @@ function startNewHand() {
     gameStage = 'PREFLOP';
     activityLog("--- NEW HAND ---");
     activityLog(`Dealer: ${players[playerOrder[dealerIndex]].name}`);
+    startTurnTimer();
     broadcast();
 }
 
@@ -212,6 +261,13 @@ function handleAction(socket, action) {
         return;
     }
     const p = players[socket.id];
+    
+    // Check auto-fold
+    if (p.autoFold && action.type !== 'fold') {
+        log(`🤖 ${p.name} has auto-fold enabled, folding automatically`);
+        action.type = 'fold';
+    }
+    
     playersActedThisRound.add(socket.id);
     
     if (action.type === 'fold') {
@@ -269,6 +325,7 @@ function handleAction(socket, action) {
     log(`📊 Round status: ${activeInHand.length} active, all acted: ${allActed}, all matched: ${allMatched}`);
 
     if (activeInHand.length <= 1 || (allActed && allMatched)) {
+        stopTurnTimer();
         advanceStage();
     } else {
         let nextIdx = turnIndex;
@@ -277,6 +334,7 @@ function handleAction(socket, action) {
         } while (players[playerOrder[nextIdx]].status !== 'ACTIVE');
         turnIndex = nextIdx;
         log(`⏭️ Next to act: ${players[playerOrder[turnIndex]].name}`);
+        startTurnTimer();
         broadcast();
     }
 }
@@ -313,10 +371,12 @@ function advanceStage() {
     while (players[playerOrder[nextIdx]].status !== 'ACTIVE') nextIdx = (nextIdx + 1) % playerOrder.length;
     turnIndex = nextIdx;
     log(`⏭️ ${gameStage} betting starts with: ${players[playerOrder[turnIndex]].name}`);
+    startTurnTimer();
     broadcast();
 }
 
 function showdown() {
+    stopTurnTimer();
     gameStage = 'SHOWDOWN';
     log(`🏆 ============ SHOWDOWN ============`);
     log(`🎴 Community cards: ${community.join(' ')}`);
@@ -387,17 +447,19 @@ function broadcast() {
             players: playerOrder.map((pid, idx) => ({
                 id: pid, name: players[pid].name, chips: players[pid].chips, bet: players[pid].bet, status: players[pid].status,
                 isDealer: idx === dealerIndex, isSB: idx === sbIdx, isBB: idx === bbIdx,
-                cards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['?','?'] : [])
+                cards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['?','?'] : []),
+                autoFold: players[pid].autoFold
             })),
             community, pot, gameStage, activeId: playerOrder[turnIndex], currentBet, SB, BB,
-            callAmt: currentBet - players[id].bet
+            callAmt: currentBet - players[id].bet,
+            timeRemaining: turnTimeRemaining
         });
     });
 }
 
 io.on('connection', (socket) => {
     socket.on('join', (name) => {
-        players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE' };
+        players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', autoFold: false };
         playerOrder.push(socket.id);
         log(`➕ ${name} joined the game (${playerOrder.length} players total)`);
         activityLog(`${name} joined`);
@@ -406,6 +468,13 @@ io.on('connection', (socket) => {
     });
     socket.on('start_game', () => startNewHand());
     socket.on('action', (data) => handleAction(socket, data));
+    socket.on('toggle_autofold', (value) => {
+        if (players[socket.id]) {
+            players[socket.id].autoFold = value;
+            log(`${players[socket.id].name} ${value ? 'enabled' : 'disabled'} auto-fold`);
+            broadcast();
+        }
+    });
     socket.on('reset_engine', () => { 
         if(playerOrder[0] === socket.id) { 
             log(`🔄 Game reset by ${players[socket.id].name}`);
@@ -462,7 +531,7 @@ app.get('/', (req, res) => {
                 position: relative;
             }
             #blinds-overlay { 
-                font-size: 11px; 
+                font-size: 13px; 
                 color: #888;
                 position: absolute;
                 left: 8px;
@@ -590,6 +659,33 @@ app.get('/', (req, res) => {
                 min-width: 80px; 
                 text-align: center; 
                 position: relative; 
+            }
+            .timer-display {
+                display: inline-block;
+                margin-left: 5px;
+                padding: 2px 5px;
+                background: rgba(255,255,255,0.1);
+                border-radius: 3px;
+                font-size: 10px;
+                font-weight: bold;
+                color: #f1c40f;
+            }
+            .timer-display.warning {
+                background: rgba(231, 76, 60, 0.3);
+                color: #e74c3c;
+                animation: pulse 0.5s infinite;
+            }
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.6; }
+            }
+            .auto-fold-container {
+                margin-top: 2px;
+                font-size: 9px;
+            }
+            .auto-fold-checkbox {
+                margin-right: 3px;
+                cursor: pointer;
             }
             .player-box.my-seat {
                 background: #fff;
@@ -1169,12 +1265,9 @@ app.get('/', (req, res) => {
                 else if (c.includes('♦')) suitLetter = 'D';
                 else if (c.includes('♣')) suitLetter = 'C';
                 
-                // Extract rank (everything except last character which is the suit symbol)
-                const rank = c.slice(0, -1);
-                
                 return \`<div class="card \${isSmall ? 'card-small' : ''} \${isRed ? 'red' : ''}">
                     <span class="suit-letter">\${suitLetter}</span>
-                    \${rank}
+                    \${c}
                 </div>\`;
             }
             
@@ -1213,13 +1306,32 @@ app.get('/', (req, res) => {
                     if (p.id === data.activeId) boxClasses.push('active-turn');
                     if (isMe) boxClasses.push('my-seat');
                     
+                    // Timer display
+                    let timerHtml = '';
+                    if (p.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
+                        const timerClass = data.timeRemaining <= 10 ? 'timer-display warning' : 'timer-display';
+                        timerHtml = \`<span class="\${timerClass}">\${data.timeRemaining}s</span>\`;
+                    }
+                    
+                    // Auto-fold checkbox (only for current player)
+                    let autoFoldHtml = '';
+                    if (isMe) {
+                        autoFoldHtml = \`<div class="auto-fold-container">
+                            <input type="checkbox" class="auto-fold-checkbox" id="autofold-\${p.id}" 
+                                \${p.autoFold ? 'checked' : ''} 
+                                onchange="socket.emit('toggle_autofold', this.checked)">
+                            <label for="autofold-\${p.id}" style="color:\${isMe ? '#666' : '#aaa'}">Auto-fold</label>
+                        </div>\`;
+                    }
+                    
                     seat.innerHTML = \`
                         <div class="\${boxClasses.join(' ')}">
                             \${disc}
-                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}">\${p.name}</b><br>
+                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}">\${p.name}\${timerHtml}</b><br>
                             <div class="card-row">\${cardsHtml}</div>
                             <div class="chip-count" style="color:\${isMe ? '#000' : '#fff'}">\${p.chips}</div>
                             \${p.bet > 0 ? '<div class="bet-amount" style="color:'+(isMe ? '#2980b9' : 'cyan')+'; font-weight:bold;">£'+p.bet+'</div>' : ''}
+                            \${autoFoldHtml}
                         </div>\`;
                     area.appendChild(seat);
                 });
