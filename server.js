@@ -34,6 +34,34 @@ function startTurnTimer() {
     if (turnTimer) clearInterval(turnTimer);
     turnTimeRemaining = 30;
     
+    // Check if current player has auto-fold enabled
+    const currentPlayer = players[playerOrder[turnIndex]];
+    if (currentPlayer && currentPlayer.autoFold) {
+        log(`🤖 ${currentPlayer.name} has auto-fold enabled - folding immediately`);
+        activityLog(`${currentPlayer.name} auto-folded`);
+        
+        currentPlayer.status = 'FOLDED';
+        currentPlayer.hand = []; // Remove cards
+        playersActedThisRound.add(playerOrder[turnIndex]);
+        
+        const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
+        const allActed = activeInHand.every(id => playersActedThisRound.has(id));
+        const allMatched = activeInHand.every(id => players[id].bet === currentBet);
+
+        if (activeInHand.length <= 1 || (allActed && allMatched)) {
+            advanceStage();
+        } else {
+            let nextIdx = turnIndex;
+            do {
+                nextIdx = (nextIdx + 1) % playerOrder.length;
+            } while (players[playerOrder[nextIdx]].status !== 'ACTIVE');
+            turnIndex = nextIdx;
+            startTurnTimer();
+            broadcast();
+        }
+        return;
+    }
+    
     turnTimer = setInterval(() => {
         turnTimeRemaining--;
         broadcast();
@@ -47,6 +75,7 @@ function startTurnTimer() {
             activityLog(`${currentPlayer.name} timed out and folded`);
             
             currentPlayer.status = 'FOLDED';
+            currentPlayer.hand = []; // Remove cards
             playersActedThisRound.add(playerOrder[turnIndex]);
             
             const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
@@ -262,16 +291,11 @@ function handleAction(socket, action) {
     }
     const p = players[socket.id];
     
-    // Check auto-fold
-    if (p.autoFold && action.type !== 'fold') {
-        log(`🤖 ${p.name} has auto-fold enabled, folding automatically`);
-        action.type = 'fold';
-    }
-    
     playersActedThisRound.add(socket.id);
     
     if (action.type === 'fold') {
         p.status = 'FOLDED';
+        p.hand = []; // Remove cards
         log(`🚫 ${p.name} FOLDED`);
         activityLog(`${p.name} folded`);
     } else if (action.type === 'call') {
@@ -531,7 +555,7 @@ app.get('/', (req, res) => {
                 position: relative;
             }
             #blinds-overlay { 
-                font-size: 13px; 
+                font-size: 24px; 
                 color: #888;
                 position: absolute;
                 left: 8px;
@@ -551,7 +575,7 @@ app.get('/', (req, res) => {
                     font-size: 20px;
                 }
                 #blinds-overlay {
-                    font-size: 10px;
+                    font-size: 20px;
                 }
             }
             
@@ -762,21 +786,22 @@ app.get('/', (req, res) => {
             
             .disc { 
                 position: absolute; 
-                top: -8px; 
-                right: -8px; 
-                width: 16px; 
-                height: 16px; 
+                top: 50%; 
+                right: -12px; 
+                transform: translateY(-50%);
+                width: 24px; 
+                height: 24px; 
                 border-radius: 50%; 
-                font-size: 9px; 
+                font-size: 11px; 
                 font-weight: bold; 
                 display: flex; 
                 align-items: center; 
                 justify-content: center; 
-                border: 1px solid black; 
+                border: 2px solid black; 
             }
             .disc.d { background: white; color: black; }
-            .disc.sb { background: #e74c3c; color: white; }
-            .disc.bb { background: #3498db; color: white; }
+            .disc.sb { background: #3498db; color: white; }
+            .disc.bb { background: #f1c40f; color: black; }
             
             #controls { 
                 background: #111; 
@@ -1167,6 +1192,29 @@ app.get('/', (req, res) => {
                 }
             });
             
+            // Audio beep functions
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            let lastTimeRemaining = 30;
+            let hasPlayedTurnBeep = false;
+            let hasPlayed10SecBeep = false;
+            
+            function playBeep(frequency = 800, duration = 150) {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration / 1000);
+            }
+            
             let socket = io();
             const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
@@ -1339,6 +1387,24 @@ app.get('/', (req, res) => {
             
             socket.on('update', data => {
                 currentData = data;
+                
+                // Check if it's now my turn (beep on turn start)
+                const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY');
+                if (isMyTurn && !hasPlayedTurnBeep) {
+                    playBeep(800, 150);
+                    hasPlayedTurnBeep = true;
+                    hasPlayed10SecBeep = false;
+                } else if (!isMyTurn) {
+                    hasPlayedTurnBeep = false;
+                }
+                
+                // Check for 10 second warning (beep once)
+                if (isMyTurn && data.timeRemaining === 10 && !hasPlayed10SecBeep) {
+                    playBeep(600, 200);
+                    hasPlayed10SecBeep = true;
+                }
+                
+                lastTimeRemaining = data.timeRemaining;
                 
                 document.getElementById('pot').innerText = data.pot;
                 document.getElementById('blinds-info').innerText = data.SB + "/" + data.BB;
