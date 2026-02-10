@@ -470,9 +470,15 @@ app.get('/', (req, res) => {
                 color: #888; 
             }
             #pot-display { 
-                font-size: 16px; 
+                font-size: 20px; 
                 color: #2ecc71; 
                 font-weight: bold; 
+            }
+            
+            @media (max-width: 768px) and (orientation: landscape) {
+                #pot-display {
+                    font-size: 18px;
+                }
             }
             
             .game-area { 
@@ -603,12 +609,30 @@ app.get('/', (req, res) => {
             .card-small { 
                 background: white; 
                 color: black; 
-                border-radius: 2px; 
+                border-radius: 4px; 
                 border: 1px solid #000; 
-                font-size: 1em; 
-                padding: 1px 2px; 
+                font-size: 1.3em; 
+                padding: 2px 4px; 
                 font-weight: bold; 
-                min-width: 20px; 
+                min-width: 30px; 
+            }
+            .card-small.red { color: #d63031; }
+            .card-small.hidden { background: #2980b9; color: #2980b9; }
+            .chip-count {
+                font-size: 12px;
+                font-weight: bold;
+                margin-top: 2px;
+            }
+            
+            @media (max-width: 768px) and (orientation: landscape) {
+                .card-small {
+                    font-size: 1.1em;
+                    min-width: 26px;
+                    padding: 1px 3px;
+                }
+                .chip-count {
+                    font-size: 11px;
+                }
             }
             
             .disc { 
@@ -864,7 +888,7 @@ app.get('/', (req, res) => {
     <body>
         <div id="top-bar">
             <div id="blinds-overlay">Blinds: <span id="blinds-info">--/--</span></div>
-            <div id="pot-display">£<span id="pot">0</span></div>
+            <div id="pot-display">Pot: £<span id="pot">0</span></div>
         </div>
         
         <button id="fullscreen-btn" class="tool-btn" onclick="toggleFullscreen()">FULLSCREEN</button>
