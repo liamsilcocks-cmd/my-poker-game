@@ -185,7 +185,7 @@ function startNewHand() {
     
     log(`🃏 NEW HAND STARTED`);
     active.forEach(id => {
-        // Updated debug line
+        // This is the debug line modification requested
         log(`  ${players[id].name}: ${players[id].hand.join(' ')}`);
     });
     
@@ -283,6 +283,7 @@ io.on('connection', (socket) => {
     socket.on('action', (data) => handleAction(socket, data));
 });
 
+// --- FULL FRONTEND UI ---
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html><html><head><title>Poker Tournament</title>
@@ -290,17 +291,17 @@ app.get('/', (req, res) => {
     <style>
         body { background: #1a472a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
         .table { width: 80%; border: 10px solid #5d4037; border-radius: 100px; padding: 50px; margin: 20px; position: relative; background: #2e7d32; }
-        .card { display: inline-block; width: 40px; height: 60px; background: white; color: black; border-radius: 5px; margin: 5px; line-height: 60px; font-weight: bold; font-size: 1.2em; border: 1px solid #000; }
-        .player { margin: 10px; padding: 10px; border: 2px solid transparent; }
-        .active-player { border-color: #ffeb3b; background: rgba(255, 235, 59, 0.2); }
-        .controls { background: #333; padding: 20px; border-radius: 10px; }
-        #debug { width: 90%; background: #000; color: #0f0; padding: 10px; height: 150px; overflow-y: scroll; font-family: monospace; text-align: left; }
-        button { padding: 10px 20px; margin: 5px; cursor: pointer; font-size: 16px; }
+        .card { display: inline-block; width: 45px; height: 65px; background: white; color: black; border-radius: 5px; margin: 5px; line-height: 65px; font-weight: bold; font-size: 1.1em; border: 1px solid #000; text-align: center; vertical-align: middle; }
+        .player { margin: 10px; padding: 15px; border: 2px solid #ccc; border-radius: 10px; width: 300px; }
+        .active-player { border-color: #ffeb3b; background: rgba(255, 235, 59, 0.2); box-shadow: 0 0 15px #ffeb3b; }
+        .controls { background: #333; padding: 20px; border-radius: 10px; margin-top: 10px; }
+        #debug { width: 90%; background: #000; color: #0f0; padding: 10px; height: 180px; overflow-y: scroll; font-family: monospace; text-align: left; border: 1px solid #444; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; font-weight: bold; }
     </style></head>
     <body>
-        <h1>Texas Hold'em</h1>
+        <h1>Poker Table</h1>
         <div id="lobby">
-            <input type="text" id="playerName" placeholder="Enter Name">
+            <input type="text" id="playerName" placeholder="Your Name" style="padding:10px">
             <button onclick="join()">Join Game</button>
         </div>
         <div id="gameView" style="display:none">
@@ -308,22 +309,20 @@ app.get('/', (req, res) => {
                 <div id="communityCards"></div>
                 <h2 id="potDisplay">Pot: 0</h2>
             </div>
-            <div id="playerList"></div>
-            <div class="controls" id="actionControls">
+            <div id="playerList" style="display:flex; flex-wrap:wrap; justify-content:center;"></div>
+            <div class="controls">
                 <button onclick="sendAction('fold')">Fold</button>
                 <button onclick="sendAction('call')">Check/Call</button>
-                <input type="number" id="raiseAmt" placeholder="Raise to...">
+                <input type="number" id="raiseAmt" style="width:70px; padding:8px" placeholder="Amt">
                 <button onclick="sendAction('raise')">Raise</button>
-                <button id="startBtn" onclick="socket.emit('start_game')" style="display:none">Start New Hand</button>
+                <button id="startBtn" onclick="socket.emit('start_game')" style="display:none; background:#4CAF50; color:white;">Deal Hand</button>
             </div>
         </div>
-        <h3>Server Log</h3>
+        <h3>Debug Log</h3>
         <div id="debug"></div>
 
         <script>
             const socket = io();
-            let myId = null;
-
             function join() {
                 const name = document.getElementById('playerName').value;
                 if(!name) return;
@@ -331,31 +330,25 @@ app.get('/', (req, res) => {
                 document.getElementById('lobby').style.display = 'none';
                 document.getElementById('gameView').style.display = 'block';
             }
-
             function sendAction(type) {
                 const amt = parseInt(document.getElementById('raiseAmt').value) || 0;
                 socket.emit('action', { type, amt });
             }
-
             socket.on('update', (data) => {
-                myId = data.myId;
                 document.getElementById('potDisplay').innerText = "Pot: " + data.pot;
                 document.getElementById('communityCards').innerHTML = data.community.map(c => '<div class="card">'+c+'</div>').join('');
-                
-                let playersHtml = '';
+                let html = '';
                 data.players.forEach(p => {
-                    const isActive = p.id === data.activeId ? 'active-player' : '';
-                    playersHtml += '<div class="player ' + isActive + '">';
-                    playersHtml += '<strong>' + p.name + '</strong> | Chips: ' + p.chips + ' | Bet: ' + p.bet + '<br>';
-                    playersHtml += p.cards.map(c => '<div class="card">'+c+'</div>').join('');
-                    playersHtml += ' [' + p.status + ']';
-                    if(p.id === data.activeId) playersHtml += ' ⏳ ' + data.timeRemaining + 's';
-                    playersHtml += '</div>';
+                    const activeClass = p.id === data.activeId ? 'active-player' : '';
+                    html += '<div class="player ' + activeClass + '">';
+                    html += '<strong>' + p.name + '</strong><br>Chips: ' + p.chips + ' | Bet: ' + p.bet + '<br>';
+                    html += p.cards.map(c => '<div class="card">'+c+'</div>').join('');
+                    if(p.id === data.activeId) html += '<br>⏳ ' + data.timeRemaining + 's';
+                    html += '</div>';
                 });
-                document.getElementById('playerList').innerHTML = playersHtml;
-                document.getElementById('startBtn').style.display = (data.gameStage === 'LOBBY' || data.gameStage === 'SHOWDOWN' ? 'block' : 'none');
+                document.getElementById('playerList').innerHTML = html;
+                document.getElementById('startBtn').style.display = (data.gameStage === 'LOBBY' || data.gameStage === 'SHOWDOWN' ? 'inline-block' : 'none');
             });
-
             socket.on('debug_msg', (msg) => {
                 const d = document.getElementById('debug');
                 d.innerHTML += msg + '<br>';
