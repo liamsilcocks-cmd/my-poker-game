@@ -117,7 +117,6 @@ function parseCard(card) {
     return { rank, suit, value: rankValues[rank] };
 }
 
-// Evaluate poker hand - returns {rank, tiebreakers, name}
 function evaluateHand(cards) {
     if (cards.length !== 5) return { rank: 0, tiebreakers: [], name: 'Invalid' };
     
@@ -125,7 +124,6 @@ function evaluateHand(cards) {
     const values = parsed.map(c => c.value);
     const suits = parsed.map(c => c.suit);
     
-    // Count occurrences
     const valueCounts = {};
     values.forEach(v => valueCounts[v] = (valueCounts[v] || 0) + 1);
     const counts = Object.values(valueCounts).sort((a, b) => b - a);
@@ -133,103 +131,63 @@ function evaluateHand(cards) {
     
     const isFlush = suits.every(s => s === suits[0]);
     const isStraight = values[0] - values[4] === 4 && new Set(values).size === 5;
-    const isLowStraight = values.join(',') === '14,5,4,3,2'; // A-2-3-4-5
+    const isLowStraight = values.join(',') === '14,5,4,3,2';
     
-    // Royal Flush
-    if (isFlush && isStraight && values[0] === 14) {
-        return { rank: 9, tiebreakers: [14], name: 'Royal Flush' };
-    }
-    
-    // Straight Flush
-    if (isFlush && (isStraight || isLowStraight)) {
-        return { rank: 8, tiebreakers: [isLowStraight ? 5 : values[0]], name: 'Straight Flush' };
-    }
-    
-    // Four of a Kind
+    if (isFlush && isStraight && values[0] === 14) return { rank: 9, tiebreakers: [14], name: 'Royal Flush' };
+    if (isFlush && (isStraight || isLowStraight)) return { rank: 8, tiebreakers: [isLowStraight ? 5 : values[0]], name: 'Straight Flush' };
     if (counts[0] === 4) {
         const quad = uniqueValues.find(v => valueCounts[v] === 4);
         const kicker = uniqueValues.find(v => valueCounts[v] === 1);
         return { rank: 7, tiebreakers: [quad, kicker], name: 'Four of a Kind' };
     }
-    
-    // Full House
     if (counts[0] === 3 && counts[1] === 2) {
         const trips = uniqueValues.find(v => valueCounts[v] === 3);
         const pair = uniqueValues.find(v => valueCounts[v] === 2);
         return { rank: 6, tiebreakers: [trips, pair], name: 'Full House' };
     }
-    
-    // Flush
-    if (isFlush) {
-        return { rank: 5, tiebreakers: values, name: 'Flush' };
-    }
-    
-    // Straight
-    if (isStraight || isLowStraight) {
-        return { rank: 4, tiebreakers: [isLowStraight ? 5 : values[0]], name: 'Straight' };
-    }
-    
-    // Three of a Kind
+    if (isFlush) return { rank: 5, tiebreakers: values, name: 'Flush' };
+    if (isStraight || isLowStraight) return { rank: 4, tiebreakers: [isLowStraight ? 5 : values[0]], name: 'Straight' };
     if (counts[0] === 3) {
         const trips = uniqueValues.find(v => valueCounts[v] === 3);
         const kickers = uniqueValues.filter(v => valueCounts[v] === 1).sort((a, b) => b - a);
         return { rank: 3, tiebreakers: [trips, ...kickers], name: 'Three of a Kind' };
     }
-    
-    // Two Pair
     if (counts[0] === 2 && counts[1] === 2) {
         const pairs = uniqueValues.filter(v => valueCounts[v] === 2).sort((a, b) => b - a);
         const kicker = uniqueValues.find(v => valueCounts[v] === 1);
         return { rank: 2, tiebreakers: [...pairs, kicker], name: 'Two Pair' };
     }
-    
-    // One Pair
     if (counts[0] === 2) {
         const pair = uniqueValues.find(v => valueCounts[v] === 2);
         const kickers = uniqueValues.filter(v => valueCounts[v] === 1).sort((a, b) => b - a);
         return { rank: 1, tiebreakers: [pair, ...kickers], name: 'One Pair' };
     }
-    
-    // High Card
     return { rank: 0, tiebreakers: values, name: 'High Card' };
 }
 
-// Find best 5-card hand from 7 cards
 function findBestHand(sevenCards) {
     let best = null;
-    
-    // Generate all 5-card combinations from 7 cards
     for (let i = 0; i < sevenCards.length; i++) {
         for (let j = i + 1; j < sevenCards.length; j++) {
             const fiveCards = sevenCards.filter((_, idx) => idx !== i && idx !== j);
             const evaluated = evaluateHand(fiveCards);
-            
             if (!best || compareHands(evaluated, best) > 0) {
                 best = evaluated;
                 best.cards = fiveCards;
             }
         }
     }
-    
     return best;
 }
 
-// Compare two hands: returns 1 if hand1 wins, -1 if hand2 wins, 0 if tie
 function compareHands(hand1, hand2) {
-    if (hand1.rank !== hand2.rank) {
-        return hand1.rank > hand2.rank ? 1 : -1;
-    }
-    
-    // Same rank, compare tiebreakers
+    if (hand1.rank !== hand2.rank) return hand1.rank > hand2.rank ? 1 : -1;
     for (let i = 0; i < Math.max(hand1.tiebreakers.length, hand2.tiebreakers.length); i++) {
         const t1 = hand1.tiebreakers[i] || 0;
         const t2 = hand2.tiebreakers[i] || 0;
-        if (t1 !== t2) {
-            return t1 > t2 ? 1 : -1;
-        }
+        if (t1 !== t2) return t1 > t2 ? 1 : -1;
     }
-    
-    return 0; // True tie
+    return 0;
 }
 
 function getPlayersInHand() {
@@ -244,7 +202,6 @@ function startNewHand() {
         log('⚠️ Not enough players with chips to start hand');
         return;
     }
-    
     dealerIndex = (dealerIndex + 1) % playerOrder.length;
     while (players[playerOrder[dealerIndex]].chips <= 0) dealerIndex = (dealerIndex + 1) % playerOrder.length;
 
@@ -259,7 +216,6 @@ function startNewHand() {
     
     const sbIdx = (dealerIndex + 1) % playerOrder.length;
     const bbIdx = (dealerIndex + 2) % playerOrder.length;
-    
     const sbPlayer = playerOrder[sbIdx];
     const bbPlayer = playerOrder[bbIdx];
     
@@ -272,6 +228,11 @@ function startNewHand() {
     log(`💵 SB: ${players[sbPlayer].name} posts ${SB}`);
     log(`💵 BB: ${players[bbPlayer].name} posts ${BB}`);
     log(`🎴 Dealing cards to ${active.length} players`);
+    
+    active.forEach(id => {
+        // Only this specific debug line modified
+        log(`  ${players[id].name}: ${players[id].hand.join(' ')}`);
+    });
     
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     gameStage = 'PREFLOP';
@@ -287,21 +248,17 @@ function handleAction(socket, action) {
         return;
     }
     const p = players[socket.id];
-    
     playersActedThisRound.add(socket.id);
     
     if (action.type === 'fold') {
         p.status = 'FOLDED';
-        p.hand = []; // Remove cards
+        p.hand = [];
         log(`🚫 ${p.name} FOLDED`);
         activityLog(`${p.name} folded`);
     } else if (action.type === 'call') {
         const amt = currentBet - p.bet;
         const actualAmt = Math.min(amt, p.chips);
-        p.chips -= actualAmt; 
-        p.bet += actualAmt; 
-        pot += actualAmt;
-        
+        p.chips -= actualAmt; p.bet += actualAmt; pot += actualAmt;
         if (amt === 0) {
             log(`✓ ${p.name} CHECKED`);
             activityLog(`${p.name} checked`);
@@ -309,41 +266,23 @@ function handleAction(socket, action) {
             log(`📞 ${p.name} CALLED ${actualAmt} (pot: ${p.bet}/${currentBet})`);
             activityLog(`${p.name} called ${actualAmt}`);
         }
-        
-        if (p.chips === 0) {
-            p.status = 'ALL_IN';
-            log(`🔥 ${p.name} is ALL IN!`);
-            activityLog(`${p.name} is ALL IN!`);
-        }
+        if (p.chips === 0) p.status = 'ALL_IN';
     } else if (action.type === 'raise') {
         const total = action.amt;
         const diff = total - p.bet;
         const actualDiff = Math.min(diff, p.chips);
-        
-        p.chips -= actualDiff; 
-        p.bet += actualDiff;
-        pot += actualDiff;
+        p.chips -= actualDiff; p.bet += actualDiff; pot += actualDiff;
         currentBet = p.bet;
-        
         playersActedThisRound.clear();
         playersActedThisRound.add(socket.id);
-        
         log(`🎲 ${p.name} RAISED to ${p.bet} (pot now: ${pot})`);
-        log(`  Current bet reset to ${currentBet}, all players must act`);
         activityLog(`${p.name} raised to £${p.bet}`);
-        
-        if (p.chips === 0) {
-            p.status = 'ALL_IN';
-            log(`🔥 ${p.name} is ALL IN!`);
-            activityLog(`${p.name} is ALL IN!`);
-        }
+        if (p.chips === 0) p.status = 'ALL_IN';
     }
     
     const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
     const allActed = activeInHand.every(id => playersActedThisRound.has(id));
     const allMatched = activeInHand.every(id => players[id].bet === currentBet);
-
-    log(`📊 Round status: ${activeInHand.length} active, all acted: ${allActed}, all matched: ${allMatched}`);
 
     if (activeInHand.length <= 1 || (allActed && allMatched)) {
         stopTurnTimer();
@@ -354,44 +293,34 @@ function handleAction(socket, action) {
             nextIdx = (nextIdx + 1) % playerOrder.length;
         } while (players[playerOrder[nextIdx]].status !== 'ACTIVE');
         turnIndex = nextIdx;
-        log(`⏭️ Next to act: ${players[playerOrder[turnIndex]].name}`);
         startTurnTimer();
         broadcast();
     }
 }
 
 function advanceStage() {
-    log(`🎬 ADVANCING STAGE from ${gameStage}`);
     playerOrder.forEach(id => { if(players[id].status !== 'OUT') players[id].bet = 0; });
     currentBet = 0;
     playersActedThisRound.clear();
-
     if (getPlayersInHand().length <= 1) return showdown();
 
     if (gameStage === 'PREFLOP') { 
         community = [deck.pop(), deck.pop(), deck.pop()]; 
         gameStage = 'FLOP'; 
-        log(`🃏 FLOP: ${community.join(' ')}`);
-        activityLog(`Flop: ${community.join(' ')}`);
     }
     else if (gameStage === 'FLOP') { 
         community.push(deck.pop()); 
         gameStage = 'TURN'; 
-        log(`🃏 TURN: ${community[3]}`);
-        activityLog(`Turn: ${community[3]}`);
     }
     else if (gameStage === 'TURN') { 
         community.push(deck.pop()); 
         gameStage = 'RIVER'; 
-        log(`🃏 RIVER: ${community[4]}`);
-        activityLog(`River: ${community[4]}`);
     }
     else return showdown();
 
     let nextIdx = (dealerIndex + 1) % playerOrder.length;
     while (players[playerOrder[nextIdx]].status !== 'ACTIVE') nextIdx = (nextIdx + 1) % playerOrder.length;
     turnIndex = nextIdx;
-    log(`⏭️ ${gameStage} betting starts with: ${players[playerOrder[turnIndex]].name}`);
     startTurnTimer();
     broadcast();
 }
@@ -399,69 +328,33 @@ function advanceStage() {
 function showdown() {
     stopTurnTimer();
     gameStage = 'SHOWDOWN';
-    log(`🏆 ============ SHOWDOWN ============`);
-    log(`🎴 Community cards: ${community.join(' ')}`);
-    
     const inHand = getPlayersInHand();
-    
     if (inHand.length === 1) {
         const winnerId = inHand[0];
         players[winnerId].chips += pot;
-        log(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
-        activityLog(`${players[winnerId].name} wins £${pot}`);
-        setTimeout(() => {
-            gameStage = 'LOBBY';
-            broadcast();
-        }, 3000);
+        setTimeout(() => { gameStage = 'LOBBY'; broadcast(); }, 3000);
         broadcast();
         return;
     }
-    
-    // Evaluate all hands
     const evaluatedPlayers = inHand.map(id => {
         const sevenCards = [...players[id].hand, ...community];
         const bestHand = findBestHand(sevenCards);
-        log(`👤 ${players[id].name}: ${players[id].hand.join(' ')}`);
-        log(`    Best hand: ${bestHand.name} (${bestHand.cards.join(' ')})`);
-        log(`    Rank: ${bestHand.rank}, Tiebreakers: [${bestHand.tiebreakers.join(', ')}]`);
         return { id, bestHand };
     });
-    
-    // Sort by hand strength (best first)
     evaluatedPlayers.sort((a, b) => compareHands(b.bestHand, a.bestHand));
-    
-    // Find all winners (handle ties)
     const winners = [evaluatedPlayers[0]];
     for (let i = 1; i < evaluatedPlayers.length; i++) {
-        if (compareHands(evaluatedPlayers[i].bestHand, winners[0].bestHand) === 0) {
-            winners.push(evaluatedPlayers[i]);
-        }
+        if (compareHands(evaluatedPlayers[i].bestHand, winners[0].bestHand) === 0) winners.push(evaluatedPlayers[i]);
     }
-    
     const winAmt = Math.floor(pot / winners.length);
-    
-    log(`🏆 WINNER(S):`);
-    winners.forEach(w => {
-        players[w.id].chips += winAmt;
-        log(`  💰 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
-        activityLog(`${players[w.id].name} wins £${winAmt} (${w.bestHand.name})`);
-    });
-    
-    log(`============ HAND COMPLETE ============`);
-    
-    // Reset to LOBBY after 3 seconds for next hand
-    setTimeout(() => {
-        gameStage = 'LOBBY';
-        broadcast();
-    }, 3000);
-    
+    winners.forEach(w => { players[w.id].chips += winAmt; });
+    setTimeout(() => { gameStage = 'LOBBY'; broadcast(); }, 3000);
     broadcast();
 }
 
 function broadcast() {
     const sbIdx = (dealerIndex + 1) % playerOrder.length;
     const bbIdx = (dealerIndex + 2) % playerOrder.length;
-
     playerOrder.forEach(id => {
         io.to(id).emit('update', {
             myId: id, myName: players[id].name, isHost: (id === playerOrder[0]),
@@ -482,33 +375,18 @@ io.on('connection', (socket) => {
     socket.on('join', (name) => {
         players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', autoFold: false };
         playerOrder.push(socket.id);
-        log(`➕ ${name} joined the game (${playerOrder.length} players total)`);
-        activityLog(`${name} joined`);
-        gameStage = 'LOBBY'; // Ensure we're in LOBBY when players join
+        gameStage = 'LOBBY';
         broadcast();
     });
     socket.on('start_game', () => startNewHand());
     socket.on('action', (data) => handleAction(socket, data));
     socket.on('toggle_autofold', (value) => {
-        if (players[socket.id]) {
-            players[socket.id].autoFold = value;
-            log(`${players[socket.id].name} ${value ? 'enabled' : 'disabled'} auto-fold`);
-            broadcast();
-        }
+        if (players[socket.id]) { players[socket.id].autoFold = value; broadcast(); }
     });
     socket.on('reset_engine', () => { 
-        if(playerOrder[0] === socket.id) { 
-            log(`🔄 Game reset by ${players[socket.id].name}`);
-            players={}; 
-            playerOrder=[]; 
-            io.emit('force_refresh'); 
-        } 
+        if(playerOrder[0] === socket.id) { players={}; playerOrder=[]; io.emit('force_refresh'); } 
     });
     socket.on('disconnect', () => { 
-        if (players[socket.id]) {
-            log(`➖ ${players[socket.id].name} disconnected`);
-            activityLog(`${players[socket.id].name} left`);
-        }
         delete players[socket.id]; 
         playerOrder = playerOrder.filter(id => id !== socket.id); 
         broadcast(); 
@@ -516,432 +394,8 @@ io.on('connection', (socket) => {
 });
 
 app.get('/', (req, res) => {
-    res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="mobile-web-app-capable" content="yes">
-        <style>
-            * { box-sizing: border-box; }
-            body { 
-                background: #000; 
-                color: white; 
-                font-family: sans-serif; 
-                margin: 0; 
-                padding: 0;
-                overflow: hidden; 
-                height: 100vh;
-                height: 100dvh;
-                display: flex; 
-                flex-direction: column;
-                position: fixed;
-                width: 100%;
-            }
-            
-            #top-bar {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                padding: 6px 8px;
-                background: rgba(0,0,0,0.5);
-                z-index: 100;
-                flex-shrink: 0;
-                position: relative;
-            }
-            #blinds-overlay { 
-                font-size: 24px; 
-                color: #888;
-                position: absolute;
-                left: 8px;
-            }
-            #pot-display { 
-                font-size: 24px; 
-                color: #2ecc71; 
-                font-weight: bold;
-                text-align: center;
-            }
-            
-            @media (max-width: 768px) and (orientation: landscape) {
-                #top-bar {
-                    padding: 4px 8px;
-                }
-                #pot-display {
-                    font-size: 20px;
-                }
-                #blinds-overlay {
-                    font-size: 20px;
-                }
-            }
-            
-            .game-area { 
-                position: relative; 
-                flex: 1; 
-                overflow: hidden; 
-                display: flex; 
-                justify-content: center; 
-                align-items: center;
-                min-height: 0;
-            }
-            
-            .poker-table { 
-                width: 500px;
-                height: 240px;
-                background: #1a5c1a; 
-                border: 4px solid #4d260a; 
-                border-radius: 120px; 
-                position: absolute; 
-                display: flex; 
-                flex-direction: column; 
-                justify-content: center; 
-                align-items: center; 
-                z-index: 1; 
-                box-shadow: inset 0 0 15px #000;
-                left: 50%;
-                top: 45%;
-                transform: translate(-50%, -50%);
-            }
-            
-            @media (max-width: 768px) and (orientation: landscape) {
-                .poker-table {
-                    width: 60vw;
-                    height: 50vh;
-                    max-width: 600px;
-                    max-height: 280px;
-                }
-            }
-            
-            @media (max-width: 768px) and (orientation: portrait) {
-                .poker-table {
-                    width: 80vw;
-                    height: 35vh;
-                }
-            }
-            
-            #table-logo { 
-                font-size: 11px; 
-                font-weight: bold; 
-                color: rgba(255,255,255,0.1); 
-                text-transform: uppercase; 
-                margin-bottom: 3px; 
-            }
-            #community { 
-                display: flex; 
-                justify-content: center; 
-                align-items: center; 
-                margin-bottom: 6px; 
-            }
-            #action-guide { 
-                font-size: 11px; 
-                color: #f1c40f; 
-                text-align: center; 
-                font-weight: bold; 
-            }
-            
-            .card { 
-                background: white; 
-                color: black; 
-                border: 2px solid #000; 
-                border-radius: 6px; 
-                padding: 4px 6px; 
-                margin: 2px; 
-                font-weight: bold; 
-                font-size: 1.6em; 
-                min-width: 40px;
-                min-height: 50px;
-                display: inline-flex; 
-                justify-content: center; 
-                align-items: center;
-                position: relative;
-            }
-            .card.red { color: #d63031; }
-            .card.hidden { background: #2980b9; color: #2980b9; }
-            .card .suit-letter {
-                position: absolute;
-                top: 2px;
-                right: 4px;
-                font-size: 0.5em;
-                font-weight: bold;
-                opacity: 0.7;
-            }
-            
-            .player-seat { 
-                position: absolute; 
-                z-index: 10; 
-            }
-            .player-box { 
-                background: #111; 
-                border: 2px solid #444; 
-                padding: 4px; 
-                border-radius: 6px; 
-                font-size: 10px; 
-                min-width: 80px; 
-                text-align: center; 
-                position: relative;
-                overflow: visible;
-            }
-            .timer-display {
-                display: inline-block;
-                margin-left: 5px;
-                padding: 2px 5px;
-                background: rgba(255,255,255,0.1);
-                border-radius: 3px;
-                font-size: 10px;
-                font-weight: bold;
-                color: #f1c40f;
-            }
-            .timer-display.warning {
-                background: rgba(231, 76, 60, 0.3);
-                color: #e74c3c;
-                animation: pulse 0.5s infinite;
-            }
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.6; }
-            }
-            .auto-fold-container {
-                margin-top: 2px;
-                font-size: 9px;
-            }
-            .auto-fold-checkbox {
-                margin-right: 3px;
-                cursor: pointer;
-            }
-            .player-box.my-seat {
-                background: #fff;
-                border: 3px solid #2ecc71;
-                box-shadow: 0 0 12px rgba(46, 204, 113, 0.6);
-            }
-            .player-box.my-seat b {
-                color: #16a085 !important;
-                font-weight: 900;
-            }
-            .player-box.my-seat .chip-count {
-                color: #000;
-                font-weight: bold;
-            }
-            .player-box.my-seat .bet-amount {
-                color: #2980b9 !important;
-            }
-            .active-turn { 
-                border-color: #f1c40f; 
-                box-shadow: 0 0 8px #f1c40f; 
-            }
-            .active-turn.my-seat {
-                border-color: #f39c12;
-                box-shadow: 0 0 15px rgba(243, 156, 18, 0.8);
-            }
-            .card-row { 
-                display: flex; 
-                justify-content: center; 
-                gap: 3px; 
-                margin: 3px 0; 
-            }
-            .card-small { 
-                background: white; 
-                color: black; 
-                border-radius: 6px; 
-                border: 2px solid #000; 
-                font-size: 1.6em; 
-                padding: 4px 6px; 
-                font-weight: bold; 
-                min-width: 40px;
-                min-height: 50px;
-                display: inline-flex;
-                justify-content: center;
-                align-items: center;
-                position: relative;
-            }
-            .card-small.red { color: #d63031; }
-            .card-small.hidden { background: #2980b9; color: #2980b9; }
-            .card-small .suit-letter {
-                position: absolute;
-                top: 2px;
-                right: 3px;
-                font-size: 0.5em;
-                font-weight: bold;
-                opacity: 0.7;
-            }
-            .chip-count {
-                font-size: 14px;
-                font-weight: bold;
-                margin-top: 3px;
-            }
-            
-            @media (max-width: 768px) and (orientation: landscape) {
-                .card-small {
-                    font-size: 1.4em;
-                    min-width: 36px;
-                    min-height: 46px;
-                    padding: 3px 5px;
-                }
-                .chip-count {
-                    font-size: 13px;
-                }
-            }
-            
-            .disc { 
-                position: absolute; 
-                top: 50%; 
-                right: -18px; 
-                transform: translateY(-50%);
-                width: 24px; 
-                height: 24px; 
-                border-radius: 50%; 
-                font-size: 11px; 
-                font-weight: bold; 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; 
-                border: 2px solid black;
-                z-index: 20;
-            }
-            .disc.d { background: white; color: black; }
-            .disc.sb { background: #3498db; color: white; }
-            .disc.bb { background: #f1c40f; color: black; }
-            
-            #controls { 
-                background: #111; 
-                padding: 8px; 
-                border-top: 2px solid #333; 
-                display: none; 
-                justify-content: center; 
-                gap: 6px; 
-                width: 100%; 
-                flex-shrink: 0;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                z-index: 101;
-            }
-            
-            @media (max-width: 768px) and (orientation: landscape) {
-                #controls {
-                    padding: 6px 8px;
-                }
-                #controls button {
-                    padding: 10px 8px;
-                    font-size: 12px;
-                }
-                #controls input {
-                    width: 50px;
-                    font-size: 13px;
-                    padding: 8px 4px;
-                }
-            }
-            
-            #controls button { 
-                flex: 1; 
-                padding: 12px 0; 
-                font-size: 13px; 
-                border: none; 
-                border-radius: 4px; 
-                color: white; 
-                font-weight: bold; 
-                max-width: 100px;
-                cursor: pointer;
-            }
-            #controls input { 
-                width: 60px; 
-                background: #000; 
-                color: #fff; 
-                border: 1px solid #444; 
-                text-align: center; 
-                font-size: 15px;
-                border-radius: 4px;
-                padding: 10px 2px;
-            }
-            
-            #debug-window { 
-                position: fixed; 
-                top: 30px; 
-                right: 10px; 
-                width: 300px; 
-                height: 300px; 
-                background: rgba(0,0,0,0.95); 
-                color: lime; 
-                font-family: monospace; 
-                font-size: 10px; 
-                padding: 8px; 
-                overflow-y: scroll; 
-                border: 1px solid #333; 
-                display: none; 
-                z-index: 200;
-                line-height: 1.3;
-            }
-            #activity-log { 
-                position: fixed; 
-                bottom: 60px; 
-                left: 10px; 
-                width: 200px; 
-                height: 120px; 
-                background: rgba(0,0,0,0.95); 
-                border: 1px solid #444; 
-                color: #fff;
-                font-size: 11px; 
-                padding: 8px; 
-                overflow-y: scroll; 
-                display: none; 
-                z-index: 200;
-                line-height: 1.4;
-            }
-            
-            #footer-btns { 
-                position: fixed; 
-                bottom: 4px; 
-                right: 4px; 
-                display: flex; 
-                gap: 4px; 
-                z-index: 102; 
-            }
-            .tool-btn { 
-                padding: 4px 8px; 
-                font-size: 10px; 
-                background: #333; 
-                color: white; 
-                border: none; 
-                border-radius: 3px;
-                cursor: pointer;
-            }
-            #fullscreen-btn {
-                background: #9b59b6;
-                position: fixed;
-                top: 40px;
-                left: 8px;
-                z-index: 103;
-                padding: 6px 12px;
-                font-size: 11px;
-                font-weight: bold;
-            }
-            
-            /* iOS Install Prompt */
-            #ios-prompt {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0,0,0,0.95);
-                border: 3px solid #9b59b6;
-                padding: 20px;
-                border-radius: 12px;
-                z-index: 300;
-                display: none;
-                max-width: 90%;
-                text-align: center;
-                color: white;
-            }
-            #ios-prompt h3 {
-                margin: 0 0 15px 0;
-                color: #9b59b6;
-            }
-            #ios-prompt p {
-                margin: 10px 0;
-                line-height: 1.6;
-            }
-            #ios-prompt button {
-                background: #9b59b6;
-                color: white;
-    `);
+    res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>Poker Client</body></html>`);
 });
+
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => { console.log('Server running on port ' + PORT); });
