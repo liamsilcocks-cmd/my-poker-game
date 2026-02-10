@@ -453,31 +453,36 @@ app.get('/', (req, res) => {
             
             #top-bar {
                 display: flex;
-                justify-content: space-between;
-                padding: 4px 8px;
+                justify-content: center;
+                align-items: center;
+                padding: 6px 8px;
                 background: rgba(0,0,0,0.5);
                 z-index: 100;
                 flex-shrink: 0;
+                position: relative;
+            }
+            #blinds-overlay { 
+                font-size: 11px; 
+                color: #888;
+                position: absolute;
+                left: 8px;
+            }
+            #pot-display { 
+                font-size: 24px; 
+                color: #2ecc71; 
+                font-weight: bold;
+                text-align: center;
             }
             
             @media (max-width: 768px) and (orientation: landscape) {
                 #top-bar {
-                    padding: 2px 8px;
+                    padding: 4px 8px;
                 }
-            }
-            #blinds-overlay { 
-                font-size: 11px; 
-                color: #888; 
-            }
-            #pot-display { 
-                font-size: 20px; 
-                color: #2ecc71; 
-                font-weight: bold; 
-            }
-            
-            @media (max-width: 768px) and (orientation: landscape) {
                 #pot-display {
-                    font-size: 18px;
+                    font-size: 20px;
+                }
+                #blinds-overlay {
+                    font-size: 10px;
                 }
             }
             
@@ -548,19 +553,29 @@ app.get('/', (req, res) => {
             .card { 
                 background: white; 
                 color: black; 
-                border: 1px solid #000; 
-                border-radius: 4px; 
-                padding: 2px 4px; 
-                margin: 1px; 
+                border: 2px solid #000; 
+                border-radius: 6px; 
+                padding: 4px 6px; 
+                margin: 2px; 
                 font-weight: bold; 
-                font-size: 1.3em; 
-                min-width: 30px; 
+                font-size: 1.6em; 
+                min-width: 40px;
+                min-height: 50px;
                 display: inline-flex; 
                 justify-content: center; 
-                align-items: center; 
+                align-items: center;
+                position: relative;
             }
             .card.red { color: #d63031; }
             .card.hidden { background: #2980b9; color: #2980b9; }
+            .card .suit-letter {
+                position: absolute;
+                top: 2px;
+                right: 4px;
+                font-size: 0.5em;
+                font-weight: bold;
+                opacity: 0.7;
+            }
             
             .player-seat { 
                 position: absolute; 
@@ -603,35 +618,49 @@ app.get('/', (req, res) => {
             .card-row { 
                 display: flex; 
                 justify-content: center; 
-                gap: 2px; 
-                margin: 2px 0; 
+                gap: 3px; 
+                margin: 3px 0; 
             }
             .card-small { 
                 background: white; 
                 color: black; 
-                border-radius: 4px; 
-                border: 1px solid #000; 
-                font-size: 1.3em; 
-                padding: 2px 4px; 
+                border-radius: 5px; 
+                border: 2px solid #000; 
+                font-size: 1.5em; 
+                padding: 3px 5px; 
                 font-weight: bold; 
-                min-width: 30px; 
+                min-width: 38px;
+                min-height: 48px;
+                display: inline-flex;
+                justify-content: center;
+                align-items: center;
+                position: relative;
             }
             .card-small.red { color: #d63031; }
             .card-small.hidden { background: #2980b9; color: #2980b9; }
-            .chip-count {
-                font-size: 12px;
+            .card-small .suit-letter {
+                position: absolute;
+                top: 2px;
+                right: 3px;
+                font-size: 0.5em;
                 font-weight: bold;
-                margin-top: 2px;
+                opacity: 0.7;
+            }
+            .chip-count {
+                font-size: 14px;
+                font-weight: bold;
+                margin-top: 3px;
             }
             
             @media (max-width: 768px) and (orientation: landscape) {
                 .card-small {
-                    font-size: 1.1em;
-                    min-width: 26px;
-                    padding: 1px 3px;
+                    font-size: 1.3em;
+                    min-width: 34px;
+                    min-height: 44px;
+                    padding: 2px 4px;
                 }
                 .chip-count {
-                    font-size: 11px;
+                    font-size: 13px;
                 }
             }
             
@@ -1132,7 +1161,21 @@ app.get('/', (req, res) => {
             function formatCard(c, isSmall = false) {
                 if (c === '?') return \`<div class="card \${isSmall ? 'card-small' : ''} hidden">?</div>\`;
                 const isRed = c.includes('♥') || c.includes('♦');
-                return \`<div class="card \${isSmall ? 'card-small' : ''} \${isRed ? 'red' : ''}">\${c}</div>\`;
+                
+                // Extract suit letter
+                let suitLetter = '';
+                if (c.includes('♠')) suitLetter = 'S';
+                else if (c.includes('♥')) suitLetter = 'H';
+                else if (c.includes('♦')) suitLetter = 'D';
+                else if (c.includes('♣')) suitLetter = 'C';
+                
+                // Extract rank (everything except last character which is the suit symbol)
+                const rank = c.slice(0, -1);
+                
+                return \`<div class="card \${isSmall ? 'card-small' : ''} \${isRed ? 'red' : ''}">
+                    <span class="suit-letter">\${suitLetter}</span>
+                    \${rank}
+                </div>\`;
             }
             
             function renderSeats(data) {
