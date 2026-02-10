@@ -256,55 +256,56 @@ app.get('/', (req, res) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
             * { box-sizing: border-box; }
-            body { background: #000; color: white; font-family: sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100dvh; display: flex; flex-direction: column; position: fixed; width: 100%; }
+            body { background: #000; color: white; font-family: sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; height: 100dvh; display: flex; flex-direction: column; position: fixed; width: 100%; }
             #top-bar { display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.5); z-index: 100; flex-shrink: 0; }
             #pot-display { font-size: 20px; color: #2ecc71; font-weight: bold; }
-            .game-area { position: relative; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 0; }
-            .poker-table { width: 500px; height: 260px; background: #1a5c1a; border: 4px solid #4d260a; border-radius: 130px; position: absolute; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1; box-shadow: inset 0 0 15px #000; left: 50%; top: 45%; transform: translate(-50%, -50%); }
+            .game-area { position: relative; flex: 1; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 0; }
+            .poker-table { width: 500px; height: 240px; background: #1a5c1a; border: 4px solid #4d260a; border-radius: 120px; position: absolute; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1; box-shadow: inset 0 0 15px #000; left: 50%; top: 45%; transform: translate(-50%, -50%); }
             
-            /* UPDATED CARD STYLES */
+            /* ENLARGED CARDS */
             .card { 
-                background: white; color: black; border: 1px solid #000; border-radius: 6px; 
-                margin: 2px; font-weight: bold; font-size: 22px; 
-                width: 55px; height: 80px;
-                display: inline-flex; flex-direction: column; justify-content: center; align-items: center; position: relative;
+                background: white; color: black; border: 1px solid #000; border-radius: 4px; 
+                margin: 2px; font-weight: bold; font-size: 2em; /* Bigger font */
+                width: 60px; height: 85px; /* Bigger dimensions */
+                display: inline-flex; justify-content: center; align-items: center; position: relative;
             }
             .card-small { 
                 background: white; color: black; border-radius: 4px; border: 1px solid #000; 
-                font-size: 18px; font-weight: bold; 
-                width: 45px; height: 65px;
-                display: inline-flex; flex-direction: column; justify-content: center; align-items: center; position: relative;
+                font-size: 1.6em; font-weight: bold; 
+                width: 50px; height: 70px;
+                display: inline-flex; justify-content: center; align-items: center; position: relative;
             }
             .suit-corner {
-                position: absolute; top: 2px; right: 4px; font-size: 0.6em; color: #666;
+                position: absolute; top: 1px; right: 3px; font-size: 0.5em; color: #444; font-weight: normal;
             }
             .card.red, .card-small.red { color: #d63031; }
             .card.hidden, .card-small.hidden { background: #2980b9; color: #2980b9; }
 
             .player-seat { position: absolute; z-index: 10; }
-            .player-box { background: #111; border: 2px solid #444; padding: 6px; border-radius: 8px; font-size: 10px; min-width: 100px; text-align: center; }
+            .player-box { background: #111; border: 2px solid #444; padding: 4px; border-radius: 6px; font-size: 10px; min-width: 80px; text-align: center; position: relative; }
             .active-turn { border-color: #f1c40f; box-shadow: 0 0 8px #f1c40f; }
-            .card-row { display: flex; justify-content: center; gap: 4px; margin: 4px 0; }
-            #controls { background: #111; padding: 12px; border-top: 2px solid #333; display: none; justify-content: center; gap: 8px; width: 100%; position: fixed; bottom: 0; z-index: 101; }
-            #controls button { flex: 1; padding: 15px 0; font-size: 14px; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; border:none; }
+            .card-row { display: flex; justify-content: center; gap: 2px; margin: 2px 0; }
+            #community { display: flex; justify-content: center; align-items: center; margin-bottom: 6px; }
+            #controls { background: #111; padding: 8px; border-top: 2px solid #333; display: none; justify-content: center; gap: 6px; width: 100%; flex-shrink: 0; position: fixed; bottom: 0; left: 0; z-index: 101; }
+            #controls button { flex: 1; padding: 12px 0; font-size: 13px; border: none; border-radius: 4px; color: white; font-weight: bold; max-width: 100px; cursor: pointer; }
+            #controls input { width: 60px; background: #000; color: #fff; border: 1px solid #444; text-align: center; font-size: 15px; border-radius: 4px; padding: 10px 2px; }
         </style>
     </head>
     <body>
         <div id="top-bar">
-            <div id="blinds-overlay">Blinds: <span id="blinds-info">25/50</span></div>
+            <div id="blinds-overlay">Blinds: <span id="blinds-info">--/--</span></div>
             <div id="pot-display">Pot: £<span id="pot">0</span></div>
         </div>
         <div class="game-area">
-            <div class="poker-table">
+            <div class="poker-table" id="poker-table">
                 <div id="community"></div>
-                <div id="action-guide"></div>
             </div>
             <div id="seats"></div>
         </div>
         <div id="controls">
             <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
             <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;">CHECK</button>
-            <input type="number" id="bet-amt" value="100" style="width:70px; text-align:center;">
+            <input type="number" id="bet-amt" value="100">
             <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
         </div>
 
@@ -331,21 +332,20 @@ app.get('/', (req, res) => {
                 return \`
                     <div class="\${isSmall ? 'card-small' : 'card'} \${isRed ? 'red' : ''}">
                         <div class="suit-corner">\${suitLetter}</div>
-                        <div>\${rank}\${suit}</div>
+                        <span>\${rank}\${suit}</span>
                     </div>\`;
             }
 
             socket.on('update', (data) => {
                 document.getElementById('pot').innerText = data.pot;
-                const commDiv = document.getElementById('community');
-                commDiv.innerHTML = data.community.map(c => renderCard(c)).join('');
+                document.getElementById('community').innerHTML = data.community.map(c => renderCard(c)).join('');
                 
                 const seatsDiv = document.getElementById('seats');
                 seatsDiv.innerHTML = '';
                 data.players.forEach((p, i) => {
                     const angle = (i * (360 / data.players.length)) * (Math.PI / 180);
-                    const x = 250 * Math.cos(angle);
-                    const y = 130 * Math.sin(angle);
+                    const x = 240 * Math.cos(angle);
+                    const y = 110 * Math.sin(angle);
                     
                     const seat = document.createElement('div');
                     seat.className = 'player-seat';
@@ -368,10 +368,6 @@ app.get('/', (req, res) => {
 
                 const controls = document.getElementById('controls');
                 controls.style.display = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN') ? 'flex' : 'none';
-                if (data.gameStage === 'LOBBY' && data.isHost) {
-                    controls.style.display = 'flex';
-                    controls.innerHTML = '<button onclick="socket.emit(\\'start_game\\')" style="background:#2980b9; max-width:100%">START GAME</button>';
-                }
             });
         </script>
     </body>
