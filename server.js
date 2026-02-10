@@ -477,74 +477,21 @@ app.get('/', (req, res) => {
             }
             
             .poker-table { 
-                width: min(50vw, 400px);
-                height: min(30vh, 200px);
+                width: 400px;
+                height: 200px;
                 background: #1a5c1a; 
                 border: 4px solid #4d260a; 
                 border-radius: 100px; 
-                position: relative; 
+                position: absolute; 
                 display: flex; 
                 flex-direction: column; 
                 justify-content: center; 
                 align-items: center; 
                 z-index: 1; 
                 box-shadow: inset 0 0 15px #000;
-            }
-            
-            @media (max-height: 500px) and (orientation: landscape) {
-                #top-bar {
-                    padding: 2px 8px;
-                }
-                #pot-display {
-                    font-size: 14px;
-                }
-                #blinds-overlay {
-                    font-size: 10px;
-                }
-                .poker-table {
-                    width: min(45vw, 350px);
-                    height: min(25vh, 150px);
-                    border-width: 3px;
-                    border-radius: 80px;
-                }
-                #table-logo {
-                    font-size: 10px !important;
-                    margin-bottom: 2px !important;
-                }
-                #action-guide {
-                    font-size: 10px !important;
-                }
-                .card {
-                    font-size: 1.1em !important;
-                    min-width: 25px !important;
-                    padding: 1px 3px !important;
-                }
-                .player-box {
-                    font-size: 9px !important;
-                    padding: 3px !important;
-                    min-width: 70px !important;
-                }
-                .player-box.my-seat {
-                    border-width: 2px !important;
-                }
-                .card-small {
-                    font-size: 0.9em !important;
-                    min-width: 18px !important;
-                }
-                #controls {
-                    padding: 6px;
-                    gap: 4px;
-                }
-                #controls button {
-                    padding: 10px 0 !important;
-                    font-size: 12px !important;
-                    max-width: 90px !important;
-                }
-                #controls input {
-                    width: 55px !important;
-                    font-size: 14px !important;
-                    padding: 8px 2px !important;
-                }
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
             }
             
             #table-logo { 
@@ -587,7 +534,6 @@ app.get('/', (req, res) => {
             .player-seat { 
                 position: absolute; 
                 z-index: 10; 
-                transform: translate(-50%, -50%); 
             }
             .player-box { 
                 background: #111; 
@@ -667,25 +613,10 @@ app.get('/', (req, res) => {
                 gap: 6px; 
                 width: 100%; 
                 flex-shrink: 0;
-                position: relative;
+                position: fixed;
+                bottom: 0;
+                left: 0;
                 z-index: 101;
-            }
-            
-            @media (max-height: 500px) and (orientation: landscape) {
-                #controls {
-                    padding: 6px;
-                    gap: 4px;
-                }
-                #controls button {
-                    padding: 10px 0 !important;
-                    font-size: 12px !important;
-                    max-width: 90px !important;
-                }
-                #controls input {
-                    width: 55px !important;
-                    font-size: 14px !important;
-                    padding: 8px 2px !important;
-                }
             }
             
             #controls button { 
@@ -714,8 +645,8 @@ app.get('/', (req, res) => {
                 position: fixed; 
                 top: 30px; 
                 right: 10px; 
-                width: 240px; 
-                height: 200px; 
+                width: 300px; 
+                height: 300px; 
                 background: rgba(0,0,0,0.95); 
                 color: lime; 
                 font-family: monospace; 
@@ -778,6 +709,62 @@ app.get('/', (req, res) => {
                 font-size: 16px;
                 cursor: pointer;
             }
+            
+            /* POSITION CONTROLS */
+            #position-controls {
+                position: fixed;
+                top: 40px;
+                left: 10px;
+                background: rgba(0,0,0,0.95);
+                border: 2px solid #f39c12;
+                padding: 10px;
+                border-radius: 8px;
+                z-index: 250;
+                display: none;
+                color: #fff;
+                font-size: 11px;
+                max-height: 80vh;
+                overflow-y: auto;
+                min-width: 280px;
+            }
+            #position-controls h3 {
+                margin: 0 0 10px 0;
+                color: #f39c12;
+                font-size: 13px;
+                border-bottom: 1px solid #f39c12;
+                padding-bottom: 5px;
+            }
+            .pos-section {
+                margin-bottom: 15px;
+                padding: 8px;
+                background: rgba(255,255,255,0.05);
+                border-radius: 4px;
+            }
+            .pos-section h4 {
+                margin: 0 0 8px 0;
+                color: #3498db;
+                font-size: 12px;
+            }
+            .slider-group {
+                margin: 5px 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .slider-group label {
+                min-width: 30px;
+                color: #aaa;
+            }
+            .slider-group input[type="range"] {
+                flex: 1;
+                height: 20px;
+            }
+            .slider-group span {
+                min-width: 50px;
+                text-align: right;
+                color: #2ecc71;
+                font-weight: bold;
+            }
         </style>
     </head>
     <body>
@@ -789,7 +776,7 @@ app.get('/', (req, res) => {
         <div class="game-area">
             <div id="debug-window"><b>🔧 DEBUG LOG</b><hr></div>
             <div id="activity-log"><b>📋 ACTIVITY</b><hr></div>
-            <div class="poker-table">
+            <div class="poker-table" id="poker-table">
                 <div id="table-logo">SYFM POKER</div>
                 <div id="community"></div>
                 <div id="action-guide"></div>
@@ -804,9 +791,61 @@ app.get('/', (req, res) => {
             <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
         </div>
         
+        <div id="position-controls">
+            <h3>🎯 POSITION CONTROLS</h3>
+            
+            <div class="pos-section">
+                <h4>Poker Table</h4>
+                <div class="slider-group">
+                    <label>X:</label>
+                    <input type="range" id="table-x" min="0" max="100" value="50" step="1">
+                    <span id="table-x-val">50%</span>
+                </div>
+                <div class="slider-group">
+                    <label>Y:</label>
+                    <input type="range" id="table-y" min="0" max="100" value="50" step="1">
+                    <span id="table-y-val">50%</span>
+                </div>
+            </div>
+            
+            <div class="pos-section">
+                <h4>Player Seats Orbit</h4>
+                <div class="slider-group">
+                    <label>X:</label>
+                    <input type="range" id="seats-x" min="0" max="100" value="50" step="1">
+                    <span id="seats-x-val">50%</span>
+                </div>
+                <div class="slider-group">
+                    <label>Y:</label>
+                    <input type="range" id="seats-y" min="0" max="100" value="50" step="1">
+                    <span id="seats-y-val">50%</span>
+                </div>
+                <div class="slider-group">
+                    <label>RX:</label>
+                    <input type="range" id="seats-rx" min="50" max="500" value="250" step="10">
+                    <span id="seats-rx-val">250px</span>
+                </div>
+                <div class="slider-group">
+                    <label>RY:</label>
+                    <input type="range" id="seats-ry" min="50" max="400" value="180" step="10">
+                    <span id="seats-ry-val">180px</span>
+                </div>
+            </div>
+            
+            <div class="pos-section">
+                <h4>Action Buttons</h4>
+                <div class="slider-group">
+                    <label>Y:</label>
+                    <input type="range" id="controls-y" min="0" max="100" value="100" step="1">
+                    <span id="controls-y-val">100%</span>
+                </div>
+            </div>
+        </div>
+        
         <div id="footer-btns">
             <button class="tool-btn" onclick="let l=document.getElementById('activity-log'); l.style.display=l.style.display==='block'?'none':'block'">LOG</button>
             <button id="debug-btn" class="tool-btn" style="display:none; background:#16a085" onclick="let d=document.getElementById('debug-window'); d.style.display=d.style.display==='block'?'none':'block'">DEBUG</button>
+            <button id="position-btn" class="tool-btn" style="background:#f39c12" onclick="let p=document.getElementById('position-controls'); p.style.display=p.style.display==='block'?'none':'block'">POSITION</button>
             <button id="reset-btn" class="tool-btn" style="display:none; background:#c0392b" onclick="socket.emit('reset_engine')">RESET</button>
         </div>
         
@@ -818,13 +857,145 @@ app.get('/', (req, res) => {
             const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
             
+            // Position state
+            let positions = {
+                tableX: 50, tableY: 50,
+                seatsX: 50, seatsY: 50, seatsRX: 250, seatsRY: 180,
+                controlsY: 100
+            };
+            
+            function logPosition(label, data) {
+                const msg = \`📍 \${label}: \${JSON.stringify(data)}\`;
+                console.log(msg);
+                const d = document.getElementById('debug-window');
+                d.innerHTML += '<div style="color:#f39c12">' + msg + '</div>';
+                d.scrollTop = d.scrollHeight;
+            }
+            
+            // Table position sliders
+            document.getElementById('table-x').addEventListener('input', (e) => {
+                positions.tableX = e.target.value;
+                document.getElementById('table-x-val').innerText = e.target.value + '%';
+                const table = document.getElementById('poker-table');
+                table.style.left = e.target.value + '%';
+                logPosition('TABLE', {x: e.target.value + '%', y: positions.tableY + '%'});
+            });
+            
+            document.getElementById('table-y').addEventListener('input', (e) => {
+                positions.tableY = e.target.value;
+                document.getElementById('table-y-val').innerText = e.target.value + '%';
+                const table = document.getElementById('poker-table');
+                table.style.top = e.target.value + '%';
+                logPosition('TABLE', {x: positions.tableX + '%', y: e.target.value + '%'});
+            });
+            
+            // Seats position sliders
+            document.getElementById('seats-x').addEventListener('input', (e) => {
+                positions.seatsX = e.target.value;
+                document.getElementById('seats-x-val').innerText = e.target.value + '%';
+                updateSeats();
+                logPosition('SEATS', {x: e.target.value + '%', y: positions.seatsY + '%', rx: positions.seatsRX + 'px', ry: positions.seatsRY + 'px'});
+            });
+            
+            document.getElementById('seats-y').addEventListener('input', (e) => {
+                positions.seatsY = e.target.value;
+                document.getElementById('seats-y-val').innerText = e.target.value + '%';
+                updateSeats();
+                logPosition('SEATS', {x: positions.seatsX + '%', y: e.target.value + '%', rx: positions.seatsRX + 'px', ry: positions.seatsRY + 'px'});
+            });
+            
+            document.getElementById('seats-rx').addEventListener('input', (e) => {
+                positions.seatsRX = e.target.value;
+                document.getElementById('seats-rx-val').innerText = e.target.value + 'px';
+                updateSeats();
+                logPosition('SEATS', {x: positions.seatsX + '%', y: positions.seatsY + '%', rx: e.target.value + 'px', ry: positions.seatsRY + 'px'});
+            });
+            
+            document.getElementById('seats-ry').addEventListener('input', (e) => {
+                positions.seatsRY = e.target.value;
+                document.getElementById('seats-ry-val').innerText = e.target.value + 'px';
+                updateSeats();
+                logPosition('SEATS', {x: positions.seatsX + '%', y: positions.seatsY + '%', rx: positions.seatsRX + 'px', ry: e.target.value + 'px'});
+            });
+            
+            // Controls position slider
+            document.getElementById('controls-y').addEventListener('input', (e) => {
+                positions.controlsY = e.target.value;
+                document.getElementById('controls-y-val').innerText = e.target.value + '%';
+                const controls = document.getElementById('controls');
+                if (e.target.value == 100) {
+                    controls.style.bottom = '0';
+                    controls.style.top = 'auto';
+                } else {
+                    controls.style.top = e.target.value + '%';
+                    controls.style.bottom = 'auto';
+                }
+                logPosition('CONTROLS', {y: e.target.value + '%'});
+            });
+            
+            let currentData = null;
+            
+            function updateSeats() {
+                if (!currentData) return;
+                renderSeats(currentData);
+            }
+            
             function formatCard(c, isSmall = false) {
                 if (c === '?') return \`<div class="card \${isSmall ? 'card-small' : ''} hidden">?</div>\`;
                 const isRed = c.includes('♥') || c.includes('♦');
                 return \`<div class="card \${isSmall ? 'card-small' : ''} \${isRed ? 'red' : ''}">\${c}</div>\`;
             }
             
+            function renderSeats(data) {
+                const area = document.getElementById('seats');
+                area.innerHTML = '';
+                
+                const vW = window.innerWidth;
+                const vH = window.innerHeight;
+                
+                const cX = vW * (positions.seatsX / 100);
+                const cY = vH * (positions.seatsY / 100);
+                
+                const rX = positions.seatsRX;
+                const rY = positions.seatsRY;
+
+                data.players.forEach((p, i) => {
+                    const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
+                    const x = cX + rX * Math.cos(angle);
+                    const y = cY + rY * Math.sin(angle);
+                    
+                    const seat = document.createElement('div');
+                    seat.className = "player-seat";
+                    seat.style.left = x + "px";
+                    seat.style.top = y + "px";
+                    seat.style.transform = "translate(-50%, -50%)";
+                    
+                    let disc = '';
+                    if(p.isDealer) disc = '<div class="disc d">D</div>';
+                    else if(p.isSB) disc = '<div class="disc sb">SB</div>';
+                    else if(p.isBB) disc = '<div class="disc bb">BB</div>';
+
+                    const cardsHtml = p.cards.map(c => formatCard(c, true)).join('');
+                    const isMe = p.id === data.myId;
+                    const boxClasses = ['player-box'];
+                    if (p.id === data.activeId) boxClasses.push('active-turn');
+                    if (isMe) boxClasses.push('my-seat');
+                    
+                    seat.innerHTML = \`
+                        <div class="\${boxClasses.join(' ')}">
+                            \${disc}
+                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}">\${p.name}</b><br>
+                            <div class="card-row">\${cardsHtml}</div>
+                            <div class="chip-count" style="color:\${isMe ? '#000' : '#fff'}">\${p.chips}</div>
+                            \${p.bet > 0 ? '<div class="bet-amount" style="color:'+(isMe ? '#2980b9' : 'cyan')+'; font-weight:bold;">£'+p.bet+'</div>' : ''}
+                        </div>\`;
+                    area.appendChild(seat);
+                });
+            }
+            
             socket.on('update', data => {
+                currentData = data;
+                
                 document.getElementById('pot').innerText = data.pot;
                 document.getElementById('blinds-info').innerText = data.SB + "/" + data.BB;
                 
@@ -848,53 +1019,7 @@ app.get('/', (req, res) => {
                 document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
                 if(isMyTurn) document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL £"+data.callAmt : "CHECK";
                 
-                const area = document.getElementById('seats');
-                area.innerHTML = '';
-                
-                const vW = window.innerWidth;
-                const vH = window.innerHeight;
-                const topBarHeight = document.getElementById('top-bar').offsetHeight;
-                const controlsHeight = isMyTurn ? document.getElementById('controls').offsetHeight : 0;
-                const availableHeight = vH - topBarHeight - controlsHeight;
-                
-                const cX = vW / 2;
-                const cY = topBarHeight + (availableHeight / 2);
-                
-                const isLandscape = vW > vH;
-                const rX = isLandscape ? Math.min(vW * 0.38, 300) : Math.min(vW * 0.38, 250);
-                const rY = isLandscape ? Math.min(availableHeight * 0.32, 140) : Math.min(availableHeight * 0.28, 180);
-
-                data.players.forEach((p, i) => {
-                    const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
-                    const x = cX + rX * Math.cos(angle);
-                    const y = cY + rY * Math.sin(angle);
-                    
-                    const seat = document.createElement('div');
-                    seat.className = "player-seat";
-                    seat.style.left = x + "px";
-                    seat.style.top = y + "px";
-                    
-                    let disc = '';
-                    if(p.isDealer) disc = '<div class="disc d">D</div>';
-                    else if(p.isSB) disc = '<div class="disc sb">SB</div>';
-                    else if(p.isBB) disc = '<div class="disc bb">BB</div>';
-
-                    const cardsHtml = p.cards.map(c => formatCard(c, true)).join('');
-                    const isMe = p.id === data.myId;
-                    const boxClasses = ['player-box'];
-                    if (p.id === data.activeId) boxClasses.push('active-turn');
-                    if (isMe) boxClasses.push('my-seat');
-                    
-                    seat.innerHTML = \`
-                        <div class="\${boxClasses.join(' ')}">
-                            \${disc}
-                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}">\${p.name}</b><br>
-                            <div class="card-row">\${cardsHtml}</div>
-                            <div class="chip-count" style="color:\${isMe ? '#000' : '#fff'}">\${p.chips}</div>
-                            \${p.bet > 0 ? '<div class="bet-amount" style="color:'+(isMe ? '#2980b9' : 'cyan')+'; font-weight:bold;">£'+p.bet+'</div>' : ''}
-                        </div>\`;
-                    area.appendChild(seat);
-                });
+                renderSeats(data);
             });
             
             socket.on('activity_log', data => {
