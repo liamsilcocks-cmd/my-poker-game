@@ -459,6 +459,12 @@ app.get('/', (req, res) => {
                 z-index: 100;
                 flex-shrink: 0;
             }
+            
+            @media (max-width: 768px) and (orientation: landscape) {
+                #top-bar {
+                    padding: 2px 8px;
+                }
+            }
             #blinds-overlay { 
                 font-size: 11px; 
                 color: #888; 
@@ -480,11 +486,11 @@ app.get('/', (req, res) => {
             }
             
             .poker-table { 
-                width: 400px;
-                height: 200px;
+                width: 500px;
+                height: 240px;
                 background: #1a5c1a; 
                 border: 4px solid #4d260a; 
-                border-radius: 100px; 
+                border-radius: 120px; 
                 position: absolute; 
                 display: flex; 
                 flex-direction: column; 
@@ -493,8 +499,24 @@ app.get('/', (req, res) => {
                 z-index: 1; 
                 box-shadow: inset 0 0 15px #000;
                 left: 50%;
-                top: 50%;
+                top: 45%;
                 transform: translate(-50%, -50%);
+            }
+            
+            @media (max-width: 768px) and (orientation: landscape) {
+                .poker-table {
+                    width: 60vw;
+                    height: 50vh;
+                    max-width: 600px;
+                    max-height: 280px;
+                }
+            }
+            
+            @media (max-width: 768px) and (orientation: portrait) {
+                .poker-table {
+                    width: 80vw;
+                    height: 35vh;
+                }
             }
             
             #table-logo { 
@@ -620,6 +642,21 @@ app.get('/', (req, res) => {
                 bottom: 0;
                 left: 0;
                 z-index: 101;
+            }
+            
+            @media (max-width: 768px) and (orientation: landscape) {
+                #controls {
+                    padding: 6px 8px;
+                }
+                #controls button {
+                    padding: 10px 8px;
+                    font-size: 12px;
+                }
+                #controls input {
+                    width: 50px;
+                    font-size: 13px;
+                    padding: 8px 4px;
+                }
             }
             
             #controls button { 
@@ -872,8 +909,8 @@ app.get('/', (req, res) => {
                 </div>
                 <div class="slider-group">
                     <label>Y:</label>
-                    <input type="range" id="table-y" min="0" max="100" value="50" step="1">
-                    <span id="table-y-val">50%</span>
+                    <input type="range" id="table-y" min="0" max="100" value="45" step="1">
+                    <span id="table-y-val">45%</span>
                 </div>
             </div>
             
@@ -886,18 +923,18 @@ app.get('/', (req, res) => {
                 </div>
                 <div class="slider-group">
                     <label>Y:</label>
-                    <input type="range" id="seats-y" min="0" max="100" value="50" step="1">
-                    <span id="seats-y-val">50%</span>
+                    <input type="range" id="seats-y" min="0" max="100" value="45" step="1">
+                    <span id="seats-y-val">45%</span>
                 </div>
                 <div class="slider-group">
                     <label>RX:</label>
-                    <input type="range" id="seats-rx" min="50" max="500" value="250" step="10">
-                    <span id="seats-rx-val">250px</span>
+                    <input type="range" id="seats-rx" min="50" max="500" value="220" step="10">
+                    <span id="seats-rx-val">220px</span>
                 </div>
                 <div class="slider-group">
                     <label>RY:</label>
-                    <input type="range" id="seats-ry" min="50" max="400" value="180" step="10">
-                    <span id="seats-ry-val">180px</span>
+                    <input type="range" id="seats-ry" min="50" max="400" value="120" step="10">
+                    <span id="seats-ry-val">120px</span>
                 </div>
             </div>
             
@@ -987,8 +1024,8 @@ app.get('/', (req, res) => {
             
             // Position state
             let positions = {
-                tableX: 50, tableY: 50,
-                seatsX: 50, seatsY: 50, seatsRX: 250, seatsRY: 180,
+                tableX: 50, tableY: 45,
+                seatsX: 50, seatsY: 45, seatsRX: 220, seatsRY: 120,
                 controlsY: 100
             };
             
