@@ -1193,12 +1193,21 @@ app.get('/', (req, res) => {
             });
             
             // Audio beep functions
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            let audioContext = null;
             let lastTimeRemaining = 30;
             let hasPlayedTurnBeep = false;
             let hasPlayed10SecBeep = false;
             
+            function initAudio() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            
             function playBeep(frequency = 800, duration = 150) {
+                initAudio();
+                if (!audioContext) return;
+                
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
                 
@@ -1348,7 +1357,7 @@ app.get('/', (req, res) => {
                     else if(p.isSB) disc = '<div class="disc sb">SB</div>';
                     else if(p.isBB) disc = '<div class="disc bb">BB</div>';
 
-                    const cardsHtml = p.cards.map(c => formatCard(c, true)).join('');
+                    const cardsHtml = (p.cards && p.cards.length > 0) ? p.cards.map(c => formatCard(c, true)).join('') : '';
                     const isMe = p.id === data.myId;
                     const boxClasses = ['player-box'];
                     if (p.id === data.activeId) boxClasses.push('active-turn');
@@ -1389,17 +1398,17 @@ app.get('/', (req, res) => {
                 currentData = data;
                 
                 // Check if it's now my turn (beep on turn start)
-                const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY');
-                if (isMyTurn && !hasPlayedTurnBeep) {
+                const isMyTurnForBeep = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY');
+                if (isMyTurnForBeep && !hasPlayedTurnBeep) {
                     playBeep(800, 150);
                     hasPlayedTurnBeep = true;
                     hasPlayed10SecBeep = false;
-                } else if (!isMyTurn) {
+                } else if (!isMyTurnForBeep) {
                     hasPlayedTurnBeep = false;
                 }
                 
                 // Check for 10 second warning (beep once)
-                if (isMyTurn && data.timeRemaining === 10 && !hasPlayed10SecBeep) {
+                if (isMyTurnForBeep && data.timeRemaining === 10 && !hasPlayed10SecBeep) {
                     playBeep(600, 200);
                     hasPlayed10SecBeep = true;
                 }
