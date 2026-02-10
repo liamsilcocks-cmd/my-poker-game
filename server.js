@@ -431,6 +431,9 @@ app.get('/', (req, res) => {
     <html>
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="mobile-web-app-capable" content="yes">
         <style>
             * { box-sizing: border-box; }
             body { 
@@ -703,6 +706,50 @@ app.get('/', (req, res) => {
                 font-weight: bold;
             }
             
+            /* iOS Install Prompt */
+            #ios-prompt {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.95);
+                border: 3px solid #9b59b6;
+                padding: 20px;
+                border-radius: 12px;
+                z-index: 300;
+                display: none;
+                max-width: 90%;
+                text-align: center;
+                color: white;
+            }
+            #ios-prompt h3 {
+                margin: 0 0 15px 0;
+                color: #9b59b6;
+            }
+            #ios-prompt p {
+                margin: 10px 0;
+                line-height: 1.6;
+            }
+            #ios-prompt button {
+                background: #9b59b6;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-weight: bold;
+                margin-top: 15px;
+                cursor: pointer;
+            }
+            .share-icon {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                background: #007AFF;
+                border-radius: 4px;
+                margin: 0 4px;
+                vertical-align: middle;
+            }
+            
             #start-btn {
                 position: fixed;
                 top: 50%;
@@ -784,6 +831,16 @@ app.get('/', (req, res) => {
         </div>
         
         <button id="fullscreen-btn" class="tool-btn" onclick="toggleFullscreen()">FULLSCREEN</button>
+        
+        <div id="ios-prompt">
+            <h3>📱 iPhone Fullscreen Mode</h3>
+            <p>To use fullscreen on iPhone:</p>
+            <p>1. Tap the Share button <span class="share-icon">⬆️</span> at the bottom of Safari</p>
+            <p>2. Scroll down and tap "Add to Home Screen"</p>
+            <p>3. Open the app from your home screen</p>
+            <p style="color: #aaa; font-size: 12px; margin-top: 15px;">This will give you a true fullscreen experience without Safari's bars!</p>
+            <button onclick="document.getElementById('ios-prompt').style.display='none'">Got It!</button>
+        </div>
         
         <div class="game-area">
             <div id="debug-window"><b>🔧 DEBUG LOG</b><hr></div>
@@ -867,6 +924,16 @@ app.get('/', (req, res) => {
         <script>
             // Fullscreen function
             function toggleFullscreen() {
+                // Check if iOS
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                const isInStandaloneMode = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+                
+                if (isIOS && !isInStandaloneMode) {
+                    // Show iOS prompt
+                    document.getElementById('ios-prompt').style.display = 'block';
+                    return;
+                }
+                
                 if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                     // Enter fullscreen
                     const elem = document.documentElement;
@@ -905,6 +972,14 @@ app.get('/', (req, res) => {
                 const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
                 document.getElementById('fullscreen-btn').innerText = isFullscreen ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
             }
+            
+            // Hide fullscreen button if already in iOS standalone mode
+            window.addEventListener('load', () => {
+                const isInStandaloneMode = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+                if (isInStandaloneMode) {
+                    document.getElementById('fullscreen-btn').style.display = 'none';
+                }
+            });
             
             let socket = io();
             const name = prompt("Name:") || "Guest";
