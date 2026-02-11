@@ -409,10 +409,12 @@ function showdown() {
         players[winnerId].chips += pot;
         log(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
         activityLog(`${players[winnerId].name} wins £${pot}`);
+        io.emit('winner_announcement', `${players[winnerId].name} wins £${pot}`);
         setTimeout(() => {
             gameStage = 'LOBBY';
+            io.emit('clear_winner');
             broadcast();
-        }, 3000);
+        }, 5000);
         broadcast();
         return;
     }
@@ -424,36 +426,109 @@ function showdown() {
         log(`👤 ${players[id].name}: ${players[id].hand.join(' ')}`);
         log(`   Best hand: ${bestHand.name} (${bestHand.cards.join(' ')})`);
         log(`   Rank: ${bestHand.rank}, Tiebreakers: [${bestHand.tiebreakers.join(', ')}]`);
-        return { id, bestHand };
+        return { 
+            id, 
+            bestHand,
+            amountInPot: players[id].bet
+        };
     });
     
-    // Sort by hand strength (best first)
-    evaluatedPlayers.sort((a, b) => compareHands(b.bestHand, a.bestHand));
+    // Build side pots
+    // Get all players who contributed to the pot (including folded)
+    const allContributions = playerOrder.map(id => ({
+        id,
+        amount: players[id].bet,
+        inHand: inHand.includes(id)
+    })).filter(p => p.amount > 0);
     
-    // Find all winners (handle ties)
-    const winners = [evaluatedPlayers[0]];
-    for (let i = 1; i < evaluatedPlayers.length; i++) {
-        if (compareHands(evaluatedPlayers[i].bestHand, winners[0].bestHand) === 0) {
-            winners.push(evaluatedPlayers[i]);
+    // Get unique bet amounts sorted ascending
+    const uniqueAmounts = [...new Set(allContributions.map(p => p.amount))].sort((a, b) => a - b);
+    
+    const sidePots = [];
+    let previousAmount = 0;
+    
+    uniqueAmounts.forEach(amount => {
+        const increment = amount - previousAmount;
+        
+        // Count how many players contributed at least this much
+        const contributors = allContributions.filter(p => p.amount >= amount);
+        const potSize = increment * contributors.length;
+        
+        // Only players still in hand at this level can win
+        const eligiblePlayers = contributors.filter(p => p.inHand).map(p => p.id);
+        
+        if (potSize > 0 && eligiblePlayers.length > 0) {
+            sidePots.push({
+                amount: potSize,
+                eligiblePlayers: eligiblePlayers
+            });
         }
+        
+        previousAmount = amount;
+    });
+    
+    // If no side pots (everyone all-in or matched exactly), create one main pot
+    if (sidePots.length === 0) {
+        sidePots.push({
+            amount: pot,
+            eligiblePlayers: inHand
+        });
     }
     
-    const winAmt = Math.floor(pot / winners.length);
-    
-    log(`🏆 WINNER(S):`);
-    winners.forEach(w => {
-        players[w.id].chips += winAmt;
-        log(`  💰 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
-        activityLog(`${players[w.id].name} wins £${winAmt} (${w.bestHand.name})`);
+    log(`💰 SIDE POTS: ${sidePots.length} pot(s)`);
+    sidePots.forEach((sp, idx) => {
+        log(`  Pot ${idx + 1}: £${sp.amount} - Eligible: ${sp.eligiblePlayers.map(id => players[id].name).join(', ')}`);
     });
+    
+    let winnerAnnouncement = '';
+    
+    // Award each pot to its winner(s), starting from highest (side pots awarded first in poker)
+    for (let potIndex = sidePots.length - 1; potIndex >= 0; potIndex--) {
+        const sidePot = sidePots[potIndex];
+        
+        // Get hands for eligible players only
+        const eligibleHands = evaluatedPlayers.filter(ep => 
+            sidePot.eligiblePlayers.includes(ep.id)
+        );
+        
+        if (eligibleHands.length === 0) continue;
+        
+        // Sort by hand strength (best first)
+        eligibleHands.sort((a, b) => compareHands(b.bestHand, a.bestHand));
+        
+        // Find all winners (handle ties)
+        const winners = [eligibleHands[0]];
+        for (let i = 1; i < eligibleHands.length; i++) {
+            if (compareHands(eligibleHands[i].bestHand, winners[0].bestHand) === 0) {
+                winners.push(eligibleHands[i]);
+            }
+        }
+        
+        const winAmt = Math.floor(sidePot.amount / winners.length);
+        
+        const potLabel = sidePots.length > 1 ? `Pot ${potIndex + 1}` : 'Pot';
+        log(`🏆 ${potLabel} (£${sidePot.amount}) WINNER(S):`);
+        
+        winners.forEach(w => {
+            players[w.id].chips += winAmt;
+            log(`  💰 ${players[w.id].name} wins £${winAmt} with ${w.bestHand.name}`);
+            activityLog(`${players[w.id].name} wins £${winAmt} (${w.bestHand.name})`);
+            
+            if (winnerAnnouncement) winnerAnnouncement += ' | ';
+            winnerAnnouncement += `${players[w.id].name}: £${winAmt} (${w.bestHand.name})`;
+        });
+    }
+    
+    io.emit('winner_announcement', winnerAnnouncement);
     
     log(`============ HAND COMPLETE ============`);
     
-    // Reset to LOBBY after 3 seconds for next hand
+    // Reset to LOBBY after 5 seconds
     setTimeout(() => {
         gameStage = 'LOBBY';
+        io.emit('clear_winner');
         broadcast();
-    }, 3000);
+    }, 5000);
     
     broadcast();
 }
@@ -653,6 +728,14 @@ app.get('/', (req, res) => {
                 text-align: center; 
                 font-weight: bold; 
             }
+            #winner-announcement {
+                font-size: 12px;
+                color: #2ecc71;
+                text-align: center;
+                font-weight: bold;
+                margin-top: 5px;
+                min-height: 20px;
+            }
             
             .card { 
                 background: white; 
@@ -698,31 +781,33 @@ app.get('/', (req, res) => {
             }
             .timer-display {
                 position: absolute;
-                top: -15px;
+                top: -20px;
                 left: 50%;
                 transform: translateX(-50%);
                 width: 0;
                 height: 0;
-                border-left: 25px solid transparent;
-                border-right: 25px solid transparent;
-                border-bottom: 30px solid #f1c40f;
-                display: flex;
-                align-items: flex-end;
-                justify-content: center;
+                border-left: 30px solid transparent;
+                border-right: 30px solid transparent;
+                border-bottom: 35px solid #f1c40f;
                 z-index: 25;
             }
-            .timer-display span {
+            .timer-display::after {
+                content: attr(data-time);
                 position: absolute;
-                bottom: 4px;
-                font-size: 16px;
+                bottom: -28px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 18px;
                 font-weight: bold;
                 color: #000;
+                width: 40px;
+                text-align: center;
             }
             .timer-display.warning {
                 border-bottom-color: #e74c3c;
                 animation: pulse 0.5s infinite;
             }
-            .timer-display.warning span {
+            .timer-display.warning::after {
                 color: #fff;
             }
             @keyframes pulse {
@@ -812,8 +897,8 @@ app.get('/', (req, res) => {
             
             .disc { 
                 position: absolute; 
-                top: -8px; 
-                right: -8px;
+                top: -18px; 
+                right: -18px;
                 width: 36px; 
                 height: 36px; 
                 border-radius: 50%; 
@@ -828,6 +913,11 @@ app.get('/', (req, res) => {
             .disc.d { background: white; color: black; }
             .disc.sb { background: #3498db; color: white; }
             .disc.bb { background: #f1c40f; color: black; }
+            .disc.bb-bottom { 
+                top: auto;
+                bottom: -18px;
+                right: -18px;
+            }
             
             #controls { 
                 background: #111; 
@@ -988,17 +1078,17 @@ app.get('/', (req, res) => {
             }
             
             #start-btn {
-                position: fixed;
-                top: 50%;
-                right: 20px;
-                transform: translateY(-50%);
+                position: absolute;
+                top: 30%;
+                left: 50%;
+                transform: translate(-50%, -50%);
                 padding: 15px 30px;
                 background: #2980b9;
                 color: white;
                 border: none;
                 border-radius: 6px;
                 display: none;
-                z-index: 1000;
+                z-index: 15;
                 font-weight: bold;
                 font-size: 16px;
                 cursor: pointer;
@@ -1084,7 +1174,9 @@ app.get('/', (req, res) => {
             <div id="activity-log"><b>📋 ACTIVITY</b><hr></div>
             <div class="poker-table" id="poker-table">
                 <div id="table-logo">SYFM POKER</div>
+                <button id="start-btn" onclick="socket.emit('start_game')">START</button>
                 <div id="community"></div>
+                <div id="winner-announcement"></div>
                 <div id="action-guide"></div>
             </div>
             <div id="seats"></div>
@@ -1367,6 +1459,8 @@ app.get('/', (req, res) => {
                 const rX = positions.seatsRX;
                 const rY = positions.seatsRY;
 
+                const isHeadsUp = data.players.length === 2;
+
                 data.players.forEach((p, i) => {
                     const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
                     const x = cX + rX * Math.cos(angle);
@@ -1379,9 +1473,16 @@ app.get('/', (req, res) => {
                     seat.style.transform = "translate(-50%, -50%)";
                     
                     let disc = '';
-                    if(p.isDealer) disc = '<div class="disc d">D</div>';
-                    else if(p.isSB) disc = '<div class="disc sb">SB</div>';
-                    else if(p.isBB) disc = '<div class="disc bb">BB</div>';
+                    // In heads-up, dealer also has BB, so show both
+                    if (isHeadsUp && p.isDealer && p.isBB) {
+                        disc = '<div class="disc d">D</div><div class="disc bb bb-bottom">BB</div>';
+                    } else if (p.isDealer) {
+                        disc = '<div class="disc d">D</div>';
+                    } else if (p.isSB) {
+                        disc = '<div class="disc sb">SB</div>';
+                    } else if (p.isBB) {
+                        disc = '<div class="disc bb">BB</div>';
+                    }
 
                     const cardsHtml = (p.cards && p.cards.length > 0 && data.gameStage !== 'LOBBY') ? p.cards.map(c => formatCard(c, true)).join('') : '';
                     const isMe = p.id === data.myId;
@@ -1393,7 +1494,7 @@ app.get('/', (req, res) => {
                     let timerHtml = '';
                     if (p.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
                         const timerClass = data.timeRemaining <= 10 ? 'timer-display warning' : 'timer-display';
-                        timerHtml = \`<div class="\${timerClass}"><span>\${data.timeRemaining}</span></div>\`;
+                        timerHtml = \`<div class="\${timerClass}" data-time="\${data.timeRemaining}"></div>\`;
                     }
                     
                     // Auto-fold checkbox (only for current player)
@@ -1472,6 +1573,16 @@ app.get('/', (req, res) => {
                 const log = document.getElementById('activity-log');
                 log.innerHTML += '<div>' + data.msg + '</div>';
                 log.scrollTop = log.scrollHeight;
+            });
+            
+            socket.on('winner_announcement', msg => {
+                const announcement = document.getElementById('winner-announcement');
+                announcement.innerText = msg;
+            });
+            
+            socket.on('clear_winner', () => {
+                const announcement = document.getElementById('winner-announcement');
+                announcement.innerText = '';
             });
             
             socket.on('debug_msg', m => {
