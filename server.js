@@ -3,6 +3,36 @@ const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
 
+/*
+ * TEXAS HOLD'EM NO LIMIT BETTING RULES (per TDA & standard poker rules)
+ * 
+ * MINIMUM BET:
+ * - The minimum bet in any round equals the big blind (BB)
+ * - Example: If BB is 50, minimum bet on flop/turn/river is 50
+ * 
+ * MINIMUM RAISE:
+ * - Must raise by at least the size of the previous bet or raise in the current round
+ * - Example: BB is 50, Player A bets 100 → minimum raise is to 200 (raise of 100)
+ * - Example: BB is 50, Player A raises to 150 → min re-raise is to 250 (raise of 100)
+ * - The "raise increment" must match or exceed the previous raise increment
+ * 
+ * COMPLETE vs INCOMPLETE RAISES (ALL-IN):
+ * - Complete raise: All-in >= minimum raise → reopens action for all players
+ * - Incomplete raise: All-in < minimum raise → does NOT reopen action
+ *   - Players who already acted cannot re-raise
+ *   - Only players who haven't acted can call or make a full raise
+ * 
+ * BETTING ROUND STRUCTURE:
+ * - Preflop: Starts with BB posted, first to act can call or raise
+ * - Postflop: Starts with no bets (currentBet = 0), first can check or bet BB minimum
+ * - Each round: lastRaiseAmount resets to BB (the minimum bet size)
+ * 
+ * IMPLEMENTATION:
+ * - currentBet: The current highest bet in this round
+ * - lastRaiseAmount: The size of the last raise (or BB if no raises)
+ * - minRaise = currentBet + lastRaiseAmount
+ */
+
 // --- CONFIG ---
 let STARTING_CHIPS = 6000;
 let SB = 25;
@@ -467,7 +497,8 @@ function advanceStage() {
     log(`🎬 ADVANCING STAGE from ${gameStage}`);
     playerOrder.forEach(id => { if(players[id].status !== 'OUT') players[id].bet = 0; });
     currentBet = 0;
-    lastRaiseAmount = 0; // Reset for new betting round
+    lastRaiseAmount = BB; // Reset to BB for new betting round (minimum bet size)
+    log(`📊 Betting reset: currentBet=0, lastRaiseAmount=${BB} (minimum bet for new round)`);
     playersActedThisRound.clear();
     playersAllowedToReraise.clear();
     
@@ -649,9 +680,14 @@ function broadcast() {
         const canRaise = myChips + players[id].bet >= minRaiseTotal;
         
         // Determine if this is a "bet" or "raise" situation
-        // It's a BET if: currentBet is 0, OR we're preflop and only the BB has been posted (no voluntary raises)
-        const isBetSituation = (currentBet === 0) || 
-                               (gameStage === 'PREFLOP' && currentBet === BB && lastRaiseAmount === BB);
+        // BET: When no one has voluntarily bet in this round (currentBet = 0)
+        // RAISE: When there's already a bet to match (currentBet > 0, including preflop BB)
+        const isBetSituation = (currentBet === 0);
+        
+        // Log betting calculations for current player's turn
+        if (playerOrder[turnIndex] === id && gameStage !== 'SHOWDOWN' && gameStage !== 'LOBBY') {
+            log(`💰 Betting calc for ${players[id].name}: currentBet=${currentBet}, lastRaise=${lastRaiseAmount}, minRaise=${minRaiseTotal}, isBet=${isBetSituation}`);
+        }
         
         io.to(id).emit('update', {
             myId: id, 
@@ -702,6 +738,12 @@ io.on('connection', (socket) => {
         log(`➕ ${name} joined the game (${playerOrder.length} players total)`);
         activityLog(`${name} joined the table`);
         gameStage = 'LOBBY'; // Ensure we're in LOBBY when players join
+        
+        // Show first player message
+        if (playerOrder.length === 1) {
+            socket.emit('first_player_message', "You're the first, you're in control");
+        }
+        
         broadcast();
     });
     socket.on('start_game', () => startNewHand());
@@ -878,6 +920,24 @@ app.get('/', (req, res) => {
                 font-weight: bold;
                 margin-top: 5px;
                 min-height: 20px;
+            }
+            
+            #first-player-message {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(46, 204, 113, 0.95);
+                color: white;
+                padding: 30px 50px;
+                border-radius: 12px;
+                font-size: 24px;
+                font-weight: bold;
+                z-index: 300;
+                display: none;
+                text-align: center;
+                box-shadow: 0 0 30px rgba(46, 204, 113, 0.8);
+                border: 3px solid #27ae60;
             }
             
             .card { 
@@ -1403,6 +1463,8 @@ app.get('/', (req, res) => {
             <div id="pot-display">Pot: <span id="pot">0</span></div>
         </div>
         
+        <div id="first-player-message"></div>
+        
         <button id="fullscreen-btn" class="tool-btn" onclick="toggleFullscreen()">FULLSCREEN</button>
         
         <div id="turn-timer-display"></div>
@@ -1604,6 +1666,17 @@ app.get('/', (req, res) => {
                     console.warn('Blocked action - not your turn');
                     return;
                 }
+                
+                // Validate bet/raise amounts
+                if (actionData.type === 'raise') {
+                    const betInput = document.getElementById('bet-amt');
+                    const amount = parseInt(betInput.value);
+                    if (isNaN(amount) || amount < parseInt(betInput.min)) {
+                        alert('Bet amount must be at least ' + betInput.min);
+                        return;
+                    }
+                }
+                
                 socket.emit('action', actionData);
             }
             
@@ -1620,6 +1693,18 @@ app.get('/', (req, res) => {
             // Handle action rejection
             socket.on('action_rejected', (message) => {
                 alert('Action rejected: ' + message);
+            });
+            
+            // Handle first player message
+            socket.on('first_player_message', (message) => {
+                const msgElement = document.getElementById('first-player-message');
+                msgElement.innerText = message;
+                msgElement.style.display = 'block';
+                
+                // Hide after 5 seconds
+                setTimeout(() => {
+                    msgElement.style.display = 'none';
+                }, 5000);
             });
             
             // Position state
