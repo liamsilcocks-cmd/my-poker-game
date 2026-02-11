@@ -43,7 +43,7 @@ function startTurnTimer() {
         activityLog(`${currentPlayer.name} auto-folded`);
         
         currentPlayer.status = 'FOLDED';
-        currentPlayer.hand = []; // Remove cards
+        // Don't clear hand - keep cards for review after hand ends
         playersActedThisRound.add(playerOrder[turnIndex]);
         
         const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
@@ -77,7 +77,7 @@ function startTurnTimer() {
             activityLog(`${currentPlayer.name} timed out and folded`);
             
             currentPlayer.status = 'FOLDED';
-            currentPlayer.hand = []; // Remove cards
+            // Don't clear hand - keep cards for review after hand ends
             playersActedThisRound.add(playerOrder[turnIndex]);
             
             const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
@@ -308,15 +308,22 @@ function startNewHand() {
 function handleAction(socket, action) {
     if (playerOrder[turnIndex] !== socket.id) {
         log(`⚠️ Action rejected: not ${socket.id}'s turn`);
+        socket.emit('action_rejected', 'Not your turn');
         return;
     }
     const p = players[socket.id];
+    
+    if (!p || p.status !== 'ACTIVE') {
+        log(`⚠️ Action rejected: ${socket.id} is not active`);
+        socket.emit('action_rejected', 'You are not active in this hand');
+        return;
+    }
     
     playersActedThisRound.add(socket.id);
     
     if (action.type === 'fold') {
         p.status = 'FOLDED';
-        p.hand = []; // Remove cards
+        // Don't clear hand - keep cards for review after hand ends
         log(`🚫 ${p.name} FOLDED`);
         activityLog(`${p.name} folded (pot was at ${currentBet})`);
         
@@ -399,10 +406,14 @@ function handleAction(socket, action) {
         const allInAmount = p.chips;
         const previousBet = currentBet;
         
+        log(`🔥 ${p.name} attempting ALL IN with ${allInAmount} chips (current bet: ${p.bet})`);
+        
         p.bet += allInAmount;
         pot += allInAmount;
         p.chips = 0;
         p.status = 'ALL_IN';
+        
+        log(`🔥 ${p.name} total bet now: ${p.bet}, pot: ${pot}`);
         
         // Check if this is a complete raise
         const minRaiseTotal = currentBet + lastRaiseAmount;
@@ -434,9 +445,11 @@ function handleAction(socket, action) {
     const allMatched = activeInHand.every(id => players[id].bet === currentBet);
 
     log(`📊 Round status: ${activeInHand.length} active, all acted: ${allActed}, all matched: ${allMatched}`);
+    log(`📊 Players: ${activeInHand.map(id => `${players[id].name}(${players[id].bet})`).join(', ')}`);
 
     if (activeInHand.length <= 1 || (allActed && allMatched)) {
         stopTurnTimer();
+        log(`📊 Advancing to next stage (${activeInHand.length} active players)`);
         advanceStage();
     } else {
         let nextIdx = turnIndex;
@@ -444,7 +457,7 @@ function handleAction(socket, action) {
             nextIdx = (nextIdx + 1) % playerOrder.length;
         } while (players[playerOrder[nextIdx]].status !== 'ACTIVE');
         turnIndex = nextIdx;
-        log(`⏭️ Next to act: ${players[playerOrder[turnIndex]].name}`);
+        log(`⏭️ Next to act: ${players[playerOrder[turnIndex]].name} (index ${turnIndex})`);
         startTurnTimer();
         broadcast();
     }
@@ -653,7 +666,8 @@ function broadcast() {
                 isDealer: idx === dealerIndex, 
                 isSB: idx === sbIdx, 
                 isBB: idx === bbIdx,
-                cards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['?','?'] : []),
+                cards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : 
+                       (players[pid].hand.length && players[pid].status !== 'FOLDED' ? ['?','?'] : []),
                 autoFold: players[pid].autoFold
             })),
             community, 
@@ -1417,12 +1431,12 @@ app.get('/', (req, res) => {
         </div>
         
         <div id="controls">
-            <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
-            <button id="check-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60; display:none;">CHECK</button>
-            <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #3498db; display:none;">CALL</button>
+            <button onclick="sendAction({type:'fold'})" style="background: #c0392b;">FOLD</button>
+            <button id="check-btn" onclick="sendAction({type:'call'})" style="background: #27ae60; display:none;">CHECK</button>
+            <button id="call-btn" onclick="sendAction({type:'call'})" style="background: #3498db; display:none;">CALL</button>
             <input type="number" id="bet-amt" value="100">
-            <button id="raise-btn" onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
-            <button id="allin-btn" onclick="socket.emit('action', {type:'allin'})" style="background: #8e44ad;">ALL IN</button>
+            <button id="raise-btn" onclick="sendAction({type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
+            <button id="allin-btn" onclick="sendAction({type:'allin'})" style="background: #8e44ad;">ALL IN</button>
         </div>
         
         <div id="position-controls">
@@ -1579,6 +1593,20 @@ app.get('/', (req, res) => {
                 oscillator.stop(audioContext.currentTime + duration / 1000);
             }
             
+            // Validate that it's the player's turn before sending action
+            function canTakeAction() {
+                const controls = document.getElementById('controls');
+                return controls.getAttribute('data-my-turn') === 'true';
+            }
+            
+            function sendAction(actionData) {
+                if (!canTakeAction()) {
+                    console.warn('Blocked action - not your turn');
+                    return;
+                }
+                socket.emit('action', actionData);
+            }
+            
             let socket = io();
             const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
@@ -1587,6 +1615,11 @@ app.get('/', (req, res) => {
             socket.on('join_rejected', (message) => {
                 alert(message);
                 window.location.reload();
+            });
+            
+            // Handle action rejection
+            socket.on('action_rejected', (message) => {
+                alert('Action rejected: ' + message);
             });
             
             // Position state
@@ -1846,13 +1879,17 @@ app.get('/', (req, res) => {
                 const guide = document.getElementById('action-guide');
                 guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
                 
+                // Store whether it's my turn for button validation
+                const controls = document.getElementById('controls');
+                controls.setAttribute('data-my-turn', isMyTurn ? 'true' : 'false');
+                
                 // Check if turn has changed (to reset bet input only once)
                 const turnChanged = lastActiveId !== data.activeId;
                 if (turnChanged) {
                     lastActiveId = data.activeId;
                 }
                 
-                document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
+                controls.style.display = isMyTurn ? 'flex' : 'none';
                 if(isMyTurn) {
                     const checkBtn = document.getElementById('check-btn');
                     const callBtn = document.getElementById('call-btn');
@@ -1884,10 +1921,11 @@ app.get('/', (req, res) => {
                     betInput.min = data.minRaise;
                     betInput.max = maxTotalBet;
                     
-                    // Determine if button should say "BET" or "RAISE"
-                    const actionWord = data.isBetSituation ? "BET" : "RAISE";
-                    const currentBetValue = parseInt(betInput.value) || defaultBetAmount;
-                    raiseBtn.innerText = actionWord + " TO " + currentBetValue;
+                    // Determine if button should say "BET" or "RAISE TO"
+                    const actionWord = data.isBetSituation ? "BET" : "RAISE TO";
+                    const currentBetValue = Math.max(parseInt(betInput.value) || defaultBetAmount, defaultBetAmount);
+                    const buttonText = data.isBetSituation ? actionWord + " " + currentBetValue : actionWord + " " + currentBetValue;
+                    raiseBtn.innerText = buttonText;
                     
                     // Hide raise/bet button if can't make minimum raise
                     if (!data.canRaise) {
@@ -1898,8 +1936,10 @@ app.get('/', (req, res) => {
                     
                     // Update raise/bet button text on input change (allow manual override)
                     betInput.oninput = function() {
-                        const val = parseInt(this.value) || 0;
-                        raiseBtn.innerText = actionWord + " TO " + val;
+                        const val = Math.max(parseInt(this.value) || defaultBetAmount, data.minRaise);
+                        const actionWord = data.isBetSituation ? "BET" : "RAISE TO";
+                        const buttonText = data.isBetSituation ? actionWord + " " + val : actionWord + " " + val;
+                        raiseBtn.innerText = buttonText;
                     };
                 }
                 
