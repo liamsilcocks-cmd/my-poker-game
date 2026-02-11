@@ -272,9 +272,6 @@ function startNewHand() {
     log(`💵 SB: ${players[sbPlayer].name} posts ${SB}`);
     log(`💵 BB: ${players[bbPlayer].name} posts ${BB}`);
     log(`🎴 Dealing cards to ${active.length} players`);
-    active.forEach(id => {
-        log(`  ${players[id].name}: ${players[id].hand.join(' ')}`);
-    });
     
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     gameStage = 'PREFLOP';
@@ -561,7 +558,7 @@ app.get('/', (req, res) => {
                 left: 8px;
             }
             #pot-display { 
-                font-size: 24px; 
+                font-size: 28px; 
                 color: #2ecc71; 
                 font-weight: bold;
                 text-align: center;
@@ -572,10 +569,10 @@ app.get('/', (req, res) => {
                     padding: 4px 8px;
                 }
                 #pot-display {
-                    font-size: 20px;
+                    font-size: 24px;
                 }
                 #blinds-overlay {
-                    font-size: 20px;
+                    font-size: 22px;
                 }
             }
             
@@ -624,12 +621,26 @@ app.get('/', (req, res) => {
             }
             
             #table-logo { 
-                font-size: 11px; 
+                font-size: 60px; 
                 font-weight: bold; 
-                color: rgba(255,255,255,0.1); 
+                color: rgba(255,255,255,0.15); 
                 text-transform: uppercase; 
-                margin-bottom: 3px; 
+                margin-bottom: 3px;
+                letter-spacing: 3px;
             }
+            
+            @media (max-width: 768px) and (orientation: landscape) {
+                #table-logo {
+                    font-size: 50px;
+                }
+            }
+            
+            @media (max-width: 768px) and (orientation: portrait) {
+                #table-logo {
+                    font-size: 45px;
+                }
+            }
+            
             #community { 
                 display: flex; 
                 justify-content: center; 
@@ -686,19 +697,33 @@ app.get('/', (req, res) => {
                 overflow: visible;
             }
             .timer-display {
-                display: inline-block;
-                margin-left: 5px;
-                padding: 2px 5px;
-                background: rgba(255,255,255,0.1);
-                border-radius: 3px;
-                font-size: 10px;
+                position: absolute;
+                top: -15px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 0;
+                height: 0;
+                border-left: 25px solid transparent;
+                border-right: 25px solid transparent;
+                border-bottom: 30px solid #f1c40f;
+                display: flex;
+                align-items: flex-end;
+                justify-content: center;
+                z-index: 25;
+            }
+            .timer-display span {
+                position: absolute;
+                bottom: 4px;
+                font-size: 16px;
                 font-weight: bold;
-                color: #f1c40f;
+                color: #000;
             }
             .timer-display.warning {
-                background: rgba(231, 76, 60, 0.3);
-                color: #e74c3c;
+                border-bottom-color: #e74c3c;
                 animation: pulse 0.5s infinite;
+            }
+            .timer-display.warning span {
+                color: #fff;
             }
             @keyframes pulse {
                 0%, 100% { opacity: 1; }
@@ -787,18 +812,17 @@ app.get('/', (req, res) => {
             
             .disc { 
                 position: absolute; 
-                top: 50%; 
-                right: -18px; 
-                transform: translateY(-50%);
-                width: 24px; 
-                height: 24px; 
+                top: -8px; 
+                right: -8px;
+                width: 36px; 
+                height: 36px; 
                 border-radius: 50%; 
-                font-size: 11px; 
+                font-size: 14px; 
                 font-weight: bold; 
                 display: flex; 
                 align-items: center; 
                 justify-content: center; 
-                border: 2px solid black;
+                border: 3px solid black;
                 z-index: 20;
             }
             .disc.d { background: white; color: black; }
@@ -877,7 +901,7 @@ app.get('/', (req, res) => {
             #activity-log { 
                 position: fixed; 
                 bottom: 60px; 
-                left: 10px; 
+                right: 10px; 
                 width: 200px; 
                 height: 120px; 
                 background: rgba(0,0,0,0.95); 
@@ -966,8 +990,8 @@ app.get('/', (req, res) => {
             #start-btn {
                 position: fixed;
                 top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
+                right: 20px;
+                transform: translateY(-50%);
                 padding: 15px 30px;
                 background: #2980b9;
                 color: white;
@@ -1359,17 +1383,17 @@ app.get('/', (req, res) => {
                     else if(p.isSB) disc = '<div class="disc sb">SB</div>';
                     else if(p.isBB) disc = '<div class="disc bb">BB</div>';
 
-                    const cardsHtml = (p.cards && p.cards.length > 0) ? p.cards.map(c => formatCard(c, true)).join('') : '';
+                    const cardsHtml = (p.cards && p.cards.length > 0 && data.gameStage !== 'LOBBY') ? p.cards.map(c => formatCard(c, true)).join('') : '';
                     const isMe = p.id === data.myId;
                     const boxClasses = ['player-box'];
                     if (p.id === data.activeId) boxClasses.push('active-turn');
                     if (isMe) boxClasses.push('my-seat');
                     
-                    // Timer display
+                    // Timer display - only show when it's this player's turn
                     let timerHtml = '';
                     if (p.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
                         const timerClass = data.timeRemaining <= 10 ? 'timer-display warning' : 'timer-display';
-                        timerHtml = \`<span class="\${timerClass}">\${data.timeRemaining}s</span>\`;
+                        timerHtml = \`<div class="\${timerClass}"><span>\${data.timeRemaining}</span></div>\`;
                     }
                     
                     // Auto-fold checkbox (only for current player)
@@ -1386,7 +1410,8 @@ app.get('/', (req, res) => {
                     seat.innerHTML = \`
                         <div class="\${boxClasses.join(' ')}">
                             \${disc}
-                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}">\${p.name}\${timerHtml}</b><br>
+                            \${timerHtml}
+                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}">\${p.name}</b><br>
                             <div class="card-row">\${cardsHtml}</div>
                             <div class="chip-count" style="color:\${isMe ? '#000' : '#fff'}">\${p.chips}</div>
                             \${p.bet > 0 ? '<div class="bet-amount" style="color:'+(isMe ? '#2980b9' : 'cyan')+'; font-weight:bold;">£'+p.bet+'</div>' : ''}
@@ -1433,9 +1458,9 @@ app.get('/', (req, res) => {
                 document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
                 document.getElementById('start-btn').style.display = (data.isHost && data.gameStage === 'LOBBY') ? 'block' : 'none';
                 
-                const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN');
+                const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY');
                 const guide = document.getElementById('action-guide');
-                guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : "WAITING...");
+                guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
                 
                 document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
                 if(isMyTurn) document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL £"+data.callAmt : "CHECK";
@@ -1463,4 +1488,3 @@ app.get('/', (req, res) => {
 });
 
 http.listen(3000, () => console.log('Server live on port 3000'));
-
