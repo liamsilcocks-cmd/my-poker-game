@@ -330,7 +330,7 @@ function handleAction(socket, action) {
         
         log(`🎲 ${p.name} RAISED to ${p.bet} (pot now: ${pot})`);
         log(`  Current bet reset to ${currentBet}, all players must act`);
-        activityLog(`${p.name} raised to £${p.bet}`);
+        activityLog(`${p.name} raised to ${p.bet}`);
         
         if (p.chips === 0) {
             p.status = 'ALL_IN';
@@ -408,8 +408,8 @@ function showdown() {
         const winnerId = inHand[0];
         players[winnerId].chips += pot;
         log(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
-        activityLog(`${players[winnerId].name} wins £${pot}`);
-        io.emit('winner_announcement', `${players[winnerId].name} wins £${pot}`);
+        activityLog(`${players[winnerId].name} wins ${pot}`);
+        io.emit('winner_announcement', `${players[winnerId].name} wins ${pot}`);
         setTimeout(() => {
             gameStage = 'LOBBY';
             io.emit('clear_winner');
@@ -477,7 +477,7 @@ function showdown() {
     
     log(`💰 SIDE POTS: ${sidePots.length} pot(s)`);
     sidePots.forEach((sp, idx) => {
-        log(`  Pot ${idx + 1}: £${sp.amount} - Eligible: ${sp.eligiblePlayers.map(id => players[id].name).join(', ')}`);
+        log(`  Pot ${idx + 1}: ${sp.amount} - Eligible: ${sp.eligiblePlayers.map(id => players[id].name).join(', ')}`);
     });
     
     let winnerAnnouncement = '';
@@ -507,15 +507,15 @@ function showdown() {
         const winAmt = Math.floor(sidePot.amount / winners.length);
         
         const potLabel = sidePots.length > 1 ? `Pot ${potIndex + 1}` : 'Pot';
-        log(`🏆 ${potLabel} (£${sidePot.amount}) WINNER(S):`);
+        log(`🏆 ${potLabel} (${sidePot.amount}) WINNER(S):`);
         
         winners.forEach(w => {
             players[w.id].chips += winAmt;
-            log(`  💰 ${players[w.id].name} wins £${winAmt} with ${w.bestHand.name}`);
-            activityLog(`${players[w.id].name} wins £${winAmt} (${w.bestHand.name})`);
+            log(`  💰 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
+            activityLog(`${players[w.id].name} wins ${winAmt} (${w.bestHand.name})`);
             
             if (winnerAnnouncement) winnerAnnouncement += ' | ';
-            winnerAnnouncement += `${players[w.id].name}: £${winAmt} (${w.bestHand.name})`;
+            winnerAnnouncement += `${players[w.id].name}: ${winAmt} (${w.bestHand.name})`;
         });
     }
     
@@ -781,34 +781,61 @@ app.get('/', (req, res) => {
             }
             .timer-display {
                 position: absolute;
-                top: -20px;
+                top: -35px;
                 left: 50%;
                 transform: translateX(-50%);
                 width: 0;
                 height: 0;
                 border-left: 30px solid transparent;
                 border-right: 30px solid transparent;
-                border-bottom: 35px solid #f1c40f;
+                border-bottom: 35px solid transparent;
                 z-index: 25;
+                /* Create outline effect using box-shadow */
+                filter: drop-shadow(0 0 0 #f1c40f) 
+                        drop-shadow(0 1px 0 #f1c40f) 
+                        drop-shadow(1px 0 0 #f1c40f) 
+                        drop-shadow(0 -1px 0 #f1c40f) 
+                        drop-shadow(-1px 0 0 #f1c40f);
+            }
+            .timer-display::before {
+                content: '';
+                position: absolute;
+                bottom: -35px;
+                left: -30px;
+                width: 0;
+                height: 0;
+                border-left: 30px solid transparent;
+                border-right: 30px solid transparent;
+                border-bottom: 35px solid #f1c40f;
+                animation: flash-yellow 1s infinite;
             }
             .timer-display::after {
                 content: attr(data-time);
                 position: absolute;
-                bottom: -28px;
+                bottom: -26px;
                 left: 50%;
                 transform: translateX(-50%);
-                font-size: 18px;
+                font-size: 20px;
                 font-weight: bold;
-                color: #000;
-                width: 40px;
+                color: #f1c40f;
+                width: 60px;
                 text-align: center;
+                z-index: 26;
             }
-            .timer-display.warning {
+            .timer-display.warning::before {
                 border-bottom-color: #e74c3c;
-                animation: pulse 0.5s infinite;
+                animation: flash-red 0.5s infinite;
             }
             .timer-display.warning::after {
-                color: #fff;
+                color: #e74c3c;
+            }
+            @keyframes flash-yellow {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.3; }
+            }
+            @keyframes flash-red {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.2; }
             }
             @keyframes pulse {
                 0%, 100% { opacity: 1; }
@@ -877,11 +904,6 @@ app.get('/', (req, res) => {
                 font-weight: bold;
                 opacity: 0.7;
             }
-            .chip-count {
-                font-size: 14px;
-                font-weight: bold;
-                margin-top: 3px;
-            }
             
             @media (max-width: 768px) and (orientation: landscape) {
                 .card-small {
@@ -889,9 +911,6 @@ app.get('/', (req, res) => {
                     min-width: 36px;
                     min-height: 46px;
                     padding: 3px 5px;
-                }
-                .chip-count {
-                    font-size: 13px;
                 }
             }
             
@@ -1154,7 +1173,7 @@ app.get('/', (req, res) => {
     <body>
         <div id="top-bar">
             <div id="blinds-overlay">Blinds: <span id="blinds-info">--/--</span></div>
-            <div id="pot-display">Pot: £<span id="pot">0</span></div>
+            <div id="pot-display">Pot: <span id="pot">0</span></div>
         </div>
         
         <button id="fullscreen-btn" class="tool-btn" onclick="toggleFullscreen()">FULLSCREEN</button>
@@ -1460,9 +1479,20 @@ app.get('/', (req, res) => {
                 const rY = positions.seatsRY;
 
                 const isHeadsUp = data.players.length === 2;
+                
+                // Find current player's index
+                const myIndex = data.players.findIndex(p => p.id === data.myId);
+                
+                // Reorder so current player is first (will be at top)
+                const reorderedPlayers = [];
+                for (let i = 0; i < data.players.length; i++) {
+                    const idx = (myIndex + i) % data.players.length;
+                    reorderedPlayers.push(data.players[idx]);
+                }
 
-                data.players.forEach((p, i) => {
-                    const angle = (i / data.players.length) * 2 * Math.PI - Math.PI/2;
+                reorderedPlayers.forEach((p, i) => {
+                    // Position players in a circle, with index 0 at top (270 degrees / -90 degrees)
+                    const angle = (i / reorderedPlayers.length) * 2 * Math.PI - Math.PI/2;
                     const x = cX + rX * Math.cos(angle);
                     const y = cY + rY * Math.sin(angle);
                     
@@ -1512,10 +1542,11 @@ app.get('/', (req, res) => {
                         <div class="\${boxClasses.join(' ')}">
                             \${disc}
                             \${timerHtml}
-                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}">\${p.name}</b><br>
+                            <b style="color:\${isMe ? '#16a085' : '#f1c40f'}; font-size: 12px;">
+                                \${p.name}: <span style="font-size: 14px; color:\${isMe ? '#000' : '#fff'}">\${p.chips}</span>
+                            </b><br>
                             <div class="card-row">\${cardsHtml}</div>
-                            <div class="chip-count" style="color:\${isMe ? '#000' : '#fff'}">\${p.chips}</div>
-                            \${p.bet > 0 ? '<div class="bet-amount" style="color:'+(isMe ? '#2980b9' : 'cyan')+'; font-weight:bold;">£'+p.bet+'</div>' : ''}
+                            \${p.bet > 0 ? '<div class="bet-amount" style="color:'+(isMe ? '#2980b9' : 'cyan')+'; font-weight:bold;">'+p.bet+'</div>' : ''}
                             \${autoFoldHtml}
                         </div>\`;
                     area.appendChild(seat);
@@ -1564,7 +1595,7 @@ app.get('/', (req, res) => {
                 guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
                 
                 document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
-                if(isMyTurn) document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL £"+data.callAmt : "CHECK";
+                if(isMyTurn) document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL "+data.callAmt : "CHECK";
                 
                 renderSeats(data);
             });
