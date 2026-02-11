@@ -15,11 +15,12 @@ let community = [];
 let deck = [];
 let pot = 0;
 let currentBet = 0;
+let lastRaiseAmount = BB; // Track the size of the last raise for minimum raise calculations
 let dealerIndex = -1; 
 let turnIndex = 0;
 let gameStage = 'LOBBY'; 
-let lastRaiser = null;
 let playersActedThisRound = new Set();
+let playersAllowedToReraise = new Set(); // Track who can re-raise after incomplete raises
 let turnTimer = null;
 let turnTimeRemaining = 30;
 
@@ -237,8 +238,10 @@ function getPlayersInHand() {
 }
 
 function startNewHand() {
-    community = []; pot = 0; currentBet = BB;
+    community = []; pot = 0; currentBet = BB; lastRaiseAmount = BB;
     playersActedThisRound.clear();
+    playersAllowedToReraise.clear();
+    
     const active = playerOrder.filter(id => players[id].chips > 0);
     if (active.length < 2) {
         log('⚠️ Not enough players with chips to start hand');
@@ -263,20 +266,36 @@ function startNewHand() {
     const sbPlayer = playerOrder[sbIdx];
     const bbPlayer = playerOrder[bbIdx];
     
-    players[sbPlayer].chips -= SB; players[sbPlayer].bet = SB;
-    players[bbPlayer].chips -= BB; players[bbPlayer].bet = BB;
-    pot = SB + BB;
+    const sbAmount = Math.min(SB, players[sbPlayer].chips);
+    const bbAmount = Math.min(BB, players[bbPlayer].chips);
+    
+    players[sbPlayer].chips -= sbAmount; players[sbPlayer].bet = sbAmount;
+    players[bbPlayer].chips -= bbAmount; players[bbPlayer].bet = bbAmount;
+    pot = sbAmount + bbAmount;
+    
+    // Mark players as all-in if they don't have enough for blinds
+    if (players[sbPlayer].chips === 0) players[sbPlayer].status = 'ALL_IN';
+    if (players[bbPlayer].chips === 0) players[bbPlayer].status = 'ALL_IN';
     
     log(`🃏 NEW HAND STARTED`);
     log(`👑 Dealer: ${players[playerOrder[dealerIndex]].name}`);
-    log(`💵 SB: ${players[sbPlayer].name} posts ${SB}`);
-    log(`💵 BB: ${players[bbPlayer].name} posts ${BB}`);
+    log(`💵 SB: ${players[sbPlayer].name} posts ${sbAmount}`);
+    log(`💵 BB: ${players[bbPlayer].name} posts ${bbAmount}`);
     log(`🎴 Dealing cards to ${active.length} players`);
     
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     gameStage = 'PREFLOP';
     activityLog("--- NEW HAND ---");
     activityLog(`Dealer: ${players[playerOrder[dealerIndex]].name}`);
+    activityLog(`SB ${sbAmount}, BB ${bbAmount}`);
+    
+    // Initialize players allowed to reraise (everyone active at start)
+    active.forEach(id => {
+        if (players[id].status === 'ACTIVE') {
+            playersAllowedToReraise.add(id);
+        }
+    });
+    
     startTurnTimer();
     broadcast();
 }
@@ -294,48 +313,114 @@ function handleAction(socket, action) {
         p.status = 'FOLDED';
         p.hand = []; // Remove cards
         log(`🚫 ${p.name} FOLDED`);
-        activityLog(`${p.name} folded`);
+        activityLog(`${p.name} folded (pot was at ${currentBet})`);
+        
     } else if (action.type === 'call') {
-        const amt = currentBet - p.bet;
-        const actualAmt = Math.min(amt, p.chips);
+        const amtToCall = currentBet - p.bet;
+        const actualAmt = Math.min(amtToCall, p.chips);
         p.chips -= actualAmt; 
         p.bet += actualAmt; 
         pot += actualAmt;
         
-        if (amt === 0) {
+        if (amtToCall === 0) {
             log(`✓ ${p.name} CHECKED`);
             activityLog(`${p.name} checked`);
         } else {
-            log(`📞 ${p.name} CALLED ${actualAmt} (pot: ${p.bet}/${currentBet})`);
-            activityLog(`${p.name} called ${actualAmt}`);
+            log(`📞 ${p.name} CALLED ${actualAmt} (total bet: ${p.bet})`);
+            activityLog(`${p.name} called ${actualAmt} (total in pot: ${p.bet})`);
         }
         
         if (p.chips === 0) {
             p.status = 'ALL_IN';
             log(`🔥 ${p.name} is ALL IN!`);
-            activityLog(`${p.name} is ALL IN!`);
+            activityLog(`${p.name} is ALL IN with ${p.bet}!`);
         }
+        
     } else if (action.type === 'raise') {
-        const total = action.amt;
-        const diff = total - p.bet;
+        const targetTotal = action.amt;
+        const raiseAmount = targetTotal - currentBet;
+        const diff = targetTotal - p.bet;
         const actualDiff = Math.min(diff, p.chips);
+        
+        const previousBet = currentBet;
         
         p.chips -= actualDiff; 
         p.bet += actualDiff;
         pot += actualDiff;
-        currentBet = p.bet;
         
-        playersActedThisRound.clear();
-        playersActedThisRound.add(socket.id);
-        
-        log(`🎲 ${p.name} RAISED to ${p.bet} (pot now: ${pot})`);
-        log(`  Current bet reset to ${currentBet}, all players must act`);
-        activityLog(`${p.name} raised to ${p.bet}`);
+        // Check if this is a complete raise (meets minimum)
+        const minRaiseTotal = currentBet + lastRaiseAmount;
+        const isCompleteRaise = p.bet >= minRaiseTotal || p.chips === 0; // All-in is always allowed
         
         if (p.chips === 0) {
+            // All-in situation
             p.status = 'ALL_IN';
-            log(`🔥 ${p.name} is ALL IN!`);
-            activityLog(`${p.name} is ALL IN!`);
+            
+            if (p.bet >= minRaiseTotal) {
+                // Complete raise - reopens action for everyone
+                currentBet = p.bet;
+                lastRaiseAmount = p.bet - previousBet;
+                playersActedThisRound.clear();
+                playersActedThisRound.add(socket.id);
+                playersAllowedToReraise = new Set(playerOrder.filter(id => players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN'));
+                
+                log(`🔥💰 ${p.name} RAISED ALL IN to ${p.bet} (complete raise of ${lastRaiseAmount}) - ACTION REOPENED`);
+                activityLog(`${p.name} raised all-in to ${p.bet} (raise of ${lastRaiseAmount}) - reopened betting`);
+            } else {
+                // Incomplete raise (under-raise) - does NOT reopen action
+                const oldBet = currentBet;
+                currentBet = p.bet;
+                
+                log(`🔥 ${p.name} ALL IN for ${p.bet} (incomplete raise from ${previousBet}, doesn't reopen action)`);
+                activityLog(`${p.name} all-in ${p.bet} (under-raise by ${minRaiseTotal - p.bet}, betting capped)`);
+                
+                // Don't clear playersActedThisRound - players who already acted cannot re-raise
+                // Only players who haven't acted yet can call or raise
+            }
+        } else {
+            // Regular raise (not all-in)
+            currentBet = p.bet;
+            lastRaiseAmount = p.bet - previousBet;
+            playersActedThisRound.clear();
+            playersActedThisRound.add(socket.id);
+            playersAllowedToReraise = new Set(playerOrder.filter(id => players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN'));
+            
+            log(`🎲 ${p.name} RAISED to ${p.bet} (raise of ${lastRaiseAmount}, min next raise: ${currentBet + lastRaiseAmount})`);
+            activityLog(`${p.name} raised to ${p.bet} (raise of ${lastRaiseAmount})`);
+        }
+        
+    } else if (action.type === 'allin') {
+        // ALL IN button - bet everything
+        const allInAmount = p.chips;
+        const previousBet = currentBet;
+        
+        p.bet += allInAmount;
+        pot += allInAmount;
+        p.chips = 0;
+        p.status = 'ALL_IN';
+        
+        // Check if this is a complete raise
+        const minRaiseTotal = currentBet + lastRaiseAmount;
+        
+        if (p.bet >= minRaiseTotal) {
+            // Complete raise - reopens action
+            lastRaiseAmount = p.bet - previousBet;
+            currentBet = p.bet;
+            playersActedThisRound.clear();
+            playersActedThisRound.add(socket.id);
+            playersAllowedToReraise = new Set(playerOrder.filter(id => players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN'));
+            
+            log(`🔥💰 ${p.name} WENT ALL IN for ${p.bet} (complete raise of ${lastRaiseAmount}) - ACTION REOPENED`);
+            activityLog(`${p.name} ALL IN ${p.bet} (raise of ${lastRaiseAmount}) - reopened betting`);
+        } else if (p.bet > currentBet) {
+            // Incomplete raise - doesn't reopen action
+            currentBet = p.bet;
+            log(`🔥 ${p.name} ALL IN for ${p.bet} (incomplete raise from ${previousBet}, doesn't reopen action)`);
+            activityLog(`${p.name} ALL IN ${p.bet} (under-raise, betting capped)`);
+        } else {
+            // Just calling all-in
+            log(`🔥 ${p.name} CALLED ALL IN for ${p.bet}`);
+            activityLog(`${p.name} called all-in with ${p.bet}`);
         }
     }
     
@@ -364,7 +449,16 @@ function advanceStage() {
     log(`🎬 ADVANCING STAGE from ${gameStage}`);
     playerOrder.forEach(id => { if(players[id].status !== 'OUT') players[id].bet = 0; });
     currentBet = 0;
+    lastRaiseAmount = 0; // Reset for new betting round
     playersActedThisRound.clear();
+    playersAllowedToReraise.clear();
+    
+    // Re-initialize players allowed to reraise
+    playerOrder.forEach(id => {
+        if (players[id].status === 'ACTIVE') {
+            playersAllowedToReraise.add(id);
+        }
+    });
 
     if (getPlayersInHand().length <= 1) return showdown();
 
@@ -372,19 +466,19 @@ function advanceStage() {
         community = [deck.pop(), deck.pop(), deck.pop()]; 
         gameStage = 'FLOP'; 
         log(`🃏 FLOP: ${community.join(' ')}`);
-        activityLog(`Flop: ${community.join(' ')}`);
+        activityLog(`--- FLOP: ${community.join(' ')} ---`);
     }
     else if (gameStage === 'FLOP') { 
         community.push(deck.pop()); 
         gameStage = 'TURN'; 
         log(`🃏 TURN: ${community[3]}`);
-        activityLog(`Turn: ${community[3]}`);
+        activityLog(`--- TURN: ${community[3]} ---`);
     }
     else if (gameStage === 'TURN') { 
         community.push(deck.pop()); 
         gameStage = 'RIVER'; 
         log(`🃏 RIVER: ${community[4]}`);
-        activityLog(`River: ${community[4]}`);
+        activityLog(`--- RIVER: ${community[4]} ---`);
     }
     else return showdown();
 
@@ -408,7 +502,7 @@ function showdown() {
         const winnerId = inHand[0];
         players[winnerId].chips += pot;
         log(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
-        activityLog(`${players[winnerId].name} wins ${pot}`);
+        activityLog(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
         io.emit('winner_announcement', `${players[winnerId].name} wins ${pot}`);
         setTimeout(() => {
             gameStage = 'LOBBY';
@@ -506,13 +600,13 @@ function showdown() {
         
         const winAmt = Math.floor(sidePot.amount / winners.length);
         
-        const potLabel = sidePots.length > 1 ? `Pot ${potIndex + 1}` : 'Pot';
+        const potLabel = sidePots.length > 1 ? `Pot ${potIndex + 1}` : 'Main Pot';
         log(`🏆 ${potLabel} (${sidePot.amount}) WINNER(S):`);
         
         winners.forEach(w => {
             players[w.id].chips += winAmt;
             log(`  💰 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
-            activityLog(`${players[w.id].name} wins ${winAmt} (${w.bestHand.name})`);
+            activityLog(`🏆 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name} (${w.bestHand.cards.join(' ')})`);
             
             if (winnerAnnouncement) winnerAnnouncement += ' | ';
             winnerAnnouncement += `${players[w.id].name}: ${winAmt} (${w.bestHand.name})`;
@@ -538,16 +632,37 @@ function broadcast() {
     const bbIdx = (dealerIndex + 2) % playerOrder.length;
 
     playerOrder.forEach(id => {
+        const myChips = players[id].chips;
+        const minRaiseTotal = currentBet + lastRaiseAmount;
+        const canRaise = myChips + players[id].bet >= minRaiseTotal;
+        
         io.to(id).emit('update', {
-            myId: id, myName: players[id].name, isHost: (id === playerOrder[0]),
+            myId: id, 
+            myName: players[id].name, 
+            isHost: (id === playerOrder[0]),
             players: playerOrder.map((pid, idx) => ({
-                id: pid, name: players[pid].name, chips: players[pid].chips, bet: players[pid].bet, status: players[pid].status,
-                isDealer: idx === dealerIndex, isSB: idx === sbIdx, isBB: idx === bbIdx,
+                id: pid, 
+                name: players[pid].name, 
+                chips: players[pid].chips, 
+                bet: players[pid].bet, 
+                status: players[pid].status,
+                isDealer: idx === dealerIndex, 
+                isSB: idx === sbIdx, 
+                isBB: idx === bbIdx,
                 cards: (pid === id || gameStage === 'SHOWDOWN') ? players[pid].hand : (players[pid].hand.length ? ['?','?'] : []),
                 autoFold: players[pid].autoFold
             })),
-            community, pot, gameStage, activeId: playerOrder[turnIndex], currentBet, SB, BB,
+            community, 
+            pot, 
+            gameStage, 
+            activeId: playerOrder[turnIndex], 
+            currentBet, 
+            SB, 
+            BB,
             callAmt: currentBet - players[id].bet,
+            minRaise: minRaiseTotal,
+            canRaise: canRaise,
+            myChips: myChips,
             timeRemaining: turnTimeRemaining
         });
     });
@@ -558,7 +673,7 @@ io.on('connection', (socket) => {
         players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', autoFold: false };
         playerOrder.push(socket.id);
         log(`➕ ${name} joined the game (${playerOrder.length} players total)`);
-        activityLog(`${name} joined`);
+        activityLog(`${name} joined the table`);
         gameStage = 'LOBBY'; // Ensure we're in LOBBY when players join
         broadcast();
     });
@@ -582,7 +697,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => { 
         if (players[socket.id]) {
             log(`➖ ${players[socket.id].name} disconnected`);
-            activityLog(`${players[socket.id].name} left`);
+            activityLog(`${players[socket.id].name} left the table`);
         }
         delete players[socket.id]; 
         playerOrder = playerOrder.filter(id => id !== socket.id); 
@@ -781,67 +896,120 @@ app.get('/', (req, res) => {
             }
             .timer-display {
                 position: absolute;
-                top: -45px;
+                top: 50%;
                 left: 50%;
-                transform: translateX(-50%);
-                width: 80px;
+                transform: translate(-50%, -50%);
+                width: 100px;
                 height: 40px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 z-index: 25;
+                pointer-events: none;
             }
-            .chevron {
+            .chevron-left, .chevron-right {
                 position: absolute;
-                width: 30px;
-                height: 30px;
+                width: 20px;
+                height: 20px;
                 border-right: 4px solid #f1c40f;
                 border-bottom: 4px solid #f1c40f;
-                transform: rotate(45deg);
-                animation: chevron-pulse 1s infinite;
             }
-            .chevron:nth-child(1) {
-                top: 0;
+            .chevron-left {
+                transform: rotate(135deg);
+                animation: chevron-slide-left 1s infinite;
+            }
+            .chevron-right {
+                transform: rotate(-45deg);
+                animation: chevron-slide-right 1s infinite;
+            }
+            .chevron-left:nth-child(1) {
+                left: -40px;
                 animation-delay: 0s;
             }
-            .chevron:nth-child(2) {
-                top: 10px;
+            .chevron-left:nth-child(2) {
+                left: -30px;
                 animation-delay: 0.15s;
                 opacity: 0.7;
             }
-            .chevron:nth-child(3) {
-                top: 20px;
+            .chevron-left:nth-child(3) {
+                left: -20px;
                 animation-delay: 0.3s;
                 opacity: 0.4;
             }
-            .timer-display.warning .chevron {
+            .chevron-right:nth-child(4) {
+                right: -40px;
+                animation-delay: 0s;
+            }
+            .chevron-right:nth-child(5) {
+                right: -30px;
+                animation-delay: 0.15s;
+                opacity: 0.7;
+            }
+            .chevron-right:nth-child(6) {
+                right: -20px;
+                animation-delay: 0.3s;
+                opacity: 0.4;
+            }
+            .timer-display.warning .chevron-left,
+            .timer-display.warning .chevron-right {
                 border-right-color: #e74c3c;
                 border-bottom-color: #e74c3c;
-                animation: chevron-pulse-fast 0.5s infinite;
             }
-            @keyframes chevron-pulse {
+            .timer-display.warning .chevron-left {
+                animation: chevron-slide-left-fast 0.5s infinite;
+            }
+            .timer-display.warning .chevron-right {
+                animation: chevron-slide-right-fast 0.5s infinite;
+            }
+            @keyframes chevron-slide-left {
                 0% {
-                    transform: rotate(45deg) translateY(0);
+                    transform: rotate(135deg) translateX(-15px);
                     opacity: 0;
                 }
                 50% {
                     opacity: 1;
                 }
                 100% {
-                    transform: rotate(45deg) translateY(15px);
+                    transform: rotate(135deg) translateX(0px);
                     opacity: 0;
                 }
             }
-            @keyframes chevron-pulse-fast {
+            @keyframes chevron-slide-right {
                 0% {
-                    transform: rotate(45deg) translateY(0);
+                    transform: rotate(-45deg) translateX(15px);
                     opacity: 0;
                 }
                 50% {
                     opacity: 1;
                 }
                 100% {
-                    transform: rotate(45deg) translateY(15px);
+                    transform: rotate(-45deg) translateX(0px);
+                    opacity: 0;
+                }
+            }
+            @keyframes chevron-slide-left-fast {
+                0% {
+                    transform: rotate(135deg) translateX(-15px);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: rotate(135deg) translateX(0px);
+                    opacity: 0;
+                }
+            }
+            @keyframes chevron-slide-right-fast {
+                0% {
+                    transform: rotate(-45deg) translateX(15px);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: rotate(-45deg) translateX(0px);
                     opacity: 0;
                 }
             }
@@ -1236,7 +1404,8 @@ app.get('/', (req, res) => {
             <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
             <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;">CHECK</button>
             <input type="number" id="bet-amt" value="100">
-            <button onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
+            <button id="raise-btn" onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
+            <button id="allin-btn" onclick="socket.emit('action', {type:'allin'})" style="background: #8e44ad;">ALL IN</button>
         </div>
         
         <div id="position-controls">
@@ -1565,14 +1734,17 @@ app.get('/', (req, res) => {
                     if (p.id === data.activeId) boxClasses.push('active-turn');
                     if (isMe) boxClasses.push('my-seat');
                     
-                    // Chevron indicator - only show when it's this player's turn
+                    // Chevron indicator - coming from left and right
                     let chevronHtml = '';
                     if (p.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
                         const chevronClass = data.timeRemaining <= 10 ? 'timer-display warning' : 'timer-display';
                         chevronHtml = \`<div class="\${chevronClass}">
-                            <div class="chevron"></div>
-                            <div class="chevron"></div>
-                            <div class="chevron"></div>
+                            <div class="chevron-left"></div>
+                            <div class="chevron-left"></div>
+                            <div class="chevron-left"></div>
+                            <div class="chevron-right"></div>
+                            <div class="chevron-right"></div>
+                            <div class="chevron-right"></div>
                         </div>\`;
                     }
                     
@@ -1644,7 +1816,26 @@ app.get('/', (req, res) => {
                 guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
                 
                 document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
-                if(isMyTurn) document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL "+data.callAmt : "CHECK";
+                if(isMyTurn) {
+                    document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL "+data.callAmt : "CHECK";
+                    
+                    // Update raise button text and bet amount
+                    const betInput = document.getElementById('bet-amt');
+                    if (data.canRaise) {
+                        betInput.value = data.minRaise;
+                        document.getElementById('raise-btn').innerText = "RAISE TO " + data.minRaise;
+                    } else {
+                        // Can't raise enough
+                        betInput.value = data.myChips;
+                        document.getElementById('raise-btn').style.display = 'none';
+                    }
+                    
+                    // Update raise button on input change
+                    betInput.oninput = function() {
+                        const val = parseInt(this.value) || 0;
+                        document.getElementById('raise-btn').innerText = "RAISE TO " + val;
+                    };
+                }
                 
                 renderSeats(data);
             });
