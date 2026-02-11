@@ -781,61 +781,90 @@ app.get('/', (req, res) => {
             }
             .timer-display {
                 position: absolute;
-                top: -35px;
+                top: -45px;
                 left: 50%;
                 transform: translateX(-50%);
-                width: 0;
-                height: 0;
-                border-left: 30px solid transparent;
-                border-right: 30px solid transparent;
-                border-bottom: 35px solid transparent;
+                width: 80px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 z-index: 25;
-                /* Create outline effect using box-shadow */
-                filter: drop-shadow(0 0 0 #f1c40f) 
-                        drop-shadow(0 1px 0 #f1c40f) 
-                        drop-shadow(1px 0 0 #f1c40f) 
-                        drop-shadow(0 -1px 0 #f1c40f) 
-                        drop-shadow(-1px 0 0 #f1c40f);
             }
-            .timer-display::before {
-                content: '';
+            .chevron {
                 position: absolute;
-                bottom: -35px;
-                left: -30px;
-                width: 0;
-                height: 0;
-                border-left: 30px solid transparent;
-                border-right: 30px solid transparent;
-                border-bottom: 35px solid #f1c40f;
-                animation: flash-yellow 1s infinite;
+                width: 30px;
+                height: 30px;
+                border-right: 4px solid #f1c40f;
+                border-bottom: 4px solid #f1c40f;
+                transform: rotate(45deg);
+                animation: chevron-pulse 1s infinite;
             }
-            .timer-display::after {
-                content: attr(data-time);
-                position: absolute;
-                bottom: -26px;
-                left: 50%;
-                transform: translateX(-50%);
-                font-size: 20px;
+            .chevron:nth-child(1) {
+                top: 0;
+                animation-delay: 0s;
+            }
+            .chevron:nth-child(2) {
+                top: 10px;
+                animation-delay: 0.15s;
+                opacity: 0.7;
+            }
+            .chevron:nth-child(3) {
+                top: 20px;
+                animation-delay: 0.3s;
+                opacity: 0.4;
+            }
+            .timer-display.warning .chevron {
+                border-right-color: #e74c3c;
+                border-bottom-color: #e74c3c;
+                animation: chevron-pulse-fast 0.5s infinite;
+            }
+            @keyframes chevron-pulse {
+                0% {
+                    transform: rotate(45deg) translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: rotate(45deg) translateY(15px);
+                    opacity: 0;
+                }
+            }
+            @keyframes chevron-pulse-fast {
+                0% {
+                    transform: rotate(45deg) translateY(0);
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: rotate(45deg) translateY(15px);
+                    opacity: 0;
+                }
+            }
+            
+            #turn-timer-display {
+                position: fixed;
+                top: 50%;
+                left: 20px;
+                transform: translateY(-50%);
+                font-size: 48px;
                 font-weight: bold;
                 color: #f1c40f;
-                width: 60px;
-                text-align: center;
-                z-index: 26;
+                z-index: 150;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+                display: none;
             }
-            .timer-display.warning::before {
-                border-bottom-color: #e74c3c;
-                animation: flash-red 0.5s infinite;
-            }
-            .timer-display.warning::after {
+            #turn-timer-display.warning {
                 color: #e74c3c;
+                animation: timer-pulse 0.5s infinite;
             }
-            @keyframes flash-yellow {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.3; }
-            }
-            @keyframes flash-red {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.2; }
+            @keyframes timer-pulse {
+                0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
+                50% { opacity: 0.7; transform: translateY(-50%) scale(1.1); }
             }
             @keyframes pulse {
                 0%, 100% { opacity: 1; }
@@ -1178,6 +1207,8 @@ app.get('/', (req, res) => {
         
         <button id="fullscreen-btn" class="tool-btn" onclick="toggleFullscreen()">FULLSCREEN</button>
         
+        <div id="turn-timer-display"></div>
+        
         <div id="ios-prompt">
             <h3>📱 iPhone Fullscreen Mode</h3>
             <p>To use fullscreen on iPhone:</p>
@@ -1489,6 +1520,20 @@ app.get('/', (req, res) => {
                     const idx = (myIndex + i) % data.players.length;
                     reorderedPlayers.push(data.players[idx]);
                 }
+                
+                // Update left-side timer display
+                const timerDisplay = document.getElementById('turn-timer-display');
+                if (data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
+                    timerDisplay.innerText = data.timeRemaining;
+                    timerDisplay.style.display = 'block';
+                    if (data.timeRemaining <= 10) {
+                        timerDisplay.classList.add('warning');
+                    } else {
+                        timerDisplay.classList.remove('warning');
+                    }
+                } else {
+                    timerDisplay.style.display = 'none';
+                }
 
                 reorderedPlayers.forEach((p, i) => {
                     // Position players in a circle, with index 0 at top (270 degrees / -90 degrees)
@@ -1520,11 +1565,15 @@ app.get('/', (req, res) => {
                     if (p.id === data.activeId) boxClasses.push('active-turn');
                     if (isMe) boxClasses.push('my-seat');
                     
-                    // Timer display - only show when it's this player's turn
-                    let timerHtml = '';
+                    // Chevron indicator - only show when it's this player's turn
+                    let chevronHtml = '';
                     if (p.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
-                        const timerClass = data.timeRemaining <= 10 ? 'timer-display warning' : 'timer-display';
-                        timerHtml = \`<div class="\${timerClass}" data-time="\${data.timeRemaining}"></div>\`;
+                        const chevronClass = data.timeRemaining <= 10 ? 'timer-display warning' : 'timer-display';
+                        chevronHtml = \`<div class="\${chevronClass}">
+                            <div class="chevron"></div>
+                            <div class="chevron"></div>
+                            <div class="chevron"></div>
+                        </div>\`;
                     }
                     
                     // Auto-fold checkbox (only for current player)
@@ -1541,7 +1590,7 @@ app.get('/', (req, res) => {
                     seat.innerHTML = \`
                         <div class="\${boxClasses.join(' ')}">
                             \${disc}
-                            \${timerHtml}
+                            \${chevronHtml}
                             <b style="color:\${isMe ? '#16a085' : '#f1c40f'}; font-size: 12px;">
                                 \${p.name}: <span style="font-size: 14px; color:\${isMe ? '#000' : '#fff'}">\${p.chips}</span>
                             </b><br>
