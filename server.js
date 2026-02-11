@@ -239,6 +239,9 @@ function getPlayersInHand() {
 }
 
 function startNewHand() {
+    // Clear any previous winner announcement
+    io.emit('clear_winner');
+    
     community = []; pot = 0; currentBet = BB; lastRaiseAmount = BB;
     playersActedThisRound.clear();
     playersAllowedToReraise.clear();
@@ -619,13 +622,7 @@ function showdown() {
     
     log(`============ HAND COMPLETE ============`);
     
-    // Reset to LOBBY after 5 seconds
-    setTimeout(() => {
-        gameStage = 'LOBBY';
-        io.emit('clear_winner');
-        broadcast();
-    }, 5000);
-    
+    // Stay in SHOWDOWN state - don't clear until START is pressed
     broadcast();
 }
 
@@ -1554,6 +1551,7 @@ app.get('/', (req, res) => {
             let lastTimeRemaining = 30;
             let hasPlayedTurnBeep = false;
             let hasPlayed10SecBeep = false;
+            let lastActiveId = null; // Track when turn changes to reset bet input
             
             function initAudio() {
                 if (!audioContext) {
@@ -1835,11 +1833,24 @@ app.get('/', (req, res) => {
                 
                 document.getElementById('debug-btn').style.display = data.isHost ? 'block' : 'none';
                 document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
-                document.getElementById('start-btn').style.display = (data.isHost && data.gameStage === 'LOBBY') ? 'block' : 'none';
+                
+                const startBtn = document.getElementById('start-btn');
+                if (data.isHost && (data.gameStage === 'LOBBY' || data.gameStage === 'SHOWDOWN')) {
+                    startBtn.style.display = 'block';
+                    startBtn.innerText = data.gameStage === 'SHOWDOWN' ? 'NEXT HAND' : 'START';
+                } else {
+                    startBtn.style.display = 'none';
+                }
                 
                 const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY');
                 const guide = document.getElementById('action-guide');
                 guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
+                
+                // Check if turn has changed (to reset bet input only once)
+                const turnChanged = lastActiveId !== data.activeId;
+                if (turnChanged) {
+                    lastActiveId = data.activeId;
+                }
                 
                 document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
                 if(isMyTurn) {
@@ -1863,7 +1874,11 @@ app.get('/', (req, res) => {
                     
                     // Default to minimum raise, or max if player can't afford minimum
                     const defaultBetAmount = Math.min(data.minRaise, maxTotalBet);
-                    betInput.value = defaultBetAmount;
+                    
+                    // Only reset input value when turn first starts (not on every update)
+                    if (turnChanged && isMyTurn) {
+                        betInput.value = defaultBetAmount;
+                    }
                     
                     // Allow player to type any amount from minRaise up to their full stack
                     betInput.min = data.minRaise;
@@ -1871,7 +1886,8 @@ app.get('/', (req, res) => {
                     
                     // Determine if button should say "BET" or "RAISE"
                     const actionWord = data.isBetSituation ? "BET" : "RAISE";
-                    raiseBtn.innerText = actionWord + " TO " + defaultBetAmount;
+                    const currentBetValue = parseInt(betInput.value) || defaultBetAmount;
+                    raiseBtn.innerText = actionWord + " TO " + currentBetValue;
                     
                     // Hide raise/bet button if can't make minimum raise
                     if (!data.canRaise) {
