@@ -19,6 +19,7 @@ let lastRaiseAmount = BB; // Track the size of the last raise for minimum raise 
 let dealerIndex = -1; 
 let turnIndex = 0;
 let gameStage = 'LOBBY'; 
+let gameStarted = false; // Track if game has ever started to prevent new joins
 let playersActedThisRound = new Set();
 let playersAllowedToReraise = new Set(); // Track who can re-raise after incomplete raises
 let turnTimer = null;
@@ -241,6 +242,7 @@ function startNewHand() {
     community = []; pot = 0; currentBet = BB; lastRaiseAmount = BB;
     playersActedThisRound.clear();
     playersAllowedToReraise.clear();
+    gameStarted = true; // Lock the game from new players joining
     
     const active = playerOrder.filter(id => players[id].chips > 0);
     if (active.length < 2) {
@@ -636,6 +638,11 @@ function broadcast() {
         const minRaiseTotal = currentBet + lastRaiseAmount;
         const canRaise = myChips + players[id].bet >= minRaiseTotal;
         
+        // Determine if this is a "bet" or "raise" situation
+        // It's a BET if: currentBet is 0, OR we're preflop and only the BB has been posted (no voluntary raises)
+        const isBetSituation = (currentBet === 0) || 
+                               (gameStage === 'PREFLOP' && currentBet === BB && lastRaiseAmount === BB);
+        
         io.to(id).emit('update', {
             myId: id, 
             myName: players[id].name, 
@@ -659,10 +666,12 @@ function broadcast() {
             currentBet, 
             SB, 
             BB,
+            myBet: players[id].bet,
             callAmt: currentBet - players[id].bet,
             minRaise: minRaiseTotal,
             canRaise: canRaise,
             myChips: myChips,
+            isBetSituation: isBetSituation,
             timeRemaining: turnTimeRemaining
         });
     });
@@ -670,6 +679,13 @@ function broadcast() {
 
 io.on('connection', (socket) => {
     socket.on('join', (name) => {
+        // Prevent joining if game has already started
+        if (gameStarted) {
+            socket.emit('join_rejected', 'Game already in progress. Please wait for the next game.');
+            log(`⛔ ${name} tried to join but game is in progress`);
+            return;
+        }
+        
         players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', autoFold: false };
         playerOrder.push(socket.id);
         log(`➕ ${name} joined the game (${playerOrder.length} players total)`);
@@ -690,7 +706,8 @@ io.on('connection', (socket) => {
         if(playerOrder[0] === socket.id) { 
             log(`🔄 Game reset by ${players[socket.id].name}`);
             players={}; 
-            playerOrder=[]; 
+            playerOrder=[];
+            gameStarted = false; // Allow new players to join again
             io.emit('force_refresh'); 
         } 
     });
@@ -1568,6 +1585,12 @@ app.get('/', (req, res) => {
             const name = prompt("Name:") || "Guest";
             socket.emit('join', name);
             
+            // Handle join rejection
+            socket.on('join_rejected', (message) => {
+                alert(message);
+                window.location.reload();
+            });
+            
             // Position state
             let positions = {
                 tableX: 50, tableY: 45,
@@ -1835,21 +1858,32 @@ app.get('/', (req, res) => {
                         callBtn.style.display = 'none';
                     }
                     
-                    // Set bet input to minimum legal raise
-                    betInput.value = data.minRaise;
-                    raiseBtn.innerText = "RAISE TO " + data.minRaise;
+                    // Calculate the max total bet (current bet + remaining chips)
+                    const maxTotalBet = data.myBet + data.myChips;
                     
-                    // Hide raise button if can't make minimum raise
+                    // Default to minimum raise, or max if player can't afford minimum
+                    const defaultBetAmount = Math.min(data.minRaise, maxTotalBet);
+                    betInput.value = defaultBetAmount;
+                    
+                    // Allow player to type any amount from minRaise up to their full stack
+                    betInput.min = data.minRaise;
+                    betInput.max = maxTotalBet;
+                    
+                    // Determine if button should say "BET" or "RAISE"
+                    const actionWord = data.isBetSituation ? "BET" : "RAISE";
+                    raiseBtn.innerText = actionWord + " TO " + defaultBetAmount;
+                    
+                    // Hide raise/bet button if can't make minimum raise
                     if (!data.canRaise) {
                         raiseBtn.style.display = 'none';
                     } else {
                         raiseBtn.style.display = 'block';
                     }
                     
-                    // Update raise button text on input change
+                    // Update raise/bet button text on input change (allow manual override)
                     betInput.oninput = function() {
                         const val = parseInt(this.value) || 0;
-                        raiseBtn.innerText = "RAISE TO " + val;
+                        raiseBtn.innerText = actionWord + " TO " + val;
                     };
                 }
                 
