@@ -913,40 +913,42 @@ app.get('/', (req, res) => {
                 height: 20px;
                 border-right: 4px solid #f1c40f;
                 border-bottom: 4px solid #f1c40f;
+                top: 50%;
+                margin-top: -10px;
             }
             .chevron-left {
-                transform: rotate(135deg);
+                transform: rotate(-45deg);
                 animation: chevron-slide-left 1s infinite;
             }
             .chevron-right {
-                transform: rotate(-45deg);
+                transform: rotate(135deg);
                 animation: chevron-slide-right 1s infinite;
             }
             .chevron-left:nth-child(1) {
-                left: -40px;
+                left: -50px;
                 animation-delay: 0s;
             }
             .chevron-left:nth-child(2) {
-                left: -30px;
+                left: -40px;
                 animation-delay: 0.15s;
                 opacity: 0.7;
             }
             .chevron-left:nth-child(3) {
-                left: -20px;
+                left: -30px;
                 animation-delay: 0.3s;
                 opacity: 0.4;
             }
             .chevron-right:nth-child(4) {
-                right: -40px;
+                right: -50px;
                 animation-delay: 0s;
             }
             .chevron-right:nth-child(5) {
-                right: -30px;
+                right: -40px;
                 animation-delay: 0.15s;
                 opacity: 0.7;
             }
             .chevron-right:nth-child(6) {
-                right: -20px;
+                right: -30px;
                 animation-delay: 0.3s;
                 opacity: 0.4;
             }
@@ -963,53 +965,53 @@ app.get('/', (req, res) => {
             }
             @keyframes chevron-slide-left {
                 0% {
-                    transform: rotate(135deg) translateX(-15px);
+                    left: -50px;
                     opacity: 0;
                 }
                 50% {
                     opacity: 1;
                 }
                 100% {
-                    transform: rotate(135deg) translateX(0px);
+                    left: -15px;
                     opacity: 0;
                 }
             }
             @keyframes chevron-slide-right {
                 0% {
-                    transform: rotate(-45deg) translateX(15px);
+                    right: -50px;
                     opacity: 0;
                 }
                 50% {
                     opacity: 1;
                 }
                 100% {
-                    transform: rotate(-45deg) translateX(0px);
+                    right: -15px;
                     opacity: 0;
                 }
             }
             @keyframes chevron-slide-left-fast {
                 0% {
-                    transform: rotate(135deg) translateX(-15px);
+                    left: -50px;
                     opacity: 0;
                 }
                 50% {
                     opacity: 1;
                 }
                 100% {
-                    transform: rotate(135deg) translateX(0px);
+                    left: -15px;
                     opacity: 0;
                 }
             }
             @keyframes chevron-slide-right-fast {
                 0% {
-                    transform: rotate(-45deg) translateX(15px);
+                    right: -50px;
                     opacity: 0;
                 }
                 50% {
                     opacity: 1;
                 }
                 100% {
-                    transform: rotate(-45deg) translateX(0px);
+                    right: -15px;
                     opacity: 0;
                 }
             }
@@ -1113,8 +1115,8 @@ app.get('/', (req, res) => {
             
             .disc { 
                 position: absolute; 
-                top: -18px; 
-                right: -18px;
+                top: -20px; 
+                right: -20px;
                 width: 36px; 
                 height: 36px; 
                 border-radius: 50%; 
@@ -1131,8 +1133,8 @@ app.get('/', (req, res) => {
             .disc.bb { background: #f1c40f; color: black; }
             .disc.bb-bottom { 
                 top: auto;
-                bottom: -18px;
-                right: -18px;
+                bottom: -20px;
+                right: -20px;
             }
             
             #controls { 
@@ -1173,16 +1175,16 @@ app.get('/', (req, res) => {
                 border-radius: 4px; 
                 color: white; 
                 font-weight: bold; 
-                max-width: 100px;
+                max-width: 90px;
                 cursor: pointer;
             }
             #controls input { 
-                width: 60px; 
+                width: 55px; 
                 background: #000; 
                 color: #fff; 
                 border: 1px solid #444; 
                 text-align: center; 
-                font-size: 15px;
+                font-size: 14px;
                 border-radius: 4px;
                 padding: 10px 2px;
             }
@@ -1402,7 +1404,8 @@ app.get('/', (req, res) => {
         
         <div id="controls">
             <button onclick="socket.emit('action', {type:'fold'})" style="background: #c0392b;">FOLD</button>
-            <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60;">CHECK</button>
+            <button id="check-btn" onclick="socket.emit('action', {type:'call'})" style="background: #27ae60; display:none;">CHECK</button>
+            <button id="call-btn" onclick="socket.emit('action', {type:'call'})" style="background: #3498db; display:none;">CALL</button>
             <input type="number" id="bet-amt" value="100">
             <button id="raise-btn" onclick="socket.emit('action', {type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
             <button id="allin-btn" onclick="socket.emit('action', {type:'allin'})" style="background: #8e44ad;">ALL IN</button>
@@ -1817,23 +1820,36 @@ app.get('/', (req, res) => {
                 
                 document.getElementById('controls').style.display = isMyTurn ? 'flex' : 'none';
                 if(isMyTurn) {
-                    document.getElementById('call-btn').innerText = data.callAmt > 0 ? "CALL "+data.callAmt : "CHECK";
-                    
-                    // Update raise button text and bet amount
+                    const checkBtn = document.getElementById('check-btn');
+                    const callBtn = document.getElementById('call-btn');
                     const betInput = document.getElementById('bet-amt');
-                    if (data.canRaise) {
-                        betInput.value = data.minRaise;
-                        document.getElementById('raise-btn').innerText = "RAISE TO " + data.minRaise;
+                    const raiseBtn = document.getElementById('raise-btn');
+                    
+                    // Show CHECK or CALL button based on whether there's a bet to call
+                    if (data.callAmt > 0) {
+                        checkBtn.style.display = 'none';
+                        callBtn.style.display = 'block';
+                        callBtn.innerText = "CALL " + data.callAmt;
                     } else {
-                        // Can't raise enough
-                        betInput.value = data.myChips;
-                        document.getElementById('raise-btn').style.display = 'none';
+                        checkBtn.style.display = 'block';
+                        callBtn.style.display = 'none';
                     }
                     
-                    // Update raise button on input change
+                    // Set bet input to minimum legal raise
+                    betInput.value = data.minRaise;
+                    raiseBtn.innerText = "RAISE TO " + data.minRaise;
+                    
+                    // Hide raise button if can't make minimum raise
+                    if (!data.canRaise) {
+                        raiseBtn.style.display = 'none';
+                    } else {
+                        raiseBtn.style.display = 'block';
+                    }
+                    
+                    // Update raise button text on input change
                     betInput.oninput = function() {
                         const val = parseInt(this.value) || 0;
-                        document.getElementById('raise-btn').innerText = "RAISE TO " + val;
+                        raiseBtn.innerText = "RAISE TO " + val;
                     };
                 }
                 
