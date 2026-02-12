@@ -11,18 +11,31 @@ const io = require('socket.io')(http);
  * 
  * MINIMUM RAISE:
  * - Must raise by at least the size of the previous bet or raise in the current round
- * - Formula: minRaise = lastLegalBet + lastRaiseIncrement
- * - Example: BB is 50, Player A bets 100 → min raise is to 200 (100 + 100 increment)
+ * - Formula: minRaise = currentBet + lastRaiseIncrement
+ * - Example: BB is 50, Player A bets 100 (increment of 100) → min raise is to 200 (100 + 100)
+ * - Example: BB is 50, Player A raises to 100 (increment of 50) → min raise is to 150 (100 + 50)
+ * 
+ * PREFLOP SPECIAL CASE:
+ * - BB posts 50 (this is the opening bet, not a raise)
+ * - First raise must be to at least 100 (50 + 50), establishing increment of 50
+ * - Next raise must be to at least 150 (100 + 50)
+ * 
+ * POSTFLOP:
+ * - No bets yet, so lastRaiseIncrement = 0
+ * - First bet must be at least BB (50)
+ * - If someone bets 200, increment becomes 200
+ * - Next raise must be to at least 400 (200 + 200)
  * 
  * INCOMPLETE RAISES (ALL-IN):
  * - Incomplete raise: All-in < minimum raise → does NOT reopen action
  * - The minimum raise for subsequent players is based on the LAST LEGAL BET, not the incomplete all-in
- * - Example: BB=50, Player A goes all-in for 75 (incomplete) → next player must call 75 OR raise to 100 (50+50)
+ * - Example: currentBet=100, increment=50, Player goes all-in for 120 (needs 150)
+ *   → Next player: CALL 120 OR RAISE to 150+ (100 + 50, NOT 120 + 50)
  * 
  * IMPLEMENTATION:
  * - currentBet: The current highest bet in this round (what you must match to call)
  * - lastLegalBet: The last LEGAL bet (used for calculating min raise after incomplete raises)
- * - lastRaiseIncrement: The size of the last legal raise (or BB if no raises)
+ * - lastRaiseIncrement: The size of the last legal raise (0 if no raises yet)
  */
 
 // --- CONFIG ---
@@ -233,8 +246,8 @@ function startNewHand() {
     community = []; 
     pot = 0; 
     currentBet = BB; 
-    lastLegalBet = BB; // BB is the first legal bet preflop
-    lastRaiseIncrement = BB; // Minimum raise increment starts at BB
+    lastLegalBet = BB; // BB is the opening bet
+    lastRaiseIncrement = 0; // No raises yet, only the BB post
     playersActedThisRound.clear();
     playersAllowedToReraise.clear();
     gameStarted = true;
@@ -277,7 +290,7 @@ function startNewHand() {
     log(`👑 Dealer: ${players[playerOrder[dealerIndex]].name}`);
     log(`💵 SB: ${players[sbPlayer].name} posts ${sbAmount}`);
     log(`💵 BB: ${players[bbPlayer].name} posts ${bbAmount}`);
-    log(`📊 currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseIncrement=${lastRaiseIncrement}`);
+    log(`📊 Initial: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}, minRaise=${currentBet + BB}`);
     
     turnIndex = (dealerIndex + 3) % playerOrder.length;
     gameStage = 'PREFLOP';
@@ -343,15 +356,23 @@ function handleAction(socket, action) {
         const amountToAdd = targetTotal - p.bet;
         const actualAmountToAdd = Math.min(amountToAdd, p.chips);
         
+        // CRITICAL: Store currentBet BEFORE we update anything
+        const previousCurrentBet = currentBet;
+        
         log(`💰 ${p.name} attempting ${isAllIn ? 'ALL-IN' : 'RAISE'} to ${targetTotal} (adding ${actualAmountToAdd})`);
-        log(`📊 BEFORE: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseIncrement=${lastRaiseIncrement}`);
+        log(`📊 BEFORE: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}`);
         
         p.chips -= actualAmountToAdd;
         p.bet += actualAmountToAdd;
         pot += actualAmountToAdd;
         
-        // Calculate minimum raise based on TDA rules
-        const minRaiseTotal = lastLegalBet + lastRaiseIncrement;
+        // Calculate minimum raise
+        let minRaiseTotal;
+        if (lastRaiseIncrement === 0) {
+            minRaiseTotal = currentBet + BB;
+        } else {
+            minRaiseTotal = lastLegalBet + lastRaiseIncrement;
+        }
         
         log(`📊 Player bet=${p.bet}, minRaiseTotal=${minRaiseTotal}, chips left=${p.chips}`);
         
@@ -361,25 +382,26 @@ function handleAction(socket, action) {
             
             if (p.bet >= minRaiseTotal) {
                 // COMPLETE RAISE - reopens action
-                const raiseSize = p.bet - currentBet;
-                lastRaiseIncrement = raiseSize; // Update increment for next raise
-                lastLegalBet = p.bet; // This is now the legal bet to beat
+                // CRITICAL: Calculate increment from PREVIOUS currentBet
+                const raiseIncrement = p.bet - previousCurrentBet;
+                lastRaiseIncrement = raiseIncrement;
+                lastLegalBet = p.bet;
                 currentBet = p.bet;
                 
                 playersActedThisRound.clear();
                 playersActedThisRound.add(socket.id);
                 playersAllowedToReraise = new Set(playerOrder.filter(id => players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN'));
                 
-                log(`✅ COMPLETE RAISE to ${p.bet} (increment of ${raiseSize}) - ACTION REOPENED`);
-                log(`📊 AFTER: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseIncrement=${lastRaiseIncrement}`);
-                activityLog(`${p.name} ${p.chips === 0 ? 'all-in' : 'raised'} to ${p.bet} (raise of ${raiseSize})`);
+                log(`✅ COMPLETE RAISE to ${p.bet} (increment of ${raiseIncrement}) - ACTION REOPENED`);
+                log(`📊 AFTER: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}`);
+                activityLog(`${p.name} ${p.chips === 0 ? 'all-in' : 'raised'} to ${p.bet} (raise of ${raiseIncrement})`);
             } else {
                 // INCOMPLETE RAISE (all-in but < minimum) - does NOT reopen action
                 currentBet = p.bet; // Players must call this amount
                 // lastLegalBet and lastRaiseIncrement stay UNCHANGED
                 
                 log(`⚠️ INCOMPLETE RAISE to ${p.bet} (needed ${minRaiseTotal}) - BETTING CAPPED`);
-                log(`📊 AFTER: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseIncrement=${lastRaiseIncrement}`);
+                log(`📊 AFTER: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}`);
                 activityLog(`${p.name} all-in ${p.bet} (under-raise, betting capped)`);
             }
         } else {
@@ -429,10 +451,10 @@ function advanceStage() {
     
     // Reset for new betting round
     currentBet = 0;
-    lastLegalBet = 0; // No legal bet yet in this round
-    lastRaiseIncrement = BB; // Minimum raise increment resets to BB
+    lastLegalBet = 0; // No bets yet in this round
+    lastRaiseIncrement = 0; // No raises yet
     
-    log(`📊 Betting reset: currentBet=0, lastLegalBet=0, lastRaiseIncrement=${BB}`);
+    log(`📊 Betting reset: currentBet=0, lastLegalBet=0, lastRaiseInc=0 (first bet must be ≥BB)`);
     playersActedThisRound.clear();
     playersAllowedToReraise.clear();
     
@@ -562,15 +584,25 @@ function broadcast() {
         const myChips = players[id].chips;
         const myBet = players[id].bet;
         
-        // CRITICAL: Minimum raise is based on lastLegalBet + lastRaiseIncrement
-        const minRaiseTotal = lastLegalBet + lastRaiseIncrement;
+        // CRITICAL: Minimum raise calculation per TDA rules
+        // If no raises yet (preflop, only BB posted), minimum raise = BB + BB = 2*BB  
+        // If there was a raise, minimum next raise = last legal bet + last raise increment
+        let minRaiseTotal;
+        if (lastRaiseIncrement === 0) {
+            // No raises yet, first raise must be at least BB more than current bet
+            minRaiseTotal = currentBet + BB;
+        } else {
+            // There was a raise, must raise by at least the last increment
+            minRaiseTotal = lastLegalBet + lastRaiseIncrement;
+        }
+        
         const maxTotalBet = myBet + myChips;
         const canRaise = maxTotalBet >= minRaiseTotal;
         
         const isBetSituation = (currentBet === 0);
         
         if (playerOrder[turnIndex] === id && gameStage !== 'SHOWDOWN' && gameStage !== 'LOBBY') {
-            log(`💰 ${players[id].name}'s turn: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseIncrement=${lastRaiseIncrement}, minRaise=${minRaiseTotal}`);
+            log(`💰 ${players[id].name}'s turn: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}, minRaise=${minRaiseTotal}`);
         }
         
         io.to(id).emit('update', {
