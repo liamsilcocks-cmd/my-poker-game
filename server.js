@@ -580,20 +580,28 @@ function broadcast() {
     const sbIdx = (dealerIndex + 1) % playerOrder.length;
     const bbIdx = (dealerIndex + 2) % playerOrder.length;
 
+    // Log global state for debugging
+    log(`🔍 BROADCAST: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}, gameStage=${gameStage}`);
+
     playerOrder.forEach(id => {
         const myChips = players[id].chips;
         const myBet = players[id].bet;
         
-        // CRITICAL: Minimum raise calculation per TDA rules
-        // If no raises yet (preflop, only BB posted), minimum raise = BB + BB = 2*BB  
-        // If there was a raise, minimum next raise = last legal bet + last raise increment
+        // Calculate minimum raise - ALWAYS fresh from global state
         let minRaiseTotal;
-        if (lastRaiseIncrement === 0) {
-            // No raises yet, first raise must be at least BB more than current bet
+        
+        if (currentBet === 0) {
+            // No bets yet this round - minimum is BB
+            minRaiseTotal = BB;
+            log(`🔍 ${players[id].name}: No bets yet, minRaise = BB = ${BB}`);
+        } else if (lastRaiseIncrement === 0) {
+            // Opening bet posted (like BB preflop), no raises yet
             minRaiseTotal = currentBet + BB;
+            log(`🔍 ${players[id].name}: Opening bet ${currentBet}, minRaise = ${currentBet} + ${BB} = ${minRaiseTotal}`);
         } else {
-            // There was a raise, must raise by at least the last increment
+            // There was a raise, must match the increment
             minRaiseTotal = lastLegalBet + lastRaiseIncrement;
+            log(`🔍 ${players[id].name}: After raise, minRaise = ${lastLegalBet} + ${lastRaiseIncrement} = ${minRaiseTotal}`);
         }
         
         const maxTotalBet = myBet + myChips;
@@ -602,7 +610,7 @@ function broadcast() {
         const isBetSituation = (currentBet === 0);
         
         if (playerOrder[turnIndex] === id && gameStage !== 'SHOWDOWN' && gameStage !== 'LOBBY') {
-            log(`💰 ${players[id].name}'s turn: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}, minRaise=${minRaiseTotal}`);
+            log(`💰 ${players[id].name}'s turn: CB=${currentBet}, LLB=${lastLegalBet}, LRI=${lastRaiseIncrement}, minR=${minRaiseTotal}, isBet=${isBetSituation}`);
         }
         
         io.to(id).emit('update', {
