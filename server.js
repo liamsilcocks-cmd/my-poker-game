@@ -80,11 +80,13 @@ function startTurnTimer() {
         currentPlayer.status = 'FOLDED';
         playersActedThisRound.add(playerOrder[turnIndex]);
         
-        const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
-        const allActed = activeInHand.every(id => playersActedThisRound.has(id));
-        const allMatched = activeInHand.every(id => players[id].bet === currentBet);
+        const playersInHand = playerOrder.filter(id => players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN');
+        const playersCanAct = playerOrder.filter(id => players[id].status === 'ACTIVE');
+        const onlyOneRemaining = playersInHand.length <= 1;
+        const allActed = playersCanAct.every(id => playersActedThisRound.has(id));
+        const allMatched = playersCanAct.every(id => players[id].bet === currentBet);
 
-        if (activeInHand.length <= 1 || (allActed && allMatched)) {
+        if (onlyOneRemaining || (allActed && allMatched)) {
             advanceStage();
         } else {
             let nextIdx = turnIndex;
@@ -112,11 +114,13 @@ function startTurnTimer() {
             currentPlayer.status = 'FOLDED';
             playersActedThisRound.add(playerOrder[turnIndex]);
             
-            const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
-            const allActed = activeInHand.every(id => playersActedThisRound.has(id));
-            const allMatched = activeInHand.every(id => players[id].bet === currentBet);
+            const playersInHand = playerOrder.filter(id => players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN');
+            const playersCanAct = playerOrder.filter(id => players[id].status === 'ACTIVE');
+            const onlyOneRemaining = playersInHand.length <= 1;
+            const allActed = playersCanAct.every(id => playersActedThisRound.has(id));
+            const allMatched = playersCanAct.every(id => players[id].bet === currentBet);
 
-            if (activeInHand.length <= 1 || (allActed && allMatched)) {
+            if (onlyOneRemaining || (allActed && allMatched)) {
                 advanceStage();
             } else {
                 let nextIdx = turnIndex;
@@ -424,13 +428,22 @@ function handleAction(socket, action) {
         }
     }
     
-    const activeInHand = playerOrder.filter(id => players[id].status === 'ACTIVE');
-    const allActed = activeInHand.every(id => playersActedThisRound.has(id));
-    const allMatched = activeInHand.every(id => players[id].bet === currentBet);
+    // Players still in the hand (can win pot)
+    const playersInHand = playerOrder.filter(id => 
+        players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN'
+    );
+    
+    // Players who can still make actions
+    const playersCanAct = playerOrder.filter(id => players[id].status === 'ACTIVE');
+    
+    // Check if betting round should end
+    const onlyOneRemaining = playersInHand.length <= 1;
+    const allActed = playersCanAct.every(id => playersActedThisRound.has(id));
+    const allMatched = playersCanAct.every(id => players[id].bet === currentBet);
 
-    log(`📊 Round status: ${activeInHand.length} active, all acted: ${allActed}, all matched: ${allMatched}`);
+    log(`📊 Round status: ${playersInHand.length} in hand (${playersCanAct.length} can act), all acted: ${allActed}, all matched: ${allMatched}`);
 
-    if (activeInHand.length <= 1 || (allActed && allMatched)) {
+    if (onlyOneRemaining || (allActed && allMatched)) {
         stopTurnTimer();
         advanceStage();
     } else {
