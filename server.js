@@ -661,10 +661,8 @@ io.on('connection', (socket) => {
     });
 });
 
-// [HTML content continues from previous file - copying the full HTML/client code here]
-// [This would be the exact same HTML/client code from the previous version, which I'll add in the next section]
-
-http.listen(3000, () => console.log('Server live on port 3000'));
+app.get('/', (req, res) => {
+    res.send(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -1948,4 +1946,4 @@ http.listen(3000, () => console.log('Server live on port 3000'));
     `);
 });
 
-http.listen(3000, () => console.log('Server live on port 3000'));
+http.listen(process.env.PORT || 3000, () => console.log(`Server live on port ${process.env.PORT || 3000}`));
