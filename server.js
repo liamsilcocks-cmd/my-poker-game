@@ -2,6 +2,56 @@ const express = require('express');
 const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
+const fs = require('fs');
+const path = require('path');
+
+// Create logs directory if it doesn't exist
+const logsDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir);
+}
+
+// Game logging
+let gameLogFile = null;
+let gameLogStream = null;
+
+function getTimestamp() {
+    const now = new Date();
+    return now.toISOString().replace('T', ' ').substring(0, 19);
+}
+
+function initGameLog(roomNumber) {
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    gameLogFile = path.join(logsDir, `game-ROOM${roomNumber}-${timestamp}.log`);
+    gameLogStream = fs.createWriteStream(gameLogFile, { flags: 'a' });
+    
+    gameLog('='.repeat(80));
+    gameLog('POKER GAME SESSION STARTED');
+    gameLog('='.repeat(80));
+    gameLog(`Room Number: ${roomNumber}`);
+    gameLog(`Session Started: ${getTimestamp()}`);
+    gameLog('='.repeat(80));
+    gameLog('');
+}
+
+function gameLog(message) {
+    const logLine = `[${getTimestamp()}] ${message}`;
+    console.log(logLine); // Also log to console
+    if (gameLogStream) {
+        gameLogStream.write(logLine + '\n');
+    }
+}
+
+function closeGameLog() {
+    if (gameLogStream) {
+        gameLog('');
+        gameLog('='.repeat(80));
+        gameLog('GAME SESSION ENDED');
+        gameLog('='.repeat(80));
+        gameLogStream.end();
+        gameLogStream = null;
+    }
+}
 
 /*
  * TEXAS HOLD'EM NO LIMIT BETTING RULES (per TDA & standard poker rules)
@@ -110,6 +160,12 @@ function startBlindTimer() {
                 
                 log(`📈 BLINDS INCREASED! New blinds: ${SB}/${BB}`);
                 activityLog(`Blinds increased to ${SB}/${BB}`);
+                gameLog('');
+                gameLog(`!!! BLIND LEVEL INCREASED !!!`);
+                gameLog(`  New Blinds: ${SB}/${BB}`);
+                gameLog(`  Level: ${blindLevel + 1}`);
+                gameLog(`  Duration: ${newBlinds[2]} minutes`);
+                gameLog('');
                 
                 broadcast();
             } else {
@@ -367,6 +423,17 @@ function startNewHand() {
     deck = createDeck();
     active.forEach(id => { players[id].hand = [deck.pop(), deck.pop()]; });
     
+    // Log hand start with all hole cards
+    gameLog('');
+    gameLog('*'.repeat(80));
+    gameLog(`HAND START - Dealer: ${players[playerOrder[dealerIndex]].name}`);
+    gameLog('*'.repeat(80));
+    gameLog('HOLE CARDS DEALT:');
+    active.forEach(id => {
+        gameLog(`  ${players[id].name}: ${players[id].hand.join(' ')}`);
+    });
+    gameLog('');
+    
     const sbIdx = (dealerIndex + 1) % playerOrder.length;
     const bbIdx = (dealerIndex + 2) % playerOrder.length;
     
@@ -379,6 +446,12 @@ function startNewHand() {
     players[sbPlayer].chips -= sbAmount; players[sbPlayer].bet = sbAmount;
     players[bbPlayer].chips -= bbAmount; players[bbPlayer].bet = bbAmount;
     pot = sbAmount + bbAmount;
+    
+    gameLog(`BLINDS POSTED:`);
+    gameLog(`  Small Blind: ${players[sbPlayer].name} posts ${sbAmount} (${players[sbPlayer].chips} chips remaining)`);
+    gameLog(`  Big Blind: ${players[bbPlayer].name} posts ${bbAmount} (${players[bbPlayer].chips} chips remaining)`);
+    gameLog(`  Pot: ${pot}`);
+    gameLog('');
     
     if (players[sbPlayer].chips === 0) players[sbPlayer].status = 'ALL_IN';
     if (players[bbPlayer].chips === 0) players[bbPlayer].status = 'ALL_IN';
@@ -438,6 +511,7 @@ function handleAction(socket, action) {
         p.status = 'FOLDED';
         log(`🚫 ${p.name} FOLDED`);
         activityLog(`${p.name} folded (pot was at ${currentBet})`);
+        gameLog(`ACTION: ${p.name} FOLDS (Pot: ${pot})`);
         
     } else if (action.type === 'call') {
         const amtToCall = currentBet - p.bet;
@@ -449,15 +523,18 @@ function handleAction(socket, action) {
         if (amtToCall === 0) {
             log(`✓ ${p.name} CHECKED`);
             activityLog(`${p.name} checked`);
+            gameLog(`ACTION: ${p.name} CHECKS`);
         } else {
             log(`📞 ${p.name} CALLED ${actualAmt} (total bet: ${p.bet}, to match ${currentBet})`);
             activityLog(`${p.name} called ${actualAmt} (total in pot: ${p.bet})`);
+            gameLog(`ACTION: ${p.name} CALLS ${actualAmt} (Total bet: ${p.bet}, Chips remaining: ${p.chips}, Pot: ${pot})`);
         }
         
         if (p.chips === 0) {
             p.status = 'ALL_IN';
             log(`🔥 ${p.name} is ALL IN!`);
             activityLog(`${p.name} is ALL IN with ${p.bet}!`);
+            gameLog(`  >> ${p.name} is ALL-IN!`);
         }
         
     } else if (action.type === 'raise' || action.type === 'allin') {
@@ -505,6 +582,10 @@ function handleAction(socket, action) {
                 log(`✅ COMPLETE RAISE to ${p.bet} (increment of ${raiseIncrement}) - ACTION REOPENED`);
                 log(`📊 AFTER: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}`);
                 activityLog(`${p.name} ${p.chips === 0 ? 'all-in' : 'raised'} to ${p.bet} (raise of ${raiseIncrement})`);
+                gameLog(`ACTION: ${p.name} RAISES to ${p.bet} (Raise amount: ${raiseIncrement}, Chips remaining: ${p.chips}, Pot: ${pot})`);
+                if (p.chips === 0) {
+                    gameLog(`  >> ${p.name} is ALL-IN!`);
+                }
             } else {
                 // INCOMPLETE RAISE (all-in but < minimum) - does NOT reopen action
                 currentBet = p.bet; // Players must call this amount
@@ -513,6 +594,7 @@ function handleAction(socket, action) {
                 log(`⚠️ INCOMPLETE RAISE to ${p.bet} (needed ${minRaiseTotal}) - BETTING CAPPED`);
                 log(`📊 AFTER: currentBet=${currentBet}, lastLegalBet=${lastLegalBet}, lastRaiseInc=${lastRaiseIncrement}`);
                 activityLog(`${p.name} all-in ${p.bet} (under-raise, betting capped)`);
+                gameLog(`ACTION: ${p.name} ALL-IN (INCOMPLETE RAISE) to ${p.bet} (Needed: ${minRaiseTotal}, Pot: ${pot})`);
             }
         } else {
             // INVALID - shouldn't happen with client validation, treat as call
@@ -591,18 +673,27 @@ function advanceStage() {
         gameStage = 'FLOP'; 
         log(`🃏 FLOP: ${community.join(' ')}`);
         activityLog(`--- FLOP: ${community.join(' ')} ---`);
+        gameLog('');
+        gameLog(`--- FLOP: ${community.join(' ')} ---`);
+        gameLog('');
     }
     else if (gameStage === 'FLOP') { 
         community.push(deck.pop()); 
         gameStage = 'TURN'; 
         log(`🃏 TURN: ${community[3]}`);
         activityLog(`--- TURN: ${community[3]} ---`);
+        gameLog('');
+        gameLog(`--- TURN: ${community[3]} (Board: ${community.join(' ')}) ---`);
+        gameLog('');
     }
     else if (gameStage === 'TURN') { 
         community.push(deck.pop()); 
         gameStage = 'RIVER'; 
         log(`🃏 RIVER: ${community[4]}`);
         activityLog(`--- RIVER: ${community[4]} ---`);
+        gameLog('');
+        gameLog(`--- RIVER: ${community[4]} (Final Board: ${community.join(' ')}) ---`);
+        gameLog('');
     }
     else return showdown();
 
@@ -651,6 +742,12 @@ function showdown() {
     gameStage = 'SHOWDOWN';
     log(`🏆 ============ SHOWDOWN ============`);
     log(`🎴 Community cards: ${community.join(' ')}`);
+    gameLog('');
+    gameLog('='.repeat(80));
+    gameLog('SHOWDOWN');
+    gameLog('='.repeat(80));
+    gameLog(`Final Board: ${community.join(' ')}`);
+    gameLog('');
     
     const inHand = getPlayersInHand();
     
@@ -659,6 +756,11 @@ function showdown() {
         players[winnerId].chips += pot;
         log(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
         activityLog(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
+        gameLog(`WINNER: ${players[winnerId].name} wins ${pot} (all others folded)`);
+        gameLog(`  Cards: ${players[winnerId].hand.join(' ')}`);
+        gameLog(`  New chip count: ${players[winnerId].chips}`);
+        gameLog('');
+        
         io.emit('winner_announcement', `${players[winnerId].name} wins ${pot}`);
         
         // Store result for ALL players
@@ -683,6 +785,17 @@ function showdown() {
         log(`   Best hand: ${bestHand.name} (${bestHand.cards.join(' ')})`);
         return { id, bestHand, amountInPot: players[id].bet };
     });
+    
+    gameLog('PLAYER HANDS:');
+    inHand.forEach(id => {
+        const evaluated = evaluatedPlayers.find(ep => ep.id === id);
+        gameLog(`  ${players[id].name}:`);
+        gameLog(`    Hole Cards: ${players[id].hand.join(' ')}`);
+        gameLog(`    Best Hand: ${evaluated.bestHand.name}`);
+        gameLog(`    Hand Cards: ${evaluated.bestHand.cards.join(' ')}`);
+        gameLog(`    Amount in pot: ${players[id].bet}`);
+    });
+    gameLog('');
     
     const allContributions = playerOrder.map(id => ({
         id, amount: players[id].bet, inHand: inHand.includes(id)
@@ -736,10 +849,20 @@ function showdown() {
             wonAmounts[w.id] = (wonAmounts[w.id] || 0) + winAmt;
             log(`🏆 ${potLabel}: ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
             activityLog(`🏆 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
+            gameLog(`${potLabel} WINNER: ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
+            gameLog(`  New chip count: ${players[w.id].chips}`);
             if (winnerAnnouncement) winnerAnnouncement += ' | ';
             winnerAnnouncement += `${players[w.id].name}: ${winAmt} (${w.bestHand.name})`;
         });
     }
+    
+    gameLog('');
+    gameLog('FINAL CHIP COUNTS:');
+    playerOrder.forEach(id => {
+        gameLog(`  ${players[id].name}: ${players[id].chips} chips`);
+    });
+    gameLog('='.repeat(80));
+    gameLog('');
     
     // Add ALL players to results
     playerOrder.forEach(id => {
@@ -872,13 +995,16 @@ io.on('connection', (socket) => {
         // If no game exists, this player creates it with their room number
         if (playerOrder.length === 0) {
             currentRoomNumber = roomNumber;
+            initGameLog(roomNumber);
             log(`🎮 Room ${roomNumber} created by ${name}`);
+            gameLog(`ROOM CREATED by ${name}`);
         }
         
         // If a game exists with a different room number, reject
         if (currentRoomNumber && currentRoomNumber !== roomNumber) {
             socket.emit('join_rejected', `Room ${currentRoomNumber} is currently playing. Please use room number "${currentRoomNumber}" to join, or wait until that game ends.`);
             log(`⛔ ${name} tried to join room ${roomNumber} but room ${currentRoomNumber} is active`);
+            gameLog(`REJECTED: ${name} attempted to join with wrong room number (${roomNumber})`);
             return;
         }
         
@@ -886,6 +1012,7 @@ io.on('connection', (socket) => {
         if (gameStarted) {
             socket.emit('join_rejected', 'Game already in progress. Please wait for the next game.');
             log(`⛔ ${name} tried to join but game is in progress`);
+            gameLog(`REJECTED: ${name} attempted to join game in progress`);
             return;
         }
         
@@ -896,6 +1023,7 @@ io.on('connection', (socket) => {
         const isFirstPlayer = playerOrder.length === 1;
         log(`➕ ${name} ${isFirstPlayer ? 'created' : 'joined'} room ${roomNumber} (${playerOrder.length} players total)`);
         activityLog(`${name} joined the table`);
+        gameLog(`PLAYER JOINED: ${name} (Total players: ${playerOrder.length}, Starting chips: ${STARTING_CHIPS})`);
         gameStage = 'LOBBY';
         
         if (isFirstPlayer) {
@@ -969,6 +1097,7 @@ io.on('connection', (socket) => {
         if (players[socket.id]) {
             log(`➖ ${players[socket.id].name} disconnected`);
             activityLog(`${players[socket.id].name} left the table`);
+            gameLog(`PLAYER DISCONNECTED: ${players[socket.id].name} (Chips: ${players[socket.id].chips})`);
         }
         delete players[socket.id]; 
         playerOrder = playerOrder.filter(id => id !== socket.id);
@@ -976,6 +1105,9 @@ io.on('connection', (socket) => {
         // If everyone left, reset the room so a new group can use any room number
         if (playerOrder.length === 0) {
             log(`🔄 Room ${currentRoomNumber} is now empty - server available for new games`);
+            gameLog('');
+            gameLog('ALL PLAYERS LEFT - GAME SESSION ENDING');
+            closeGameLog();
             stopBlindTimer();
             stopTurnTimer();
             currentRoomNumber = null;
@@ -1976,6 +2108,8 @@ app.get('/', (req, res) => {
             <button class="tool-btn" onclick="let l=document.getElementById('activity-log'); l.style.display=l.style.display==='block'?'none':'block'">LOG</button>
             <button id="debug-btn" class="tool-btn" style="display:none; background:#16a085" onclick="let d=document.getElementById('debug-window'); d.style.display=d.style.display==='block'?'none':'block'">DEBUG</button>
             <button class="tool-btn" style="background:#9b59b6" onclick="let h=document.getElementById('hand-results'); h.style.display=h.style.display==='block'?'none':'block'">HANDS</button>
+            <button id="download-log-btn" class="tool-btn" style="display:none; background:#e67e22" onclick="downloadGameLog()">DOWNLOAD LOG</button>
+            <button id="view-logs-btn" class="tool-btn" style="display:none; background:#3498db" onclick="window.open('/logs', '_blank')">VIEW ALL LOGS</button>
             <button id="position-btn" class="tool-btn" style="background:#f39c12" onclick="let p=document.getElementById('position-controls'); p.style.display=p.style.display==='block'?'none':'block'">POSITION</button>
             <button id="reset-btn" class="tool-btn" style="display:none; background:#c0392b" onclick="socket.emit('reset_engine')">RESET</button>
         </div>
@@ -2101,6 +2235,19 @@ app.get('/', (req, res) => {
             }
             
             let socket;
+            
+            // Function to download current game log
+            function downloadGameLog() {
+                fetch('/current-log')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.filename) {
+                            window.location.href = '/logs/' + data.filename;
+                        } else {
+                            alert('No active game log available');
+                        }
+                    });
+            }
             
             // Position state
             let positions = {
@@ -2492,6 +2639,8 @@ app.get('/', (req, res) => {
                     
                     document.getElementById('debug-btn').style.display = data.isHost ? 'block' : 'none';
                     document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
+                    document.getElementById('download-log-btn').style.display = data.isHost ? 'block' : 'none';
+                    document.getElementById('view-logs-btn').style.display = data.isHost ? 'block' : 'none';
                     
                     // Update hand results panel
                     if (data.handResults && data.handResults.length > 0) {
@@ -2655,6 +2804,50 @@ app.get('/', (req, res) => {
     </body>
     </html>
     `);
+});
+
+// Endpoint to list all log files
+app.get('/logs', (req, res) => {
+    fs.readdir(logsDir, (err, files) => {
+        if (err) {
+            return res.status(500).send('Error reading logs directory');
+        }
+        const logFiles = files.filter(f => f.endsWith('.log')).sort().reverse();
+        let html = '<html><head><title>Poker Game Logs</title><style>body{font-family:monospace;background:#000;color:#0f0;padding:20px;}a{color:#0ff;text-decoration:none;display:block;padding:5px;}a:hover{background:#222;}</style></head><body>';
+        html += '<h1>🃏 Poker Game Logs</h1>';
+        html += '<p>Click a log file to download:</p>';
+        logFiles.forEach(file => {
+            html += `<a href="/logs/${file}" download>${file}</a>`;
+        });
+        html += '</body></html>';
+        res.send(html);
+    });
+});
+
+// Endpoint to download a specific log file
+app.get('/logs/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filepath = path.join(logsDir, filename);
+    
+    // Security: prevent directory traversal
+    if (!filename.endsWith('.log') || filename.includes('..')) {
+        return res.status(400).send('Invalid filename');
+    }
+    
+    res.download(filepath, filename, (err) => {
+        if (err) {
+            res.status(404).send('Log file not found');
+        }
+    });
+});
+
+// Endpoint to get current game log filename
+app.get('/current-log', (req, res) => {
+    if (gameLogFile) {
+        res.json({ filename: path.basename(gameLogFile), fullPath: gameLogFile });
+    } else {
+        res.json({ filename: null });
+    }
 });
 
 http.listen(process.env.PORT || 3000, () => console.log(`Server live on port ${process.env.PORT || 3000}`));
