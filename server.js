@@ -40,8 +40,26 @@ const io = require('socket.io')(http);
 
 // --- CONFIG ---
 let STARTING_CHIPS = 6000;
-let SB = 25;
-let BB = 50;
+
+// Blind schedule: [SB, BB, durationMinutes]
+const BLIND_SCHEDULE = [
+    [25, 50, 5],
+    [50, 100, 5],
+    [100, 200, 5],
+    [200, 400, 5],
+    [300, 600, 3],
+    [400, 800, 3],
+    [500, 1000, 3],
+    [600, 1200, 3],
+    [800, 1600, 3],
+    [1000, 2000, 3],
+    [1500, 3000, 3],
+    [2000, 4000, 3],
+    [4000, 8000, 3],
+    [6000, 12000, 3],
+    [8000, 16000, 3],
+    [10000, 20000, 3]
+];
 
 // --- STATE ---
 let players = {};
@@ -50,8 +68,8 @@ let community = [];
 let deck = [];
 let pot = 0;
 let currentBet = 0;
-let lastLegalBet = 0; // Track last legal bet for min raise calculations
-let lastRaiseIncrement = BB; // Track the size of the last raise
+let lastLegalBet = 0;
+let lastRaiseIncrement = 50;
 let dealerIndex = -1; 
 let turnIndex = 0;
 let gameStage = 'LOBBY'; 
@@ -60,7 +78,13 @@ let playersActedThisRound = new Set();
 let playersAllowedToReraise = new Set();
 let turnTimer = null;
 let turnTimeRemaining = 30;
-let lastHandResults = []; // Store hand results for display after showdown
+let lastHandResults = [];
+let SB = BLIND_SCHEDULE[0][0];
+let BB = BLIND_SCHEDULE[0][1];
+let blindLevel = 0;
+let blindTimer = null;
+let blindTimeRemaining = BLIND_SCHEDULE[0][2] * 60;
+let gameRoomNumber = null; // Current game's room number
 
 const suits = ['♠','♥','♦','♣'];
 const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
@@ -68,6 +92,53 @@ const rankValues = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':
 
 function log(msg) { io.emit('debug_msg', msg); }
 function activityLog(msg) { io.emit('activity_log', { msg }); }
+
+function startBlindTimer() {
+    if (blindTimer) clearInterval(blindTimer);
+    
+    blindTimer = setInterval(() => {
+        blindTimeRemaining--;
+        
+        if (blindTimeRemaining <= 0) {
+            // Move to next blind level
+            if (blindLevel < BLIND_SCHEDULE.length - 1) {
+                blindLevel++;
+                const newBlinds = BLIND_SCHEDULE[blindLevel];
+                SB = newBlinds[0];
+                BB = newBlinds[1];
+                blindTimeRemaining = newBlinds[2] * 60;
+                
+                log(`📈 BLINDS INCREASED! New blinds: ${SB}/${BB}`);
+                activityLog(`Blinds increased to ${SB}/${BB}`);
+                
+                broadcast();
+            } else {
+                // At max blind level, just reset timer
+                blindTimeRemaining = BLIND_SCHEDULE[blindLevel][2] * 60;
+            }
+        }
+        
+        // Broadcast periodically to update timer display
+        if (blindTimeRemaining % 10 === 0 || blindTimeRemaining <= 10) {
+            broadcast();
+        }
+    }, 1000);
+}
+
+function stopBlindTimer() {
+    if (blindTimer) {
+        clearInterval(blindTimer);
+        blindTimer = null;
+    }
+}
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+
 
 function startTurnTimer() {
     if (turnTimer) clearInterval(turnTimer);
@@ -261,6 +332,12 @@ function checkGameOver() {
 function startNewHand() {
     io.emit('clear_winner');
     lastHandResults = []; // Clear previous hand results
+    
+    // Start blind timer on first hand
+    if (!blindTimer && !gameStarted) {
+        startBlindTimer();
+        log(`⏰ Blind timer started at level ${blindLevel + 1}: ${SB}/${BB}`);
+    }
     
     community = []; 
     pot = 0; 
@@ -776,13 +853,34 @@ function broadcast() {
             isBetSituation: isBetSituation,
             timeRemaining: turnTimeRemaining,
             handResults: lastHandResults,
-            lastCommunity: community // Include community cards for hand results display
+            lastCommunity: community, // Include community cards for hand results display
+            blindLevel: blindLevel + 1, // Display as 1-indexed
+            blindTimeRemaining: blindTimeRemaining,
+            nextBlinds: blindLevel < BLIND_SCHEDULE.length - 1 ? 
+                `${BLIND_SCHEDULE[blindLevel + 1][0]}/${BLIND_SCHEDULE[blindLevel + 1][1]}` : 
+                'MAX',
+            roomNumber: gameRoomNumber
         });
     });
 }
 
 io.on('connection', (socket) => {
-    socket.on('join', (name) => {
+    socket.on('join', (data) => {
+        const name = data.name || 'Guest';
+        const roomNumber = data.roomNumber || '1234';
+        
+        // If this is the first player, set the room number
+        if (playerOrder.length === 0) {
+            gameRoomNumber = roomNumber;
+        }
+        
+        // Check if room number matches
+        if (gameRoomNumber && gameRoomNumber !== roomNumber) {
+            socket.emit('join_rejected', `Wrong game number. This game is for room ${gameRoomNumber}.`);
+            log(`⛔ ${name} tried to join with wrong room number (${roomNumber} vs ${gameRoomNumber})`);
+            return;
+        }
+        
         if (gameStarted) {
             socket.emit('join_rejected', 'Game already in progress. Please wait for the next game.');
             log(`⛔ ${name} tried to join but game is in progress`);
@@ -791,7 +889,7 @@ io.on('connection', (socket) => {
         
         players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', autoFold: false };
         playerOrder.push(socket.id);
-        log(`➕ ${name} joined the game (${playerOrder.length} players total)`);
+        log(`➕ ${name} joined the game (${playerOrder.length} players total) - Room: ${roomNumber}`);
         activityLog(`${name} joined the table`);
         gameStage = 'LOBBY';
         
@@ -809,6 +907,13 @@ io.on('connection', (socket) => {
         if (playerOrder[0] === socket.id) {
             log(`🔄 New game started by ${players[socket.id].name}`);
             activityLog(`New game started`);
+            
+            // Stop and reset blind timer
+            stopBlindTimer();
+            blindLevel = 0;
+            blindTimeRemaining = BLIND_SCHEDULE[0][2] * 60;
+            SB = BLIND_SCHEDULE[0][0];
+            BB = BLIND_SCHEDULE[0][1];
             
             // Reset all player chips
             playerOrder.forEach(id => {
@@ -838,10 +943,17 @@ io.on('connection', (socket) => {
     socket.on('reset_engine', () => { 
         if(playerOrder[0] === socket.id) { 
             log(`🔄 Game reset by ${players[socket.id].name}`);
+            stopBlindTimer();
+            stopTurnTimer();
             players={}; 
             playerOrder=[];
             gameStarted = false;
             lastHandResults = [];
+            gameRoomNumber = null;
+            blindLevel = 0;
+            blindTimeRemaining = BLIND_SCHEDULE[0][2] * 60;
+            SB = BLIND_SCHEDULE[0][0];
+            BB = BLIND_SCHEDULE[0][1];
             io.emit('force_refresh'); 
         } 
     });
@@ -894,10 +1006,11 @@ app.get('/', (req, res) => {
                 position: relative;
             }
             #blinds-overlay { 
-                font-size: 24px; 
-                color: #888;
                 position: absolute;
                 left: 8px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
             }
             #pot-display { 
                 font-size: 28px; 
@@ -914,7 +1027,16 @@ app.get('/', (req, res) => {
                     font-size: 24px;
                 }
                 #blinds-overlay {
-                    font-size: 22px;
+                    font-size: 16px;
+                }
+                #blind-timer {
+                    font-size: 12px !important;
+                }
+                #next-blinds {
+                    font-size: 10px !important;
+                }
+                #room-display {
+                    font-size: 14px !important;
                 }
             }
             
@@ -1635,8 +1757,19 @@ app.get('/', (req, res) => {
     </head>
     <body>
         <div id="top-bar">
-            <div id="blinds-overlay">Blinds: <span id="blinds-info">--/--</span></div>
+            <div id="blinds-overlay">
+                <div style="font-size: 20px;">Blinds: <span id="blinds-info">--/--</span></div>
+                <div id="blind-timer" style="font-size: 14px; color: #3498db; margin-top: 2px;">
+                    Level <span id="blind-level">1</span> | <span id="blind-time">5:00</span>
+                </div>
+                <div id="next-blinds" style="font-size: 12px; color: #95a5a6; margin-top: 2px;">
+                    Next: <span id="next-blinds-value">50/100</span>
+                </div>
+            </div>
             <div id="pot-display">Pot: <span id="pot">0</span></div>
+            <div id="room-display" style="position: absolute; right: 8px; font-size: 16px; color: #95a5a6;">
+                Room: <span id="room-number">--</span>
+            </div>
         </div>
         
         <div id="first-player-message"></div>
@@ -2161,8 +2294,9 @@ app.get('/', (req, res) => {
             // Wait for page to load before prompting for name
             window.addEventListener('load', () => {
                 socket = io();
-                const name = prompt("Name:") || "Guest";
-                socket.emit('join', name);
+                const name = prompt("Enter your name:") || "Guest";
+                const roomNumber = prompt("Enter game room number:", "1234") || "1234";
+                socket.emit('join', { name, roomNumber });
                 
                 // Handle join rejection
                 socket.on('join_rejected', (message) => {
@@ -2210,6 +2344,28 @@ app.get('/', (req, res) => {
                     
                     document.getElementById('pot').innerText = data.pot;
                     document.getElementById('blinds-info').innerText = data.SB + "/" + data.BB;
+                    
+                    // Update blind timer display
+                    if (data.blindLevel) {
+                        document.getElementById('blind-level').innerText = data.blindLevel;
+                        const mins = Math.floor(data.blindTimeRemaining / 60);
+                        const secs = data.blindTimeRemaining % 60;
+                        document.getElementById('blind-time').innerText = mins + ':' + secs.toString().padStart(2, '0');
+                        document.getElementById('next-blinds-value').innerText = data.nextBlinds;
+                        
+                        // Warning color when less than 1 minute
+                        const timerEl = document.getElementById('blind-timer');
+                        if (data.blindTimeRemaining < 60) {
+                            timerEl.style.color = '#e74c3c';
+                        } else {
+                            timerEl.style.color = '#3498db';
+                        }
+                    }
+                    
+                    // Update room number display
+                    if (data.roomNumber) {
+                        document.getElementById('room-number').innerText = data.roomNumber;
+                    }
                     
                     const comm = document.getElementById('community');
                     let html = '';
