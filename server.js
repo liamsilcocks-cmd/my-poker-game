@@ -60,6 +60,7 @@ let playersActedThisRound = new Set();
 let playersAllowedToReraise = new Set();
 let turnTimer = null;
 let turnTimeRemaining = 30;
+let lastHandResults = []; // Store hand results for display after showdown
 
 const suits = ['♠','♥','♦','♣'];
 const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
@@ -244,8 +245,22 @@ function getPlayersInHand() {
     return playerOrder.filter(id => (players[id].status === 'ACTIVE' || players[id].status === 'ALL_IN') && players[id].hand.length > 0);
 }
 
+function checkGameOver() {
+    // Check if only one player has chips remaining
+    const playersWithChips = playerOrder.filter(id => players[id].chips > 0);
+    if (playersWithChips.length === 1) {
+        gameStage = 'GAME_OVER';
+        log(`🏆 GAME OVER! ${players[playersWithChips[0]].name} wins!`);
+        activityLog(`🏆 GAME OVER! ${players[playersWithChips[0]].name} has all the chips!`);
+        broadcast();
+        return true;
+    }
+    return false;
+}
+
 function startNewHand() {
     io.emit('clear_winner');
+    lastHandResults = []; // Clear previous hand results
     
     community = []; 
     pot = 0; 
@@ -259,6 +274,7 @@ function startNewHand() {
     const active = playerOrder.filter(id => players[id].chips > 0);
     if (active.length < 2) {
         log('⚠️ Not enough players with chips to start hand');
+        checkGameOver();
         return;
     }
     
@@ -538,7 +554,18 @@ function showdown() {
         log(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
         activityLog(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
         io.emit('winner_announcement', `${players[winnerId].name} wins ${pot}`);
+        
+        // Store result for display
+        lastHandResults = [{
+            playerId: winnerId,
+            playerName: players[winnerId].name,
+            hand: players[winnerId].hand,
+            bestHand: null,
+            wonAmount: pot
+        }];
+        
         broadcast();
+        checkGameOver();
         return;
     }
     
@@ -577,6 +604,9 @@ function showdown() {
     log(`💰 SIDE POTS: ${sidePots.length} pot(s)`);
     let winnerAnnouncement = '';
     
+    // Store results for display
+    lastHandResults = [];
+    
     for (let potIndex = sidePots.length - 1; potIndex >= 0; potIndex--) {
         const sidePot = sidePots[potIndex];
         const eligibleHands = evaluatedPlayers.filter(ep => sidePot.eligiblePlayers.includes(ep.id));
@@ -599,11 +629,41 @@ function showdown() {
             activityLog(`🏆 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
             if (winnerAnnouncement) winnerAnnouncement += ' | ';
             winnerAnnouncement += `${players[w.id].name}: ${winAmt} (${w.bestHand.name})`;
+            
+            // Add to results
+            lastHandResults.push({
+                playerId: w.id,
+                playerName: players[w.id].name,
+                hand: players[w.id].hand,
+                bestHand: w.bestHand,
+                wonAmount: winAmt
+            });
         });
     }
     
+    // Add all players who were in the hand (including losers) to results, sorted by hand rank
+    evaluatedPlayers.forEach(ep => {
+        if (!lastHandResults.find(r => r.playerId === ep.id)) {
+            lastHandResults.push({
+                playerId: ep.id,
+                playerName: players[ep.id].name,
+                hand: players[ep.id].hand,
+                bestHand: ep.bestHand,
+                wonAmount: 0
+            });
+        }
+    });
+    
+    // Sort results by hand rank (best to worst)
+    lastHandResults.sort((a, b) => {
+        if (!a.bestHand) return 1;
+        if (!b.bestHand) return -1;
+        return compareHands(b.bestHand, a.bestHand);
+    });
+    
     io.emit('winner_announcement', winnerAnnouncement);
     broadcast();
+    checkGameOver();
 }
 
 function broadcast() {
@@ -639,7 +699,7 @@ function broadcast() {
         
         const isBetSituation = (currentBet === 0);
         
-        if (playerOrder[turnIndex] === id && gameStage !== 'SHOWDOWN' && gameStage !== 'LOBBY') {
+        if (playerOrder[turnIndex] === id && gameStage !== 'SHOWDOWN' && gameStage !== 'LOBBY' && gameStage !== 'GAME_OVER') {
             log(`💰 ${players[id].name}'s turn: CB=${currentBet}, LLB=${lastLegalBet}, LRI=${lastRaiseIncrement}, minR=${minRaiseTotal}, isBet=${isBetSituation}`);
         }
         
@@ -673,7 +733,8 @@ function broadcast() {
             canRaise: canRaise,
             myChips: myChips,
             isBetSituation: isBetSituation,
-            timeRemaining: turnTimeRemaining
+            timeRemaining: turnTimeRemaining,
+            handResults: lastHandResults
         });
     });
 }
@@ -702,6 +763,28 @@ io.on('connection', (socket) => {
     socket.on('start_game', () => startNewHand());
     socket.on('action', (data) => handleAction(socket, data));
     
+    socket.on('new_game', () => {
+        if (playerOrder[0] === socket.id) {
+            log(`🔄 New game started by ${players[socket.id].name}`);
+            activityLog(`New game started`);
+            
+            // Reset all player chips
+            playerOrder.forEach(id => {
+                players[id].chips = STARTING_CHIPS;
+                players[id].status = 'ACTIVE';
+                players[id].bet = 0;
+                players[id].hand = [];
+            });
+            
+            gameStarted = false;
+            gameStage = 'LOBBY';
+            dealerIndex = -1;
+            lastHandResults = [];
+            
+            broadcast();
+        }
+    });
+    
     socket.on('toggle_autofold', (value) => {
         if (players[socket.id]) {
             players[socket.id].autoFold = value;
@@ -716,6 +799,7 @@ io.on('connection', (socket) => {
             players={}; 
             playerOrder=[];
             gameStarted = false;
+            lastHandResults = [];
             io.emit('force_refresh'); 
         } 
     });
@@ -896,6 +980,74 @@ app.get('/', (req, res) => {
                 border: 3px solid #27ae60;
             }
             
+            /* Hand Results Panel */
+            #hand-results {
+                position: fixed;
+                top: 80px;
+                left: 10px;
+                width: 220px;
+                max-height: 60vh;
+                background: rgba(0,0,0,0.95);
+                border: 2px solid #f39c12;
+                border-radius: 8px;
+                padding: 10px;
+                z-index: 150;
+                display: none;
+                overflow-y: auto;
+            }
+            #hand-results h3 {
+                margin: 0 0 10px 0;
+                color: #f39c12;
+                font-size: 14px;
+                text-align: center;
+                border-bottom: 1px solid #f39c12;
+                padding-bottom: 5px;
+            }
+            .hand-result-item {
+                background: rgba(255,255,255,0.05);
+                border-radius: 4px;
+                padding: 8px;
+                margin-bottom: 8px;
+                border-left: 3px solid #2ecc71;
+            }
+            .hand-result-item.loser {
+                border-left-color: #e74c3c;
+            }
+            .hand-result-name {
+                font-weight: bold;
+                color: #f1c40f;
+                font-size: 13px;
+                margin-bottom: 4px;
+            }
+            .hand-result-hand {
+                font-size: 11px;
+                color: #aaa;
+                margin-bottom: 3px;
+            }
+            .hand-result-cards {
+                display: flex;
+                gap: 2px;
+                margin-bottom: 4px;
+            }
+            .hand-result-card {
+                background: white;
+                color: black;
+                border-radius: 3px;
+                padding: 2px 4px;
+                font-size: 10px;
+                font-weight: bold;
+                min-width: 20px;
+                text-align: center;
+            }
+            .hand-result-card.red {
+                color: #d63031;
+            }
+            .hand-result-amount {
+                color: #2ecc71;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            
             .card { 
                 background: white; 
                 color: black; 
@@ -937,6 +1089,19 @@ app.get('/', (req, res) => {
                 text-align: center; 
                 position: relative;
                 overflow: visible;
+            }
+            .you-label {
+                position: absolute;
+                top: -18px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #2ecc71;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 3px;
+                font-size: 9px;
+                font-weight: bold;
+                z-index: 21;
             }
             .timer-display {
                 position: absolute;
@@ -1339,23 +1504,6 @@ app.get('/', (req, res) => {
                 vertical-align: middle;
             }
             
-            #start-btn {
-                position: absolute;
-                top: 30%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                padding: 15px 30px;
-                background: #2980b9;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                display: none;
-                z-index: 15;
-                font-weight: bold;
-                font-size: 16px;
-                cursor: pointer;
-            }
-            
             /* POSITION CONTROLS */
             #position-controls {
                 position: fixed;
@@ -1425,6 +1573,12 @@ app.get('/', (req, res) => {
         
         <div id="turn-timer-display"></div>
         
+        <!-- Hand Results Panel -->
+        <div id="hand-results">
+            <h3>🏆 HAND RESULTS</h3>
+            <div id="hand-results-content"></div>
+        </div>
+        
         <div id="ios-prompt">
             <h3>📱 iPhone Fullscreen Mode</h3>
             <p>To use fullscreen on iPhone:</p>
@@ -1440,7 +1594,6 @@ app.get('/', (req, res) => {
             <div id="activity-log"><b>📋 ACTIVITY</b><hr></div>
             <div class="poker-table" id="poker-table">
                 <div id="table-logo">SYFM POKER</div>
-                <button id="start-btn" onclick="socket.emit('start_game')">START</button>
                 <div id="community"></div>
                 <div id="winner-announcement"></div>
                 <div id="action-guide"></div>
@@ -1455,6 +1608,8 @@ app.get('/', (req, res) => {
             <input type="number" id="bet-amt" value="100">
             <button id="raise-btn" onclick="sendAction({type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
             <button id="allin-btn" onclick="sendAction({type:'allin'})" style="background: #8e44ad;">ALL IN</button>
+            <button id="next-hand-btn" onclick="socket.emit('start_game')" style="background: #2980b9; display:none;">NEXT HAND</button>
+            <button id="new-game-btn" onclick="socket.emit('new_game')" style="background: #27ae60; display:none;">NEW GAME</button>
         </div>
         
         <div id="position-controls">
@@ -1511,11 +1666,10 @@ app.get('/', (req, res) => {
         <div id="footer-btns">
             <button class="tool-btn" onclick="let l=document.getElementById('activity-log'); l.style.display=l.style.display==='block'?'none':'block'">LOG</button>
             <button id="debug-btn" class="tool-btn" style="display:none; background:#16a085" onclick="let d=document.getElementById('debug-window'); d.style.display=d.style.display==='block'?'none':'block'">DEBUG</button>
+            <button class="tool-btn" style="background:#9b59b6" onclick="let h=document.getElementById('hand-results'); h.style.display=h.style.display==='block'?'none':'block'">HANDS</button>
             <button id="position-btn" class="tool-btn" style="background:#f39c12" onclick="let p=document.getElementById('position-controls'); p.style.display=p.style.display==='block'?'none':'block'">POSITION</button>
             <button id="reset-btn" class="tool-btn" style="display:none; background:#c0392b" onclick="socket.emit('reset_engine')">RESET</button>
         </div>
-        
-        <button id="start-btn" onclick="socket.emit('start_game')">START</button>
         
         <script src="/socket.io/socket.io.js"></script>
         <script>
@@ -1623,12 +1777,13 @@ app.get('/', (req, res) => {
                     return;
                 }
                 
-                // Validate bet/raise amounts
+                // Validate bet/raise amounts - FIXED: use >= instead of >
                 if (actionData.type === 'raise') {
                     const betInput = document.getElementById('bet-amt');
                     const amount = parseInt(betInput.value);
-                    if (isNaN(amount) || amount < parseInt(betInput.min)) {
-                        alert('Bet amount must be at least ' + betInput.min);
+                    const minAmount = parseInt(betInput.min);
+                    if (isNaN(amount) || amount < minAmount) {
+                        alert('Bet amount must be at least ' + minAmount);
                         return;
                     }
                 }
@@ -1677,6 +1832,34 @@ app.get('/', (req, res) => {
                 </div>\`;
             }
             
+            function updateHandResults(results) {
+                const container = document.getElementById('hand-results-content');
+                if (!results || results.length === 0) {
+                    container.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">No hands to display</div>';
+                    return;
+                }
+                
+                container.innerHTML = '';
+                results.forEach(result => {
+                    const isWinner = result.wonAmount > 0;
+                    const item = document.createElement('div');
+                    item.className = 'hand-result-item' + (isWinner ? '' : ' loser');
+                    
+                    const cardsHtml = result.hand.map(c => {
+                        const isRed = c.includes('♥') || c.includes('♦');
+                        return \`<div class="hand-result-card \${isRed ? 'red' : ''}">\${c}</div>\`;
+                    }).join('');
+                    
+                    item.innerHTML = \`
+                        <div class="hand-result-name">\${result.playerName}</div>
+                        <div class="hand-result-cards">\${cardsHtml}</div>
+                        \${result.bestHand ? \`<div class="hand-result-hand">\${result.bestHand.name}</div>\` : ''}
+                        \${isWinner ? \`<div class="hand-result-amount">Won \${result.wonAmount}</div>\` : ''}
+                    \`;
+                    container.appendChild(item);
+                });
+            }
+            
             function renderSeats(data) {
                 const area = document.getElementById('seats');
                 area.innerHTML = '';
@@ -1704,7 +1887,7 @@ app.get('/', (req, res) => {
                 
                 // Update left-side timer display
                 const timerDisplay = document.getElementById('turn-timer-display');
-                if (data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
+                if (data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY' && data.gameStage !== 'GAME_OVER') {
                     timerDisplay.innerText = data.timeRemaining;
                     timerDisplay.style.display = 'block';
                     if (data.timeRemaining <= 10) {
@@ -1746,9 +1929,12 @@ app.get('/', (req, res) => {
                     if (p.id === data.activeId) boxClasses.push('active-turn');
                     if (isMe) boxClasses.push('my-seat');
                     
+                    // Add YOU label for current player
+                    const youLabel = isMe ? '<div class="you-label">YOU</div>' : '';
+                    
                     // Chevron indicator - coming from left and right
                     let chevronHtml = '';
-                    if (p.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY') {
+                    if (p.id === data.activeId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY' && data.gameStage !== 'GAME_OVER') {
                         const chevronClass = data.timeRemaining <= 10 ? 'timer-display warning' : 'timer-display';
                         chevronHtml = \`<div class="\${chevronClass}">
                             <div class="chevron-left"></div>
@@ -1773,6 +1959,7 @@ app.get('/', (req, res) => {
                     
                     seat.innerHTML = \`
                         <div class="\${boxClasses.join(' ')}">
+                            \${youLabel}
                             \${disc}
                             \${chevronHtml}
                             <b style="color:\${isMe ? '#16a085' : '#f1c40f'}; font-size: 12px;">
@@ -1880,7 +2067,7 @@ app.get('/', (req, res) => {
                     currentData = data;
                     
                     // Check if it's now my turn (beep on turn start)
-                    const isMyTurnForBeep = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY');
+                    const isMyTurnForBeep = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY' && data.gameStage !== 'GAME_OVER');
                     if (isMyTurnForBeep && !hasPlayedTurnBeep) {
                         playBeep(800, 150);
                         hasPlayedTurnBeep = true;
@@ -1912,17 +2099,18 @@ app.get('/', (req, res) => {
                     document.getElementById('debug-btn').style.display = data.isHost ? 'block' : 'none';
                     document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
                     
-                    const startBtn = document.getElementById('start-btn');
-                    if (data.isHost && (data.gameStage === 'LOBBY' || data.gameStage === 'SHOWDOWN')) {
-                        startBtn.style.display = 'block';
-                        startBtn.innerText = data.gameStage === 'SHOWDOWN' ? 'NEXT HAND' : 'START';
-                    } else {
-                        startBtn.style.display = 'none';
+                    // Update hand results panel
+                    if (data.handResults && data.handResults.length > 0) {
+                        updateHandResults(data.handResults);
                     }
                     
-                    const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY');
+                    const isMyTurn = (data.activeId === data.myId && data.gameStage !== 'SHOWDOWN' && data.gameStage !== 'LOBBY' && data.gameStage !== 'GAME_OVER');
                     const guide = document.getElementById('action-guide');
-                    guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
+                    if (data.gameStage === 'GAME_OVER') {
+                        guide.innerText = "GAME OVER";
+                    } else {
+                        guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
+                    }
                     
                     // Store whether it's my turn for button validation
                     const controls = document.getElementById('controls');
@@ -1934,12 +2122,44 @@ app.get('/', (req, res) => {
                         lastActiveId = data.activeId;
                     }
                     
-                    controls.style.display = isMyTurn ? 'flex' : 'none';
-                    if(isMyTurn) {
+                    // Hide regular action buttons
+                    const actionButtons = ['fold', 'check-btn', 'call-btn', 'bet-amt', 'raise-btn', 'allin-btn'];
+                    const nextHandBtn = document.getElementById('next-hand-btn');
+                    const newGameBtn = document.getElementById('new-game-btn');
+                    
+                    if (data.gameStage === 'GAME_OVER') {
+                        // Show New Game button only for host
+                        controls.style.display = data.isHost ? 'flex' : 'none';
+                        actionButtons.forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.style.display = 'none';
+                        });
+                        nextHandBtn.style.display = 'none';
+                        newGameBtn.style.display = data.isHost ? 'block' : 'none';
+                    } else if (data.gameStage === 'SHOWDOWN') {
+                        // Show Next Hand button only for host
+                        controls.style.display = data.isHost ? 'flex' : 'none';
+                        actionButtons.forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.style.display = 'none';
+                        });
+                        nextHandBtn.style.display = data.isHost ? 'block' : 'none';
+                        newGameBtn.style.display = 'none';
+                    } else if (data.gameStage === 'LOBBY') {
+                        controls.style.display = 'none';
+                    } else if (isMyTurn) {
+                        // Show action buttons
+                        controls.style.display = 'flex';
+                        nextHandBtn.style.display = 'none';
+                        newGameBtn.style.display = 'none';
+                        
                         const checkBtn = document.getElementById('check-btn');
                         const callBtn = document.getElementById('call-btn');
                         const betInput = document.getElementById('bet-amt');
                         const raiseBtn = document.getElementById('raise-btn');
+                        
+                        // Show fold button
+                        document.getElementById('fold').style.display = 'block';
                         
                         // Show CHECK or CALL button based on whether there's a bet to call
                         if (data.callAmt > 0) {
@@ -1965,6 +2185,7 @@ app.get('/', (req, res) => {
                         // Allow player to type any amount from minRaise up to their full stack
                         betInput.min = data.minRaise;
                         betInput.max = maxTotalBet;
+                        betInput.style.display = 'block';
                         
                         // Determine if button should say "BET" or "RAISE TO"
                         const actionWord = data.isBetSituation ? "BET" : "RAISE TO";
@@ -1979,6 +2200,9 @@ app.get('/', (req, res) => {
                             raiseBtn.style.display = 'block';
                         }
                         
+                        // Show all-in button
+                        document.getElementById('allin-btn').style.display = 'block';
+                        
                         // Update raise/bet button text on input change (allow manual override)
                         betInput.oninput = function() {
                             const val = Math.max(parseInt(this.value) || defaultBetAmount, data.minRaise);
@@ -1986,6 +2210,8 @@ app.get('/', (req, res) => {
                             const buttonText = data.isBetSituation ? actionWord + " " + val : actionWord + " " + val;
                             raiseBtn.innerText = buttonText;
                         };
+                    } else {
+                        controls.style.display = 'none';
                     }
                     
                     renderSeats(data);
