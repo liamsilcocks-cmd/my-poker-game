@@ -61,7 +61,7 @@ const BLIND_SCHEDULE = [
     [10000, 20000, 3]
 ];
 
-// --- STATE ---
+// --- STATE (Single game at a time, but room number is flexible) ---
 let players = {};
 let playerOrder = [];
 let community = [];
@@ -84,7 +84,7 @@ let BB = BLIND_SCHEDULE[0][1];
 let blindLevel = 0;
 let blindTimer = null;
 let blindTimeRemaining = BLIND_SCHEDULE[0][2] * 60;
-let gameRoomNumber = null; // Current game's room number
+let currentRoomNumber = null; // Which room number is currently playing
 
 const suits = ['♠','♥','♦','♣'];
 const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
@@ -859,7 +859,7 @@ function broadcast() {
             nextBlinds: blindLevel < BLIND_SCHEDULE.length - 1 ? 
                 `${BLIND_SCHEDULE[blindLevel + 1][0]}/${BLIND_SCHEDULE[blindLevel + 1][1]}` : 
                 'MAX',
-            roomNumber: gameRoomNumber
+            roomNumber: currentRoomNumber
         });
     });
 }
@@ -869,27 +869,27 @@ io.on('connection', (socket) => {
         const name = data.name || 'Guest';
         const roomNumber = data.roomNumber || '1234';
         
-        // If this is the first player in ANY game, or if room is empty, set/create the room
+        // If no game exists, this player creates it with their room number
         if (playerOrder.length === 0) {
-            gameRoomNumber = roomNumber;
+            currentRoomNumber = roomNumber;
             log(`🎮 Room ${roomNumber} created by ${name}`);
         }
         
-        // Check if trying to join a different room than current game
-        if (gameRoomNumber && gameRoomNumber !== roomNumber) {
-            socket.emit('join_rejected', `Wrong game number. This game is for room ${gameRoomNumber}. Please enter ${gameRoomNumber} or start a new game.`);
-            log(`⛔ ${name} tried to join room ${roomNumber} but current game is room ${gameRoomNumber}`);
+        // If a game exists with a different room number, reject
+        if (currentRoomNumber && currentRoomNumber !== roomNumber) {
+            socket.emit('join_rejected', `Room ${currentRoomNumber} is currently playing. Please use room number "${currentRoomNumber}" to join, or wait until that game ends.`);
+            log(`⛔ ${name} tried to join room ${roomNumber} but room ${currentRoomNumber} is active`);
             return;
         }
         
         // Check if game already started
         if (gameStarted) {
-            socket.emit('join_rejected', 'Game already in progress. Please wait for the next game or use a different room number.');
+            socket.emit('join_rejected', 'Game already in progress. Please wait for the next game.');
             log(`⛔ ${name} tried to join but game is in progress`);
             return;
         }
         
-        // Successfully join the room
+        // Successfully join
         players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', autoFold: false };
         playerOrder.push(socket.id);
         
@@ -909,6 +909,14 @@ io.on('connection', (socket) => {
     
     socket.on('start_game', () => startNewHand());
     socket.on('action', (data) => handleAction(socket, data));
+    
+    socket.on('toggle_autofold', (value) => {
+        if (players[socket.id]) {
+            players[socket.id].autoFold = value;
+            log(`${players[socket.id].name} ${value ? 'enabled' : 'disabled'} auto-fold`);
+            broadcast();
+        }
+    });
     
     socket.on('new_game', () => {
         if (playerOrder[0] === socket.id) {
@@ -939,14 +947,6 @@ io.on('connection', (socket) => {
         }
     });
     
-    socket.on('toggle_autofold', (value) => {
-        if (players[socket.id]) {
-            players[socket.id].autoFold = value;
-            log(`${players[socket.id].name} ${value ? 'enabled' : 'disabled'} auto-fold`);
-            broadcast();
-        }
-    });
-    
     socket.on('reset_engine', () => { 
         if(playerOrder[0] === socket.id) { 
             log(`🔄 Game reset by ${players[socket.id].name}`);
@@ -956,7 +956,7 @@ io.on('connection', (socket) => {
             playerOrder=[];
             gameStarted = false;
             lastHandResults = [];
-            gameRoomNumber = null;
+            currentRoomNumber = null;
             blindLevel = 0;
             blindTimeRemaining = BLIND_SCHEDULE[0][2] * 60;
             SB = BLIND_SCHEDULE[0][0];
@@ -973,12 +973,12 @@ io.on('connection', (socket) => {
         delete players[socket.id]; 
         playerOrder = playerOrder.filter(id => id !== socket.id);
         
-        // If everyone left, reset the room
+        // If everyone left, reset the room so a new group can use any room number
         if (playerOrder.length === 0) {
-            log(`🔄 Room ${gameRoomNumber} is now empty - resetting`);
+            log(`🔄 Room ${currentRoomNumber} is now empty - server available for new games`);
             stopBlindTimer();
             stopTurnTimer();
-            gameRoomNumber = null;
+            currentRoomNumber = null;
             gameStarted = false;
             gameStage = 'LOBBY';
             blindLevel = 0;
@@ -986,9 +986,9 @@ io.on('connection', (socket) => {
             SB = BLIND_SCHEDULE[0][0];
             BB = BLIND_SCHEDULE[0][1];
             lastHandResults = [];
+        } else {
+            broadcast();
         }
-        
-        broadcast(); 
     });
 });
 
