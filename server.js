@@ -1602,14 +1602,15 @@ app.get('/', (req, res) => {
         </div>
         
         <div id="controls">
-            <button onclick="sendAction({type:'fold'})" style="background: #c0392b;">FOLD</button>
+            <button id="fold-btn" onclick="sendAction({type:'fold'})" style="background: #c0392b;">FOLD</button>
             <button id="check-btn" onclick="sendAction({type:'call'})" style="background: #27ae60; display:none;">CHECK</button>
             <button id="call-btn" onclick="sendAction({type:'call'})" style="background: #3498db; display:none;">CALL</button>
             <input type="number" id="bet-amt" value="100">
             <button id="raise-btn" onclick="sendAction({type:'raise', amt:parseInt(document.getElementById('bet-amt').value)})" style="background: #e67e22;">RAISE</button>
             <button id="allin-btn" onclick="sendAction({type:'allin'})" style="background: #8e44ad;">ALL IN</button>
-            <button id="next-hand-btn" onclick="socket.emit('start_game')" style="background: #2980b9; display:none;">NEXT HAND</button>
-            <button id="new-game-btn" onclick="socket.emit('new_game')" style="background: #27ae60; display:none;">NEW GAME</button>
+            <button id="start-btn" onclick="socket.emit('start_game')" style="background: #2ecc71; display:none; max-width: 150px;">START GAME</button>
+            <button id="next-hand-btn" onclick="socket.emit('start_game')" style="background: #2980b9; display:none; max-width: 150px;">NEXT HAND</button>
+            <button id="new-game-btn" onclick="socket.emit('new_game')" style="background: #27ae60; display:none; max-width: 150px;">NEW GAME</button>
         </div>
         
         <div id="position-controls">
@@ -2123,9 +2124,10 @@ app.get('/', (req, res) => {
                     }
                     
                     // Hide regular action buttons
-                    const actionButtons = ['fold', 'check-btn', 'call-btn', 'bet-amt', 'raise-btn', 'allin-btn'];
+                    const actionButtons = ['fold-btn', 'check-btn', 'call-btn', 'bet-amt', 'raise-btn', 'allin-btn'];
                     const nextHandBtn = document.getElementById('next-hand-btn');
                     const newGameBtn = document.getElementById('new-game-btn');
+                    const startBtn = document.getElementById('start-btn');
                     
                     if (data.gameStage === 'GAME_OVER') {
                         // Show New Game button only for host
@@ -2136,6 +2138,7 @@ app.get('/', (req, res) => {
                         });
                         nextHandBtn.style.display = 'none';
                         newGameBtn.style.display = data.isHost ? 'block' : 'none';
+                        startBtn.style.display = 'none';
                     } else if (data.gameStage === 'SHOWDOWN') {
                         // Show Next Hand button only for host
                         controls.style.display = data.isHost ? 'flex' : 'none';
@@ -2145,21 +2148,32 @@ app.get('/', (req, res) => {
                         });
                         nextHandBtn.style.display = data.isHost ? 'block' : 'none';
                         newGameBtn.style.display = 'none';
+                        startBtn.style.display = 'none';
                     } else if (data.gameStage === 'LOBBY') {
-                        controls.style.display = 'none';
+                        // Show Start button only for host
+                        controls.style.display = data.isHost ? 'flex' : 'none';
+                        actionButtons.forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.style.display = 'none';
+                        });
+                        nextHandBtn.style.display = 'none';
+                        newGameBtn.style.display = 'none';
+                        startBtn.style.display = data.isHost ? 'block' : 'none';
                     } else if (isMyTurn) {
                         // Show action buttons
                         controls.style.display = 'flex';
                         nextHandBtn.style.display = 'none';
                         newGameBtn.style.display = 'none';
+                        startBtn.style.display = 'none';
                         
                         const checkBtn = document.getElementById('check-btn');
                         const callBtn = document.getElementById('call-btn');
                         const betInput = document.getElementById('bet-amt');
                         const raiseBtn = document.getElementById('raise-btn');
+                        const foldBtn = document.getElementById('fold-btn');
                         
                         // Show fold button
-                        document.getElementById('fold').style.display = 'block';
+                        foldBtn.style.display = 'block';
                         
                         // Show CHECK or CALL button based on whether there's a bet to call
                         if (data.callAmt > 0) {
