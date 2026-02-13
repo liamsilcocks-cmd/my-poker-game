@@ -869,32 +869,39 @@ io.on('connection', (socket) => {
         const name = data.name || 'Guest';
         const roomNumber = data.roomNumber || '1234';
         
-        // If this is the first player, set the room number
+        // If this is the first player in ANY game, or if room is empty, set/create the room
         if (playerOrder.length === 0) {
             gameRoomNumber = roomNumber;
+            log(`🎮 Room ${roomNumber} created by ${name}`);
         }
         
-        // Check if room number matches
+        // Check if trying to join a different room than current game
         if (gameRoomNumber && gameRoomNumber !== roomNumber) {
-            socket.emit('join_rejected', `Wrong game number. This game is for room ${gameRoomNumber}.`);
-            log(`⛔ ${name} tried to join with wrong room number (${roomNumber} vs ${gameRoomNumber})`);
+            socket.emit('join_rejected', `Wrong game number. This game is for room ${gameRoomNumber}. Please enter ${gameRoomNumber} or start a new game.`);
+            log(`⛔ ${name} tried to join room ${roomNumber} but current game is room ${gameRoomNumber}`);
             return;
         }
         
+        // Check if game already started
         if (gameStarted) {
-            socket.emit('join_rejected', 'Game already in progress. Please wait for the next game.');
+            socket.emit('join_rejected', 'Game already in progress. Please wait for the next game or use a different room number.');
             log(`⛔ ${name} tried to join but game is in progress`);
             return;
         }
         
+        // Successfully join the room
         players[socket.id] = { name, chips: STARTING_CHIPS, hand: [], bet: 0, status: 'ACTIVE', autoFold: false };
         playerOrder.push(socket.id);
-        log(`➕ ${name} joined the game (${playerOrder.length} players total) - Room: ${roomNumber}`);
+        
+        const isFirstPlayer = playerOrder.length === 1;
+        log(`➕ ${name} ${isFirstPlayer ? 'created' : 'joined'} room ${roomNumber} (${playerOrder.length} players total)`);
         activityLog(`${name} joined the table`);
         gameStage = 'LOBBY';
         
-        if (playerOrder.length === 1) {
-            socket.emit('first_player_message', "You're the first, you're in control");
+        if (isFirstPlayer) {
+            socket.emit('first_player_message', "You're the host! Wait for players, then click START GAME.");
+        } else {
+            socket.emit('first_player_message', `Joined room ${roomNumber}! Waiting for host to start...`);
         }
         
         broadcast();
@@ -964,7 +971,23 @@ io.on('connection', (socket) => {
             activityLog(`${players[socket.id].name} left the table`);
         }
         delete players[socket.id]; 
-        playerOrder = playerOrder.filter(id => id !== socket.id); 
+        playerOrder = playerOrder.filter(id => id !== socket.id);
+        
+        // If everyone left, reset the room
+        if (playerOrder.length === 0) {
+            log(`🔄 Room ${gameRoomNumber} is now empty - resetting`);
+            stopBlindTimer();
+            stopTurnTimer();
+            gameRoomNumber = null;
+            gameStarted = false;
+            gameStage = 'LOBBY';
+            blindLevel = 0;
+            blindTimeRemaining = BLIND_SCHEDULE[0][2] * 60;
+            SB = BLIND_SCHEDULE[0][0];
+            BB = BLIND_SCHEDULE[0][1];
+            lastHandResults = [];
+        }
+        
         broadcast(); 
     });
 });
@@ -1142,6 +1165,62 @@ app.get('/', (req, res) => {
                 text-align: center;
                 box-shadow: 0 0 30px rgba(46, 204, 113, 0.8);
                 border: 3px solid #27ae60;
+            }
+            
+            /* Login Screen */
+            #login-screen {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.95);
+                z-index: 400;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+            #login-box {
+                background: #111;
+                border: 3px solid #f39c12;
+                border-radius: 12px;
+                padding: 30px;
+                max-width: 400px;
+                width: 100%;
+                box-shadow: 0 0 30px rgba(243, 156, 18, 0.6);
+            }
+            #login-box h1 {
+                font-size: 32px;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            }
+            #login-form input:focus {
+                outline: none;
+                border-color: #f39c12;
+            }
+            #login-form button:hover {
+                background: #27ae60;
+            }
+            #login-form button:active {
+                transform: scale(0.98);
+            }
+            
+            @media (max-width: 480px) {
+                #login-box {
+                    padding: 20px;
+                }
+                #login-box h1 {
+                    font-size: 24px;
+                    margin-bottom: 15px !important;
+                }
+                #login-form input {
+                    padding: 8px !important;
+                    font-size: 14px !important;
+                }
+                #login-form button {
+                    padding: 12px !important;
+                    font-size: 16px !important;
+                }
             }
             
             /* Hand Results Panel */
@@ -1774,6 +1853,29 @@ app.get('/', (req, res) => {
         
         <div id="first-player-message"></div>
         
+        <!-- Login Screen -->
+        <div id="login-screen">
+            <div id="login-box">
+                <h1 style="margin: 0 0 20px 0; color: #f39c12; text-align: center;">SYFM POKER</h1>
+                <form id="login-form">
+                    <div style="margin-bottom: 15px;">
+                        <label for="player-name" style="display: block; margin-bottom: 5px; color: #aaa; font-size: 14px;">Your Name</label>
+                        <input type="text" id="player-name" required maxlength="20" autofocus
+                            style="width: 100%; padding: 10px; font-size: 16px; border: 2px solid #444; border-radius: 4px; background: #222; color: white;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label for="room-number" style="display: block; margin-bottom: 5px; color: #aaa; font-size: 14px;">Game Room Number</label>
+                        <input type="text" id="room-number-input" required value="1234" maxlength="10"
+                            style="width: 100%; padding: 10px; font-size: 16px; border: 2px solid #444; border-radius: 4px; background: #222; color: white;">
+                        <div style="font-size: 12px; color: #888; margin-top: 5px;">Enter a number to create or join a game</div>
+                    </div>
+                    <button type="submit" style="width: 100%; padding: 15px; font-size: 18px; font-weight: bold; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        CREATE / JOIN GAME
+                    </button>
+                </form>
+            </div>
+        </div>
+        
         <button id="fullscreen-btn" class="tool-btn" onclick="toggleFullscreen()">FULLSCREEN</button>
         
         <div id="turn-timer-display"></div>
@@ -2291,17 +2393,29 @@ app.get('/', (req, res) => {
                 logPosition('CONTROLS', {y: e.target.value + '%'});
             });
             
-            // Wait for page to load before prompting for name
+            // Wait for page to load before setting up login
             window.addEventListener('load', () => {
                 socket = io();
-                const name = prompt("Enter your name:") || "Guest";
-                const roomNumber = prompt("Enter game room number:", "1234") || "1234";
-                socket.emit('join', { name, roomNumber });
                 
-                // Handle join rejection
+                // Handle login form submission
+                document.getElementById('login-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const name = document.getElementById('player-name').value.trim() || 'Guest';
+                    const roomNumber = document.getElementById('room-number-input').value.trim() || '1234';
+                    
+                    // Hide login screen
+                    document.getElementById('login-screen').style.display = 'none';
+                    
+                    // Send join request
+                    socket.emit('join', { name, roomNumber });
+                });
+                
+                // Handle join rejection - show login screen again with preserved values
                 socket.on('join_rejected', (message) => {
                     alert(message);
-                    window.location.reload();
+                    document.getElementById('login-screen').style.display = 'flex';
+                    // Name is already preserved in the input field, just refocus
+                    document.getElementById('player-name').focus();
                 });
                 
                 // Handle action rejection
@@ -2388,8 +2502,11 @@ app.get('/', (req, res) => {
                     const guide = document.getElementById('action-guide');
                     if (data.gameStage === 'GAME_OVER') {
                         guide.innerText = "GAME OVER";
+                    } else if (data.gameStage === 'LOBBY') {
+                        const playerCount = data.players.length;
+                        guide.innerText = `${playerCount} PLAYER${playerCount !== 1 ? 'S' : ''} IN LOBBY`;
                     } else {
-                        guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : (data.gameStage === 'LOBBY' ? "" : "WAITING..."));
+                        guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : "WAITING...");
                     }
                     
                     // Store whether it's my turn for button validation
