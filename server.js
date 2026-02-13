@@ -324,6 +324,19 @@ function startNewHand() {
         }
     });
     
+    // Check if only one or zero players can act after blinds
+    const playersCanAct = playerOrder.filter(id => players[id].status === 'ACTIVE');
+    if (playersCanAct.length <= 1) {
+        log(`🔥 Only ${playersCanAct.length} player(s) can act after blinds, dealing to showdown...`);
+        activityLog(`All players all-in after blinds, dealing to showdown`);
+        broadcast();
+        
+        setTimeout(() => {
+            advanceStage();
+        }, 2000);
+        return;
+    }
+    
     startTurnTimer();
     broadcast();
 }
@@ -456,10 +469,11 @@ function handleAction(socket, action) {
     const onlyOneRemaining = playersInHand.length <= 1;
     const allActed = playersCanAct.every(id => playersActedThisRound.has(id));
     const allMatched = playersCanAct.every(id => players[id].bet === currentBet);
+    const onlyOneCanAct = playersCanAct.length <= 1; // If only one or zero players can act, no more betting
 
-    log(`📊 Round status: ${playersInHand.length} in hand (${playersCanAct.length} can act), all acted: ${allActed}, all matched: ${allMatched}`);
+    log(`📊 Round status: ${playersInHand.length} in hand (${playersCanAct.length} can act), all acted: ${allActed}, all matched: ${allMatched}, only one can act: ${onlyOneCanAct}`);
 
-    if (onlyOneRemaining || (allActed && allMatched)) {
+    if (onlyOneRemaining || (allActed && allMatched) || onlyOneCanAct) {
         stopTurnTimer();
         advanceStage();
     } else {
@@ -529,6 +543,21 @@ function advanceStage() {
             advanceStage();
         }, 2000);
         return;
+    } else if (activePlayers.length === 1 && currentBet > 0) {
+        // Only one active player left and there's a bet to call
+        // Check if that player has already matched the bet
+        const lastActivePlayer = players[activePlayers[0]];
+        if (lastActivePlayer.bet >= currentBet) {
+            // Player has matched, no action needed
+            log(`🔥 Only one active player left who has matched bet, dealing to showdown...`);
+            activityLog(`Only one player can act, dealing to showdown`);
+            broadcast();
+            
+            setTimeout(() => {
+                advanceStage();
+            }, 2000);
+            return;
+        }
     }
 
     // Find next active player to act
@@ -555,14 +584,15 @@ function showdown() {
         activityLog(`🏆 ${players[winnerId].name} wins ${pot} (all others folded)`);
         io.emit('winner_announcement', `${players[winnerId].name} wins ${pot}`);
         
-        // Store result for display
-        lastHandResults = [{
-            playerId: winnerId,
-            playerName: players[winnerId].name,
-            hand: players[winnerId].hand,
+        // Store result for ALL players
+        lastHandResults = playerOrder.map(id => ({
+            playerId: id,
+            playerName: players[id].name,
+            hand: players[id].hand,
             bestHand: null,
-            wonAmount: pot
-        }];
+            wonAmount: id === winnerId ? pot : 0,
+            status: players[id].status
+        }));
         
         broadcast();
         checkGameOver();
@@ -604,8 +634,9 @@ function showdown() {
     log(`💰 SIDE POTS: ${sidePots.length} pot(s)`);
     let winnerAnnouncement = '';
     
-    // Store results for display
+    // Store results for display - initialize with ALL players
     lastHandResults = [];
+    const wonAmounts = {};
     
     for (let potIndex = sidePots.length - 1; potIndex >= 0; potIndex--) {
         const sidePot = sidePots[potIndex];
@@ -625,40 +656,50 @@ function showdown() {
         
         winners.forEach(w => {
             players[w.id].chips += winAmt;
+            wonAmounts[w.id] = (wonAmounts[w.id] || 0) + winAmt;
             log(`🏆 ${potLabel}: ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
             activityLog(`🏆 ${players[w.id].name} wins ${winAmt} with ${w.bestHand.name}`);
             if (winnerAnnouncement) winnerAnnouncement += ' | ';
             winnerAnnouncement += `${players[w.id].name}: ${winAmt} (${w.bestHand.name})`;
-            
-            // Add to results
-            lastHandResults.push({
-                playerId: w.id,
-                playerName: players[w.id].name,
-                hand: players[w.id].hand,
-                bestHand: w.bestHand,
-                wonAmount: winAmt
-            });
         });
     }
     
-    // Add all players who were in the hand (including losers) to results, sorted by hand rank
-    evaluatedPlayers.forEach(ep => {
-        if (!lastHandResults.find(r => r.playerId === ep.id)) {
-            lastHandResults.push({
-                playerId: ep.id,
-                playerName: players[ep.id].name,
-                hand: players[ep.id].hand,
-                bestHand: ep.bestHand,
-                wonAmount: 0
-            });
+    // Add ALL players to results
+    playerOrder.forEach(id => {
+        const playerData = {
+            playerId: id,
+            playerName: players[id].name,
+            hand: players[id].hand,
+            bestHand: null,
+            wonAmount: wonAmounts[id] || 0,
+            status: players[id].status
+        };
+        
+        // If player was in hand, add their evaluated hand
+        const evaluated = evaluatedPlayers.find(ep => ep.id === id);
+        if (evaluated) {
+            playerData.bestHand = evaluated.bestHand;
         }
+        
+        lastHandResults.push(playerData);
     });
     
-    // Sort results by hand rank (best to worst)
+    // Sort results: winners first (by hand rank), then losers (by hand rank), then folded players
     lastHandResults.sort((a, b) => {
-        if (!a.bestHand) return 1;
-        if (!b.bestHand) return -1;
-        return compareHands(b.bestHand, a.bestHand);
+        // Winners at top
+        if (a.wonAmount > 0 && b.wonAmount === 0) return -1;
+        if (a.wonAmount === 0 && b.wonAmount > 0) return 1;
+        
+        // Among winners or losers, sort by hand rank
+        if (a.bestHand && b.bestHand) {
+            return compareHands(b.bestHand, a.bestHand);
+        }
+        
+        // Folded/out players at bottom
+        if (!a.bestHand && b.bestHand) return 1;
+        if (a.bestHand && !b.bestHand) return -1;
+        
+        return 0;
     });
     
     io.emit('winner_announcement', winnerAnnouncement);
@@ -734,7 +775,8 @@ function broadcast() {
             myChips: myChips,
             isBetSituation: isBetSituation,
             timeRemaining: turnTimeRemaining,
-            handResults: lastHandResults
+            handResults: lastHandResults,
+            lastCommunity: community // Include community cards for hand results display
         });
     });
 }
@@ -985,8 +1027,8 @@ app.get('/', (req, res) => {
                 position: fixed;
                 top: 80px;
                 left: 10px;
-                width: 220px;
-                max-height: 60vh;
+                width: 260px;
+                max-height: 70vh;
                 background: rgba(0,0,0,0.95);
                 border: 2px solid #f39c12;
                 border-radius: 8px;
@@ -1003,6 +1045,25 @@ app.get('/', (req, res) => {
                 border-bottom: 1px solid #f39c12;
                 padding-bottom: 5px;
             }
+            #hand-results-community {
+                background: rgba(26, 92, 26, 0.4);
+                border: 1px solid #4d260a;
+                border-radius: 6px;
+                padding: 8px;
+                margin-bottom: 10px;
+                text-align: center;
+            }
+            #hand-results-community .label {
+                font-size: 10px;
+                color: #888;
+                margin-bottom: 5px;
+            }
+            #hand-results-community .cards {
+                display: flex;
+                gap: 3px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
             .hand-result-item {
                 background: rgba(255,255,255,0.05);
                 border-radius: 4px;
@@ -1012,6 +1073,10 @@ app.get('/', (req, res) => {
             }
             .hand-result-item.loser {
                 border-left-color: #e74c3c;
+            }
+            .hand-result-item.folded {
+                border-left-color: #95a5a6;
+                opacity: 0.6;
             }
             .hand-result-name {
                 font-weight: bold;
@@ -1026,18 +1091,20 @@ app.get('/', (req, res) => {
             }
             .hand-result-cards {
                 display: flex;
-                gap: 2px;
+                gap: 3px;
                 margin-bottom: 4px;
+                flex-wrap: wrap;
             }
             .hand-result-card {
                 background: white;
                 color: black;
-                border-radius: 3px;
-                padding: 2px 4px;
-                font-size: 10px;
+                border-radius: 4px;
+                padding: 4px 6px;
+                font-size: 13px;
                 font-weight: bold;
-                min-width: 20px;
+                min-width: 28px;
                 text-align: center;
+                border: 1px solid #000;
             }
             .hand-result-card.red {
                 color: #d63031;
@@ -1046,6 +1113,11 @@ app.get('/', (req, res) => {
                 color: #2ecc71;
                 font-weight: bold;
                 font-size: 12px;
+            }
+            .hand-result-odds {
+                color: #3498db;
+                font-size: 10px;
+                font-style: italic;
             }
             
             .card { 
@@ -1575,7 +1647,8 @@ app.get('/', (req, res) => {
         
         <!-- Hand Results Panel -->
         <div id="hand-results">
-            <h3>🏆 HAND RESULTS</h3>
+            <h3>🏆 LAST HAND RESULTS</h3>
+            <div id="hand-results-community"></div>
             <div id="hand-results-content"></div>
         </div>
         
@@ -1835,26 +1908,76 @@ app.get('/', (req, res) => {
             
             function updateHandResults(results) {
                 const container = document.getElementById('hand-results-content');
+                const communityContainer = document.getElementById('hand-results-community');
+                
                 if (!results || results.length === 0) {
                     container.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">No hands to display</div>';
+                    communityContainer.innerHTML = '';
                     return;
                 }
+                
+                // Display community cards if available - use lastCommunity from the data
+                if (currentData && currentData.lastCommunity && currentData.lastCommunity.length > 0) {
+                    const communityCardsHtml = currentData.lastCommunity.map(c => {
+                        const isRed = c.includes('♥') || c.includes('♦');
+                        return \`<div class="hand-result-card \${isRed ? 'red' : ''}">\${c}</div>\`;
+                    }).join('');
+                    communityContainer.innerHTML = \`
+                        <div class="label">COMMUNITY CARDS</div>
+                        <div class="cards">\${communityCardsHtml}</div>
+                    \`;
+                } else {
+                    communityContainer.innerHTML = '';
+                }
+                
+                // Calculate hand strength percentages for odds display
+                const playersWithHands = results.filter(r => r.bestHand);
+                const maxRank = playersWithHands.length > 0 ? Math.max(...playersWithHands.map(r => r.bestHand.rank)) : 0;
                 
                 container.innerHTML = '';
                 results.forEach(result => {
                     const isWinner = result.wonAmount > 0;
-                    const item = document.createElement('div');
-                    item.className = 'hand-result-item' + (isWinner ? '' : ' loser');
+                    const isFolded = result.status === 'FOLDED';
+                    const isOut = result.status === 'OUT';
                     
-                    const cardsHtml = result.hand.map(c => {
+                    let itemClass = 'hand-result-item';
+                    if (isFolded || isOut) {
+                        itemClass += ' folded';
+                    } else if (!isWinner) {
+                        itemClass += ' loser';
+                    }
+                    
+                    const item = document.createElement('div');
+                    item.className = itemClass;
+                    
+                    const cardsHtml = result.hand && result.hand.length > 0 ? result.hand.map(c => {
                         const isRed = c.includes('♥') || c.includes('♦');
                         return \`<div class="hand-result-card \${isRed ? 'red' : ''}">\${c}</div>\`;
-                    }).join('');
+                    }).join('') : '<span style="color:#666">No cards</span>';
+                    
+                    // Calculate simplified odds - hand rank based strength
+                    let oddsText = '';
+                    if (result.bestHand) {
+                        // Hand strength as percentage (0-100)
+                        // Royal Flush (9) = 100%, Straight Flush (8) = 95%, etc.
+                        const baseStrength = (result.bestHand.rank / 9) * 85 + 10; // 10-95% range
+                        
+                        // Adjust based on relative position to best hand
+                        const relativeStrength = maxRank > 0 ? (result.bestHand.rank / maxRank) * 100 : 50;
+                        
+                        const finalStrength = Math.round((baseStrength + relativeStrength) / 2);
+                        oddsText = \`<div class="hand-result-odds">Win probability: ~\${finalStrength}%</div>\`;
+                    } else if (isFolded) {
+                        oddsText = '<div class="hand-result-odds" style="color:#95a5a6">Folded</div>';
+                    } else if (isOut) {
+                        oddsText = '<div class="hand-result-odds" style="color:#95a5a6">Out of chips</div>';
+                    }
                     
                     item.innerHTML = \`
-                        <div class="hand-result-name">\${result.playerName}</div>
+                        <div class="hand-result-name">\${result.playerName}\${isWinner ? ' 🏆' : ''}</div>
                         <div class="hand-result-cards">\${cardsHtml}</div>
                         \${result.bestHand ? \`<div class="hand-result-hand">\${result.bestHand.name}</div>\` : ''}
+                        \${oddsText}
                         \${isWinner ? \`<div class="hand-result-amount">Won \${result.wonAmount}</div>\` : ''}
                     \`;
                     container.appendChild(item);
