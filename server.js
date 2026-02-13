@@ -2504,7 +2504,7 @@ app.get('/', (req, res) => {
                         guide.innerText = "GAME OVER";
                     } else if (data.gameStage === 'LOBBY') {
                         const playerCount = data.players.length;
-                        guide.innerText = `${playerCount} PLAYER${playerCount !== 1 ? 'S' : ''} IN LOBBY`;
+                        guide.innerText = playerCount + " PLAYER" + (playerCount !== 1 ? 'S' : '') + " IN LOBBY";
                     } else {
                         guide.innerText = isMyTurn ? "YOUR TURN" : (data.gameStage === 'SHOWDOWN' ? "SHOWDOWN" : "WAITING...");
                     }
