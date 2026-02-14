@@ -2411,13 +2411,22 @@ app.get('/', (req, res) => {
                     return;
                 }
                 
-                // Validate bet/raise amounts - FIXED: use >= instead of >
+                // Validate bet/raise amounts
                 if (actionData.type === 'raise') {
                     const betInput = document.getElementById('bet-amt');
                     const amount = parseInt(betInput.value);
                     const minAmount = parseInt(betInput.min);
+                    
+                    console.log('🔍 RAISE VALIDATION:', {
+                        inputValue: betInput.value,
+                        inputMin: betInput.min,
+                        parsedAmount: amount,
+                        parsedMin: minAmount,
+                        isValid: !(isNaN(amount) || amount < minAmount)
+                    });
+                    
                     if (isNaN(amount) || amount < minAmount) {
-                        alert('Bet amount must be at least ' + minAmount);
+                        alert('Bet amount must be at least ' + minAmount + ' (you entered: ' + amount + ')');
                         return;
                     }
                 }
