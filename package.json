@@ -1,13 +1,17 @@
 {
-  "name": "poker-tournament",
+  "name": "poker-game",
   "version": "1.0.0",
-  "description": "Texas Hold'em Poker Tournament Server",
-  "main": "poker-server.js",
+  "description": "Texas Hold'em Poker Game",
+  "main": "poker-fixed.js",
   "scripts": {
-    "start": "node poker-server.js"
+    "start": "node poker-fixed.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "socket.io": "^4.6.1"
+    "socket.io": "^4.5.4",
+    "nodemailer": "^6.9.7"
   }
 }
