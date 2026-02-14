@@ -70,6 +70,29 @@ function initGameLog(roomNumber) {
     gameLog('');
 }
 
+function initHandLog(roomNumber, handNumber) {
+    // Close previous hand's log if exists
+    if (gameLogStream) {
+        console.log(`📝 Closing previous hand log file`);
+        gameLogStream.end();
+    }
+    
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    gameLogFile = path.join(logsDir, `game-ROOM${roomNumber}-hand-${handNumber.toString().padStart(3, '0')}-${timestamp}.log`);
+    gameLogStream = fs.createWriteStream(gameLogFile, { flags: 'a' });
+    
+    console.log(`📝 Created NEW log file for hand #${handNumber}: ${path.basename(gameLogFile)}`);
+    
+    gameLog('='.repeat(80));
+    gameLog(`POKER HAND #${handNumber} LOG`);
+    gameLog('='.repeat(80));
+    gameLog(`Room Number: ${roomNumber}`);
+    gameLog(`Hand Number: ${handNumber}`);
+    gameLog(`Timestamp: ${getTimestamp()}`);
+    gameLog('='.repeat(80));
+    gameLog('');
+}
+
 function gameLog(message) {
     const logLine = `[${getTimestamp()}] ${message}`;
     console.log(logLine); // Also log to console
@@ -135,6 +158,8 @@ async function uploadLogToFTP(handNumber, roomNumber) {
         console.log('FTP not configured or no log file available');
         return;
     }
+
+    console.log(`📤 Uploading hand #${handNumber} log file: ${path.basename(gameLogFile)}`);
 
     const client = new ftp.Client();
     client.ftp.verbose = false; // Set to true for debugging
@@ -507,6 +532,14 @@ function checkGameOver() {
 function startNewHand() {
     io.emit('clear_winner');
     lastHandResults = []; // Clear previous hand results
+    
+    // Increment hand counter
+    handCounter++;
+    
+    // Create new log file for this hand
+    if (currentRoomNumber) {
+        initHandLog(currentRoomNumber, handCounter);
+    }
     
     // Start blind timer on first hand
     if (!blindTimer && !gameStarted) {
@@ -892,9 +925,14 @@ function showdown() {
             status: players[id].status
         }));
         
-        handCounter++;
         gameLog(`HAND #${handCounter} COMPLETE`);
         gameLog('');
+        
+        // Close this hand's log file
+        if (gameLogStream) {
+            gameLogStream.end();
+            gameLogStream = null;
+        }
         
         // Upload log to FTP after this hand
         uploadLogToFTP(handCounter, currentRoomNumber);
@@ -1028,9 +1066,14 @@ function showdown() {
         return 0;
     });
     
-    handCounter++;
     gameLog(`HAND #${handCounter} COMPLETE`);
     gameLog('');
+    
+    // Close this hand's log file
+    if (gameLogStream) {
+        gameLogStream.end();
+        gameLogStream = null;
+    }
     
     // Upload log to FTP after this hand
     uploadLogToFTP(handCounter, currentRoomNumber);
@@ -1128,10 +1171,8 @@ io.on('connection', (socket) => {
         // If no game exists, this player creates it with their room number
         if (playerOrder.length === 0) {
             currentRoomNumber = roomNumber;
-            initGameLog(roomNumber);
             handCounter = 0; // Reset hand counter for new game
             log(`🎮 Room ${roomNumber} created by ${name}`);
-            gameLog(`ROOM CREATED by ${name}`);
         }
         
         // If a game exists with a different room number, reject
