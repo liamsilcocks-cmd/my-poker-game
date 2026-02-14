@@ -2,9 +2,9 @@
   "name": "poker-game",
   "version": "1.0.0",
   "description": "Texas Hold'em Poker Game",
-  "main": "poker-fixed.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node poker-fixed.js"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=14.0.0"
