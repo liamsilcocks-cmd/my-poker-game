@@ -2193,8 +2193,6 @@ app.get('/', (req, res) => {
             <button class="tool-btn" onclick="let l=document.getElementById('activity-log'); l.style.display=l.style.display==='block'?'none':'block'">LOG</button>
             <button id="debug-btn" class="tool-btn" style="display:none; background:#16a085" onclick="let d=document.getElementById('debug-window'); d.style.display=d.style.display==='block'?'none':'block'">DEBUG</button>
             <button class="tool-btn" style="background:#9b59b6" onclick="let h=document.getElementById('hand-results'); h.style.display=h.style.display==='block'?'none':'block'">HANDS</button>
-            <button id="download-log-btn" class="tool-btn" style="display:none; background:#e67e22" onclick="downloadGameLog()">DOWNLOAD LOG</button>
-            <button id="view-logs-btn" class="tool-btn" style="display:none; background:#3498db" onclick="window.open('/logs', '_blank')">VIEW ALL LOGS</button>
             <button id="position-btn" class="tool-btn" style="background:#f39c12" onclick="let p=document.getElementById('position-controls'); p.style.display=p.style.display==='block'?'none':'block'">POSITION</button>
             <button id="reset-btn" class="tool-btn" style="display:none; background:#c0392b" onclick="socket.emit('reset_engine')">RESET</button>
         </div>
@@ -2320,19 +2318,6 @@ app.get('/', (req, res) => {
             }
             
             let socket;
-            
-            // Function to download current game log
-            function downloadGameLog() {
-                fetch('/current-log')
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.filename) {
-                            window.location.href = '/logs/' + data.filename;
-                        } else {
-                            alert('No active game log available');
-                        }
-                    });
-            }
             
             // Position state
             let positions = {
@@ -2724,8 +2709,6 @@ app.get('/', (req, res) => {
                     
                     document.getElementById('debug-btn').style.display = data.isHost ? 'block' : 'none';
                     document.getElementById('reset-btn').style.display = data.isHost ? 'block' : 'none';
-                    document.getElementById('download-log-btn').style.display = data.isHost ? 'block' : 'none';
-                    document.getElementById('view-logs-btn').style.display = data.isHost ? 'block' : 'none';
                     
                     // Update hand results panel
                     if (data.handResults && data.handResults.length > 0) {
