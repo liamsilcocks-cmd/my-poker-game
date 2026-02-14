@@ -4,6 +4,35 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const fs = require('fs');
 const path = require('path');
+const nodemailer = require('nodemailer');
+
+// Email configuration - set these as environment variables on Render
+const EMAIL_USER = process.env.EMAIL_USER || ''; // Your email for sending
+const EMAIL_PASS = process.env.EMAIL_PASS || ''; // Your email password or app password
+const EMAIL_TO = 'crazy2106@hotmail.com'; // Your hotmail to receive logs
+const EMAIL_SERVICE = process.env.EMAIL_SERVICE || 'outlook'; // 'gmail' or 'outlook' or 'smtp'
+const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp-mail.outlook.com'; // SMTP host
+const EMAIL_PORT = process.env.EMAIL_PORT || 587; // SMTP port
+
+// Create email transporter
+let emailTransporter = null;
+if (EMAIL_USER && EMAIL_PASS) {
+    emailTransporter = nodemailer.createTransport({
+        host: EMAIL_HOST,
+        port: EMAIL_PORT,
+        secure: false, // true for 465, false for other ports
+        auth: {
+            user: EMAIL_USER,
+            pass: EMAIL_PASS
+        }
+    });
+    console.log('✉️ Email service configured');
+} else {
+    console.log('⚠️ Email not configured - set EMAIL_USER and EMAIL_PASS environment variables');
+}
+
+// Hand counter for email subjects
+let handCounter = 0;
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, 'logs');
@@ -50,6 +79,47 @@ function closeGameLog() {
         gameLog('='.repeat(80));
         gameLogStream.end();
         gameLogStream = null;
+    }
+}
+
+async function emailHandLog(handNumber, roomNumber) {
+    if (!emailTransporter || !gameLogFile) {
+        console.log('Email not configured or no log file available');
+        return;
+    }
+
+    try {
+        // Read the current log file
+        const logContent = fs.readFileSync(gameLogFile, 'utf8');
+        
+        const mailOptions = {
+            from: EMAIL_USER,
+            to: EMAIL_TO,
+            subject: `Poker Log - Room ${roomNumber} - Hand #${handNumber} - ${new Date().toLocaleString()}`,
+            text: `Hand #${handNumber} completed in Room ${roomNumber}\n\nSee attached log file for full details.`,
+            html: `
+                <h2>🃏 Poker Hand Log</h2>
+                <p><strong>Room:</strong> ${roomNumber}</p>
+                <p><strong>Hand Number:</strong> ${handNumber}</p>
+                <p><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
+                <p>Complete game log is attached.</p>
+                <hr>
+                <p style="font-size: 12px; color: #666;">This is an automatic email sent after each completed hand for debugging purposes.</p>
+            `,
+            attachments: [
+                {
+                    filename: path.basename(gameLogFile),
+                    content: logContent
+                }
+            ]
+        };
+
+        await emailTransporter.sendMail(mailOptions);
+        console.log(`✉️ Hand #${handNumber} log emailed successfully to ${EMAIL_TO}`);
+        gameLog(`EMAIL: Hand log sent to ${EMAIL_TO}`);
+    } catch (error) {
+        console.error('❌ Error sending email:', error.message);
+        gameLog(`EMAIL ERROR: Failed to send log - ${error.message}`);
     }
 }
 
@@ -773,6 +843,13 @@ function showdown() {
             status: players[id].status
         }));
         
+        handCounter++;
+        gameLog(`HAND #${handCounter} COMPLETE`);
+        gameLog('');
+        
+        // Email log after this hand
+        emailHandLog(handCounter, currentRoomNumber);
+        
         broadcast();
         checkGameOver();
         return;
@@ -902,6 +979,13 @@ function showdown() {
         return 0;
     });
     
+    handCounter++;
+    gameLog(`HAND #${handCounter} COMPLETE`);
+    gameLog('');
+    
+    // Email log after this hand
+    emailHandLog(handCounter, currentRoomNumber);
+    
     io.emit('winner_announcement', winnerAnnouncement);
     broadcast();
     checkGameOver();
@@ -996,6 +1080,7 @@ io.on('connection', (socket) => {
         if (playerOrder.length === 0) {
             currentRoomNumber = roomNumber;
             initGameLog(roomNumber);
+            handCounter = 0; // Reset hand counter for new game
             log(`🎮 Room ${roomNumber} created by ${name}`);
             gameLog(`ROOM CREATED by ${name}`);
         }
@@ -2806,8 +2891,29 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Endpoint to list all log files
+// Password for accessing logs (set as environment variable on Render)
+const LOGS_PASSWORD = process.env.LOGS_PASSWORD || 'poker2024'; // Change this!
+
+// Endpoint to list all log files (password protected)
 app.get('/logs', (req, res) => {
+    const password = req.query.password || req.query.pass || req.query.p;
+    
+    if (password !== LOGS_PASSWORD) {
+        return res.status(401).send(`
+            <html><head><title>Access Denied</title><style>
+                body{font-family:monospace;background:#000;color:#f00;padding:50px;text-align:center;}
+                input{padding:10px;font-size:16px;margin:10px;}
+                button{padding:10px 20px;font-size:16px;background:#0f0;border:none;cursor:pointer;}
+            </style></head><body>
+                <h1>🔒 Password Required</h1>
+                <form method="GET">
+                    <input type="password" name="password" placeholder="Enter password" autofocus>
+                    <button type="submit">Access Logs</button>
+                </form>
+            </body></html>
+        `);
+    }
+    
     fs.readdir(logsDir, (err, files) => {
         if (err) {
             return res.status(500).send('Error reading logs directory');
@@ -2817,16 +2923,22 @@ app.get('/logs', (req, res) => {
         html += '<h1>🃏 Poker Game Logs</h1>';
         html += '<p>Click a log file to download:</p>';
         logFiles.forEach(file => {
-            html += `<a href="/logs/${file}" download>${file}</a>`;
+            html += `<a href="/logs/${file}?password=${password}" download>${file}</a>`;
         });
         html += '</body></html>';
         res.send(html);
     });
 });
 
-// Endpoint to download a specific log file
+// Endpoint to download a specific log file (password protected)
 app.get('/logs/:filename', (req, res) => {
+    const password = req.query.password || req.query.pass || req.query.p;
     const filename = req.params.filename;
+    
+    if (password !== LOGS_PASSWORD) {
+        return res.status(401).send('Access denied - password required');
+    }
+    
     const filepath = path.join(logsDir, filename);
     
     // Security: prevent directory traversal
