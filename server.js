@@ -5,6 +5,13 @@ const io = require('socket.io')(http);
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const ftp = require('basic-ftp');
+
+// FTP configuration - set these as environment variables on Render
+const FTP_HOST = process.env.FTP_HOST || '';
+const FTP_USER = process.env.FTP_USER || '';
+const FTP_PASS = process.env.FTP_PASS || '';
+const FTP_REMOTE_DIR = process.env.FTP_REMOTE_DIR || '/poker-logs';
 
 // Email configuration - set these as environment variables on Render
 const EMAIL_USER = process.env.EMAIL_USER || ''; // Your email for sending
@@ -120,6 +127,48 @@ async function emailHandLog(handNumber, roomNumber) {
     } catch (error) {
         console.error('❌ Error sending email:', error.message);
         gameLog(`EMAIL ERROR: Failed to send log - ${error.message}`);
+    }
+}
+
+async function uploadLogToFTP(handNumber, roomNumber) {
+    if (!FTP_HOST || !FTP_USER || !FTP_PASS || !gameLogFile) {
+        console.log('FTP not configured or no log file available');
+        return;
+    }
+
+    const client = new ftp.Client();
+    client.ftp.verbose = false; // Set to true for debugging
+    
+    try {
+        await client.access({
+            host: FTP_HOST,
+            user: FTP_USER,
+            password: FTP_PASS,
+            secure: false // Use true if your FTP supports FTPS
+        });
+        
+        console.log(`📤 Connected to FTP server: ${FTP_HOST}`);
+        
+        // Create remote directory if it doesn't exist
+        try {
+            await client.ensureDir(FTP_REMOTE_DIR);
+            console.log(`📁 Directory ensured: ${FTP_REMOTE_DIR}`);
+        } catch (err) {
+            console.log(`📁 Directory may already exist: ${FTP_REMOTE_DIR}`);
+        }
+        
+        // Upload the log file
+        const remoteFilePath = `${FTP_REMOTE_DIR}/${path.basename(gameLogFile)}`;
+        await client.uploadFrom(gameLogFile, remoteFilePath);
+        
+        console.log(`✅ Hand #${handNumber} log uploaded to FTP: ${remoteFilePath}`);
+        gameLog(`FTP UPLOAD: Log uploaded to ${FTP_HOST}${remoteFilePath}`);
+        
+    } catch (error) {
+        console.error('❌ FTP upload error:', error.message);
+        gameLog(`FTP ERROR: Failed to upload log - ${error.message}`);
+    } finally {
+        client.close();
     }
 }
 
@@ -847,8 +896,8 @@ function showdown() {
         gameLog(`HAND #${handCounter} COMPLETE`);
         gameLog('');
         
-        // Email log after this hand
-        emailHandLog(handCounter, currentRoomNumber);
+        // Upload log to FTP after this hand
+        uploadLogToFTP(handCounter, currentRoomNumber);
         
         broadcast();
         checkGameOver();
@@ -983,8 +1032,8 @@ function showdown() {
     gameLog(`HAND #${handCounter} COMPLETE`);
     gameLog('');
     
-    // Email log after this hand
-    emailHandLog(handCounter, currentRoomNumber);
+    // Upload log to FTP after this hand
+    uploadLogToFTP(handCounter, currentRoomNumber);
     
     io.emit('winner_announcement', winnerAnnouncement);
     broadcast();
