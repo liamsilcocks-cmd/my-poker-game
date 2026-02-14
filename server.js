@@ -646,6 +646,29 @@ function startNewHand() {
     
     // Check if only one or zero players can act after blinds
     const playersCanAct = playerOrder.filter(id => players[id].status === 'ACTIVE');
+    
+    // Also check if all other players are settled (folded/out or all-in and matched)
+    if (playersCanAct.length > 0) {
+        const currentTurnPlayer = playerOrder[turnIndex];
+        const otherPlayers = playerOrder.filter(id => id !== currentTurnPlayer);
+        const allOthersSettled = otherPlayers.every(id => {
+            const p = players[id];
+            return p.status === 'FOLDED' || 
+                   p.status === 'OUT' || 
+                   (p.status === 'ALL_IN' && p.bet === currentBet);
+        });
+        
+        if (allOthersSettled) {
+            log(`🔥 All other players are settled after blinds, auto-advancing...`);
+            activityLog(`All other players settled, dealing to showdown`);
+            broadcast();
+            setTimeout(() => {
+                advanceStage();
+            }, 2000);
+            return;
+        }
+    }
+    
     if (playersCanAct.length <= 1) {
         log(`🔥 Only ${playersCanAct.length} player(s) can act after blinds, dealing to showdown...`);
         activityLog(`All players all-in after blinds, dealing to showdown`);
@@ -794,15 +817,29 @@ function handleAction(socket, action) {
     // Players who can still make actions
     const playersCanAct = playerOrder.filter(id => players[id].status === 'ACTIVE');
     
+    // Check if all OTHER players (not including current active player) are either:
+    // 1. Out of the hand (FOLDED/OUT), OR
+    // 2. All-in AND have matched the current bet
+    const otherPlayers = playerOrder.filter(id => id !== playerOrder[turnIndex]);
+    const allOthersSettled = otherPlayers.every(id => {
+        const p = players[id];
+        return p.status === 'FOLDED' || 
+               p.status === 'OUT' || 
+               (p.status === 'ALL_IN' && p.bet === currentBet);
+    });
+    
     // Check if betting round should end
     const onlyOneRemaining = playersInHand.length <= 1;
     const allActed = playersCanAct.every(id => playersActedThisRound.has(id));
     const allMatched = playersCanAct.every(id => players[id].bet === currentBet);
     const onlyOneCanAct = playersCanAct.length <= 1; // If only one or zero players can act, no more betting
 
-    log(`📊 Round status: ${playersInHand.length} in hand (${playersCanAct.length} can act), all acted: ${allActed}, all matched: ${allMatched}, only one can act: ${onlyOneCanAct}`);
+    log(`📊 Round status: ${playersInHand.length} in hand (${playersCanAct.length} can act), all acted: ${allActed}, all matched: ${allMatched}, only one can act: ${onlyOneCanAct}, all others settled: ${allOthersSettled}`);
 
-    if (onlyOneRemaining || (allActed && allMatched) || onlyOneCanAct) {
+    if (onlyOneRemaining || (allActed && allMatched) || onlyOneCanAct || allOthersSettled) {
+        if (allOthersSettled && playersCanAct.length === 1) {
+            log(`⚡ Auto-advancing: All other players are all-in and matched`);
+        }
         stopTurnTimer();
         advanceStage();
     } else {
@@ -881,6 +918,28 @@ function advanceStage() {
             advanceStage();
         }, 2000);
         return;
+    }
+    
+    // Check if only one active player remains and all others are settled
+    if (activePlayers.length === 1) {
+        const activePlayer = activePlayers[0];
+        const otherPlayers = playerOrder.filter(id => id !== activePlayer);
+        const allOthersSettled = otherPlayers.every(id => {
+            const p = players[id];
+            return p.status === 'FOLDED' || 
+                   p.status === 'OUT' || 
+                   (p.status === 'ALL_IN' && p.bet === currentBet);
+        });
+        
+        if (allOthersSettled) {
+            log(`⚡ Only one active player and all others settled, auto-advancing...`);
+            activityLog(`All other players settled, dealing remaining cards`);
+            broadcast();
+            setTimeout(() => {
+                advanceStage();
+            }, 2000);
+            return;
+        }
     } else if (activePlayers.length === 1 && currentBet > 0) {
         // Only one active player left and there's a bet to call
         // Check if that player has already matched the bet
