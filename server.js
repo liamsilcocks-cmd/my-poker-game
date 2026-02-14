@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const ftp = require('basic-ftp');
+const crypto = require('crypto'); // For cryptographically secure random numbers
 
 // FTP configuration - set these as environment variables on Render
 const FTP_HOST = process.env.FTP_HOST || '';
@@ -284,6 +285,14 @@ const suits = ['♠','♥','♦','♣'];
 const ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const rankValues = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
 
+// Cryptographically secure random number generator (casino-grade)
+// Returns a number between 0 and 1 using crypto.randomBytes
+function secureRandom() {
+    const randomBytes = crypto.randomBytes(4);
+    const randomNumber = randomBytes.readUInt32BE(0);
+    return randomNumber / 0x100000000; // Divide by 2^32 to get 0-1 range
+}
+
 function log(msg) { io.emit('debug_msg', msg); }
 function activityLog(msg) { io.emit('activity_log', { msg }); }
 
@@ -418,7 +427,16 @@ function stopTurnTimer() {
 function createDeck() {
     const d = [];
     suits.forEach(s => ranks.forEach(r => d.push(r + s)));
-    return d.sort(() => Math.random() - 0.5);
+    
+    // Fisher-Yates shuffle with CRYPTOGRAPHICALLY SECURE randomness (casino-grade)
+    for (let i = d.length - 1; i > 0; i--) {
+        const j = Math.floor(secureRandom() * (i + 1));
+        [d[i], d[j]] = [d[j], d[i]]; // Swap
+    }
+    
+    console.log('🎲 Deck shuffled using CRYPTOGRAPHICALLY SECURE randomness (crypto.randomBytes)');
+    
+    return d;
 }
 
 function parseCard(card) {
