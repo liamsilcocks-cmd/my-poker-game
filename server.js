@@ -16,22 +16,22 @@ const ACTION_TIMEOUT = 15000; // 15 seconds
 const server = http.createServer((req, res) => {
   if (req.url === '/' || req.url === '/index.html') {
     fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      if (err) { res.writeHead(500); res.end('Error loading game'); return; }
+      if (err) { 
+        console.error('Error reading index.html:', err);
+        res.writeHead(500); 
+        res.end('Error loading game'); 
+        return; 
+      }
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(data);
     });
   } else {
-    res.writeHead(404); res.end('Not found');
+    res.writeHead(404); 
+    res.end('Not found');
   }
 });
 
-const wss = new WebSocketServer({ noServer: true });
-
-server.on('upgrade', (request, socket, head) => {
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request);
-  });
-});
+const wss = new WebSocketServer({ server });
 
 const rooms = new Map();
 
@@ -517,4 +517,4 @@ function handName(s) {
   return 'High Card';
 }
 
-server.listen(PORT, ()=>console.log(`🃏 Poker server on port ${PORT}`));
+server.listen(PORT, ()=>console.log(`🃏 SYFM Poker server running on port ${PORT}`));
