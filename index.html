@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vegas Poker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+#c{width:100%;height:100%;display:block;touch-action:none}
+
+/* ── OVERLAY SCREENS ── */
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:100;font-family:Georgia,serif;color:#f0e0a0}
+#overlay.hidden{display:none}
+.panel{background:linear-gradient(160deg,#1a0d2e,#0d0618);border:2px solid #c8a020;border-radius:16px;padding:36px 44px;min-width:340px;max-width:480px;text-align:center;box-shadow:0 0 60px rgba(200,160,32,0.15)}
+.panel h1{font-size:2.2rem;color:#ffd700;margin-bottom:6px;text-shadow:0 0 20px rgba(255,215,0,0.4)}
+.panel h2{font-size:1.1rem;color:#c8a020;margin-bottom:28px;font-style:italic}
+.panel input{width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;border:1px solid rgba(200,160,32,0.5);background:rgba(255,255,255,0.06);color:#f0e0a0;font-size:1rem;font-family:Georgia,serif;outline:none}
+.panel input:focus{border-color:#ffd700;background:rgba(255,255,255,0.10)}
+.btn{display:inline-block;padding:13px 30px;margin:8px 6px;border-radius:9px;border:2px solid rgba(255,255,255,0.25);cursor:pointer;font-family:Georgia,serif;font-size:1rem;font-weight:bold;transition:all 0.2s}
+.btn-gold{background:linear-gradient(135deg,#7a5800,#c8a020);color:#fff8e0}
+.btn-gold:hover{background:linear-gradient(135deg,#c8a020,#ffd700);transform:translateY(-1px)}
+.btn-green{background:linear-gradient(135deg,#0d4a0d,#1a7a1a);color:#c8ffc8}
+.btn-green:hover{background:linear-gradient(135deg,#1a7a1a,#28a828)}
+.btn-red{background:linear-gradient(135deg,#4a0d0d,#7a1a1a);color:#ffc8c8}
+.btn-red:hover{background:linear-gradient(135deg,#7a1a1a,#a82828)}
+.panel p{color:#b090d0;font-size:0.92rem;margin:6px 0}
+.panel .room-code{font-size:2rem;font-weight:bold;color:#ffd700;letter-spacing:8px;margin:14px 0;text-shadow:0 0 12px rgba(255,215,0,0.5)}
+.panel .status{color:#90b890;margin:10px 0;font-size:0.95rem}
+#seatList{list-style:none;margin:12px 0;text-align:left}
+#seatList li{padding:8px 12px;margin:4px 0;border-radius:6px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;font-size:0.92rem}
+#seatList li .name{color:#f0e0a0}
+#seatList li .chips{color:#ffd700;font-size:0.85rem}
+#pendingList{margin:10px 0}
+#pendingList .req{background:rgba(200,120,0,0.15);border:1px solid rgba(200,120,0,0.4);border-radius:8px;padding:10px 14px;margin:6px 0;display:flex;align-items:center;justify-content:space-between}
+#pendingList .req .rname{color:#ffc060;font-size:0.95rem}
+.pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:bold;margin-left:8px}
+.pill-host{background:#7a5800;color:#ffd700}
+.pill-you{background:#0d4a4a;color:#80ffd0}
+/* Join notification toast */
+#toast{position:fixed;top:72px;left:50%;transform:translateX(-50%);background:rgba(20,10,35,0.96);border:1px solid #c8a020;border-radius:10px;padding:12px 22px;color:#f0e0a0;font-family:Georgia,serif;font-size:0.95rem;z-index:200;opacity:0;transition:opacity 0.35s;pointer-events:none;text-align:center;min-width:260px}
+#toast.show{opacity:1}
+/* Chat */
+#chatBox{position:fixed;bottom:110px;right:16px;width:260px;z-index:50}
+#chatLog{height:130px;overflow-y:auto;background:rgba(0,0,0,0.72);border:1px solid rgba(200,160,32,0.25);border-radius:8px 8px 0 0;padding:8px;font-size:0.82rem;font-family:Arial,sans-serif;color:#d0c0a0}
+#chatLog .cm{margin:3px 0}.cm .cn{color:#ffd700;font-weight:bold}
+#chatLog .cm .ct{color:#d0c0a0}
+#chatRow{display:flex}
+#chatInput{flex:1;padding:7px 10px;background:rgba(10,5,20,0.9);border:1px solid rgba(200,160,32,0.3);border-top:none;border-radius:0 0 0 8px;color:#f0e0a0;font-size:0.82rem;font-family:Arial,sans-serif;outline:none}
+#chatSend{padding:7px 12px;background:rgba(100,70,0,0.9);border:1px solid rgba(200,160,32,0.3);border-top:none;border-left:none;border-radius:0 0 8px 0;color:#ffd700;cursor:pointer;font-size:0.82rem}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- CHAT -->
+<div id="chatBox" style="display:none">
+  <div id="chatLog"></div>
+  <div id="chatRow">
+    <input id="chatInput" placeholder="Chat..." maxlength="100">
+    <button id="chatSend">➤</button>
+  </div>
+</div>
+
+<!-- ══ LOBBY OVERLAY ══ -->
+<div id="overlay">
+  <!-- Step 1: Enter name -->
+  <div class="panel" id="screenName">
+    <h1>♠ Vegas Poker</h1>
+    <h2>Cash Game — No Limit Hold'em</h2>
+    <input id="nameInput" placeholder="Your name" maxlength="18" value="">
+    <br>
+    <button class="btn btn-gold" onclick="goConnect()">Enter Lobby</button>
+    <p style="margin-top:14px;color:#705090;font-size:0.82rem">
+      You'll be asked for a room code, or create a new room.
+    </p>
+  </div>
+
+  <!-- Step 2: Create or Join -->
+  <div class="panel hidden" id="screenJoin">
+    <h1>♠ Vegas Poker</h1>
+    <p>Enter a room code to join, or create a new table.</p>
+    <input id="roomInput" placeholder="Room code (leave blank to create)" maxlength="6" style="text-transform:uppercase;letter-spacing:4px;text-align:center">
+    <br>
+    <button class="btn btn-gold" onclick="doConnect()">Enter</button>
+  </div>
+
+  <!-- Step 3: Waiting room / lobby -->
+  <div class="panel hidden" id="screenLobby">
+    <h1>♠ Vegas Poker</h1>
+    <p>Room Code:</p>
+    <div class="room-code" id="roomCodeDisplay">——</div>
+    <p style="color:#706080;font-size:0.8rem">Share this code with friends</p>
+
+    <ul id="seatList"></ul>
+    <div id="pendingSection" style="display:none">
+      <p style="color:#c8a020;margin-top:12px">Waiting to join:</p>
+      <div id="pendingList"></div>
+    </div>
+    <div class="status" id="lobbyStatus">Waiting for players…</div>
+    <button class="btn btn-green hidden" id="startBtn" onclick="doStartGame()">▶ Start Game</button>
+    <button class="btn btn-gold hidden" id="waitBtn">Waiting for host…</button>
+  </div>
+
+  <!-- Waiting for approval -->
+  <div class="panel hidden" id="screenWait">
+    <h1>♠ Vegas Poker</h1>
+    <p style="margin-bottom:20px">Requesting a seat…</p>
+    <div class="status" id="waitStatus">Waiting for host approval</div>
+    <div style="font-size:2rem;margin:20px 0">⏳</div>
+  </div>
+</div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CONFIG — auto-detects server URL
+// ═══════════════════════════════════════════════════════════
+const SERVER_URL = window.location.protocol === 'https:' 
+  ? 'wss://' + window.location.host 
+  : 'ws://' + window.location.host;
+
+// ═══════════════════════════════════════════════════════════
+//  AUDIO
+// ═══════════════════════════════════════════════════════════
+let audioCtx;
+function ensureAudio(){ if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); }
+function snd_deal(){
+  ensureAudio(); const t=audioCtx.currentTime;
+  const len=Math.floor(audioCtx.sampleRate*0.12);
+  const buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/len),0.6);
+  const src=audioCtx.createBufferSource();
+  const bp=audioCtx.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=0.6;
+  bp.frequency.setValueAtTime(4200,t); bp.frequency.exponentialRampToValueAtTime(1600,t+0.12);
+  const g=audioCtx.createGain();
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.32,t+0.015);
+  g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+  src.buffer=buf; src.connect(bp); bp.connect(g); g.connect(audioCtx.destination); src.start(t);
+}
+function snd_flip(){
+  ensureAudio(); const t=audioCtx.currentTime;
+  const b=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.055),audioCtx.sampleRate);
+  const d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);
+  const src=audioCtx.createBufferSource(); const g=audioCtx.createGain();
+  const hp=audioCtx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=2200;
+  g.gain.setValueAtTime(0.38,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.055);
+  src.buffer=b; src.connect(hp); hp.connect(g); g.connect(audioCtx.destination); src.start(t);
+}
+function snd_chip(){
+  ensureAudio(); const t=audioCtx.currentTime;
+  const base=1600+Math.random()*500;
+  [[1.0,0.18],[1.52,0.10],[2.51,0.06],[3.97,0.03],[5.80,0.015]].forEach(([r,v])=>{
+    const osc=audioCtx.createOscillator(); const g=audioCtx.createGain();
+    osc.type='sine'; osc.frequency.value=base*r*(0.97+Math.random()*0.06);
+    g.gain.setValueAtTime(v,t); g.gain.setValueAtTime(v*0.6,t+0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.08+r*0.025);
+    osc.connect(g); g.connect(audioCtx.destination); osc.start(t); osc.stop(t+0.15);
+  });
+}
+function snd_win(){
+  ensureAudio(); const t=audioCtx.currentTime;
+  [523,659,784,1047,1319].forEach((f,i)=>{
+    const o=audioCtx.createOscillator(); const g=audioCtx.createGain();
+    o.type='triangle'; o.frequency.value=f;
+    g.gain.setValueAtTime(0,t+i*0.10); g.gain.linearRampToValueAtTime(0.14,t+i*0.10+0.04);
+    g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);
+    o.connect(g); g.connect(audioCtx.destination); o.start(t+i*0.10); o.stop(t+i*0.10+0.6);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const SUITS=['♠','♥','♦','♣'];
+const RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const NAMES=['YOU','Viktor','Sophia','James','Mei','Carlos','Anna','Duke','Roxy'];
+const NP=9, SB=10, BB=20;
+const TRX=5.4, TRZ=3.5, SRX=7.0, SRZ=5.2;
+const CHIP_DENOM=[
+  {val:1,  col:[0.92,0.90,0.88]},
+  {val:5,  col:[0.85,0.10,0.10]},
+  {val:25, col:[0.10,0.62,0.16]},
+  {val:100,col:[0.14,0.20,0.88]},
+  {val:500,col:[0.52,0.06,0.62]},
+];
+const PIPS={
+  '2':[[.5,.26],[.5,.74]],
+  '3':[[.5,.22],[.5,.5],[.5,.78]],
+  '4':[[.28,.26],[.72,.26],[.28,.74],[.72,.74]],
+  '5':[[.28,.24],[.72,.24],[.5,.5],[.28,.76],[.72,.76]],
+  '6':[[.28,.22],[.72,.22],[.28,.5],[.72,.5],[.28,.78],[.72,.78]],
+  '7':[[.28,.22],[.72,.22],[.5,.36],[.28,.5],[.72,.5],[.28,.78],[.72,.78]],
+  '8':[[.28,.20],[.72,.20],[.5,.33],[.28,.47],[.72,.47],[.5,.62],[.28,.76],[.72,.76]],
+  '9':[[.28,.19],[.72,.19],[.28,.38],[.72,.38],[.5,.5],[.28,.62],[.72,.62],[.28,.81],[.72,.81]],
+  '10':[[.28,.18],[.72,.18],[.5,.28],[.28,.38],[.72,.38],[.28,.62],[.72,.62],[.5,.72],[.28,.82],[.72,.82]],
+};
+
+// ═══════════════════════════════════════════════════════════
+//  NETWORKING STATE
+// ═══════════════════════════════════════════════════════════
+let ws = null;
+let myId   = localStorage.getItem('pkr_id') || ('p_'+Math.random().toString(36).slice(2,8));
+let myName = '';
+let mySeat = null;
+let isHost = false;
+let roomCode = '';
+
+localStorage.setItem('pkr_id', myId);
+
+// ═══════════════════════════════════════════════════════════
+//  LOBBY UI
+// ═══════════════════════════════════════════════════════════
+function showScreen(id){
+  ['screenName','screenJoin','screenLobby','screenWait'].forEach(s=>{
+    document.getElementById(s).classList.toggle('hidden', s!==id);
+  });
+  document.getElementById('overlay').classList.remove('hidden');
+}
+function hideOverlay(){
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('chatBox').style.display='block';
+}
+
+function goConnect(){
+  myName = document.getElementById('nameInput').value.trim() || 'Player';
+  if(!myName){ document.getElementById('nameInput').focus(); return; }
+  showScreen('screenJoin');
+}
+
+function doConnect(){
+  const code = document.getElementById('roomInput').value.trim().toUpperCase();
+  roomCode = code || generateRoomCode();
+  connectWS(roomCode);
+}
+
+function generateRoomCode(){
+  return Math.random().toString(36).slice(2,8).toUpperCase();
+}
+
+function connectWS(code){
+  const url = `${SERVER_URL}?room=${code}`;
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type:'join', id:myId, name:myName, room:code }));
+  };
+  ws.onmessage = e => handleServer(JSON.parse(e.data));
+  ws.onclose   = () => showToast('Disconnected from server. Refresh to reconnect.');
+  ws.onerror   = () => showToast('Connection error — check server URL in config.');
+}
+
+function handleServer(msg){
+  switch(msg.type){
+
+    case 'joined':
+      myId   = msg.id;
+      mySeat = msg.seat;
+      isHost = msg.isHost;
+      roomCode = msg.room || roomCode;
+      document.getElementById('roomCodeDisplay').textContent = roomCode;
+      showScreen('screenLobby');
+      if(isHost){
+        document.getElementById('startBtn').classList.remove('hidden');
+        document.getElementById('waitBtn').classList.add('hidden');
+      } else {
+        document.getElementById('startBtn').classList.add('hidden');
+        document.getElementById('waitBtn').classList.remove('hidden');
+      }
+      break;
+
+    case 'waiting':
+      showScreen('screenWait');
+      break;
+
+    case 'rejected':
+      document.getElementById('waitStatus').textContent = msg.reason || 'Request declined';
+      break;
+
+    case 'joinRequest':
+      // Host sees approve/decline buttons
+      if(isHost) addPendingRequest(msg.id, msg.name);
+      break;
+
+    case 'lobby':
+      updateLobbyUI(msg);
+      break;
+
+    case 'newHand':
+      hideOverlay();
+      ensureAudio();
+      onNewHand(msg);
+      break;
+
+    case 'state':
+      onStateUpdate(msg);
+      break;
+
+    case 'communityDealt':
+      onCommunityDealt(msg);
+      break;
+
+    case 'playerAction':
+      onPlayerAction(msg);
+      break;
+
+    case 'yourTurn':
+      // Show action buttons if it's our seat
+      if(msg.seat === mySeat) showActionButtons(msg.callAmt);
+      else setBtns(false);
+      break;
+
+    case 'act':
+      showActionButtons(msg.callAmt);
+      break;
+
+    case 'winner':
+      onWinner(msg);
+      break;
+
+    case 'showdown':
+      onShowdown(msg);
+      break;
+
+    case 'playerLeft':
+      showToast(`${msg.name} left the table`);
+      break;
+
+    case 'chat':
+      addChat(msg.name, msg.text);
+      break;
+
+    case 'sittingOut':
+      showToast(msg.reason);
+      hideOverlay();
+      break;
+
+    case 'waitingForPlayers':
+      showToast('Waiting for more players…');
+      break;
+
+    case 'error':
+      showToast(msg.msg);
+      break;
+  }
+}
+
+function updateLobbyUI(msg){
+  // Update seat list
+  const ul = document.getElementById('seatList');
+  ul.innerHTML = '';
+  msg.seats.forEach(s => {
+    if(!s) return;
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="name">${esc(s.name)}${s.id===msg.hostId?'<span class="pill pill-host">HOST</span>':''}${s.id===myId?'<span class="pill pill-you">YOU</span>':''}</span><span class="chips">£${(s.chips/100).toFixed(2)}</span>`;
+    ul.appendChild(li);
+  });
+
+  // Update pending (host only)
+  if(isHost && msg.pending && msg.pending.length > 0){
+    document.getElementById('pendingSection').style.display='block';
+    renderPending(msg.pending);
+  } else {
+    document.getElementById('pendingSection').style.display='none';
+  }
+
+  const count = msg.seats.filter(Boolean).length;
+  document.getElementById('lobbyStatus').textContent =
+    msg.gameActive ? 'Game in progress' : `${count} player${count!==1?'s':''} at table`;
+}
+
+function renderPending(list){
+  const div = document.getElementById('pendingList');
+  div.innerHTML = '';
+  list.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'req';
+    row.innerHTML = `<span class="rname">${esc(p.name)} wants to join</span><span><button class="btn btn-green" style="padding:5px 12px;font-size:0.8rem;margin:0 3px" onclick="approve('${p.id}',true)">✓</button><button class="btn btn-red" style="padding:5px 12px;font-size:0.8rem;margin:0 3px" onclick="approve('${p.id}',false)">✗</button></span>`;
+    div.appendChild(row);
+  });
+}
+
+function addPendingRequest(id, name){
+  showToast(`${name} wants to join — check lobby`);
+  // Refresh pending section
+  const div = document.getElementById('pendingList');
+  const row = document.createElement('div');
+  row.className = 'req'; row.id = 'req_'+id;
+  row.innerHTML = `<span class="rname">${esc(name)} wants to join</span><span><button class="btn btn-green" style="padding:5px 12px;font-size:0.8rem;margin:0 3px" onclick="approve('${id}',true)">✓</button><button class="btn btn-red" style="padding:5px 12px;font-size:0.8rem;margin:0 3px" onclick="approve('${id}',false)">✗</button></span>`;
+  div.appendChild(row);
+  document.getElementById('pendingSection').style.display='block';
+}
+
+function approve(id, accept){
+  ws.send(JSON.stringify({ type:'approve', id, accept }));
+  const el = document.getElementById('req_'+id);
+  if(el) el.remove();
+}
+
+function doStartGame(){
+  ws.send(JSON.stringify({ type:'startGame' }));
+}
+
+function esc(s){ return String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Toast notification
+let toastTimer;
+function showToast(msg, ms=3500){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), ms);
+}
+
+// Chat
+function addChat(name, text){
+  const log = document.getElementById('chatLog');
+  const div = document.createElement('div'); div.className='cm';
+  div.innerHTML=`<span class="cn">${esc(name)}: </span><span class="ct">${esc(text)}</span>`;
+  log.appendChild(div); log.scrollTop=log.scrollHeight;
+}
+document.getElementById('chatSend').addEventListener('click',()=>{
+  const inp = document.getElementById('chatInput');
+  const txt = inp.value.trim(); if(!txt||!ws) return;
+  ws.send(JSON.stringify({type:'chat',text:txt})); inp.value='';
+});
+document.getElementById('chatInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){ document.getElementById('chatSend').click(); }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  SCENE
+// ═══════════════════════════════════════════════════════════
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true});
+window.addEventListener('resize',()=>engine.resize());
+
+let scene,gui,shadowGen;
+let cardBackMat,cardFrontMats={};
+let cardPool=[],cardIdx=0;
+let chipPool=[],potChips=[];
+
+// Local render state (driven by server)
+let renderState = {
+  seats: Array(NP).fill(null),  // { name, chips, bet, folded, cards[] }
+  community: [],
+  pot: 0,
+  phase: 'idle',
+  toActSeat: null,
+  dealerSeat: 0
+};
+let seatMeshCards = Array(NP).fill(null).map(()=>[]);  // card meshes per seat
+let communityMeshes = [];
+
+function createScene(){
+  scene=new BABYLON.Scene(engine);
+  scene.clearColor=new BABYLON.Color4(0.015,0.01,0.025,1);
+  mkCamera(); mkLights(); mkRoom(); mkTable();
+  buildCardMats(); buildCardPool(); buildChipPool();
+  mkSeatDiscs();
+  mkUI();
+  return scene;
+}
+
+// ── Camera ────────────────────────────────────────────────
+function mkCamera(){
+  const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.8,17,
+    new BABYLON.Vector3(0,0.5,0),scene);
+  cam.lowerRadiusLimit=7; cam.upperRadiusLimit=26;
+  cam.lowerBetaLimit=0.20; cam.upperBetaLimit=1.35;
+  cam.wheelPrecision=22; cam.attachControl(canvas,true);
+}
+
+// ── Lights ────────────────────────────────────────────────
+function mkLights(){
+  const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
+  h.intensity=0.10; h.diffuse=new BABYLON.Color3(0.45,0.38,0.55);
+  h.groundColor=new BABYLON.Color3(0.04,0.02,0.05);
+  const spot=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),
+    new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.5,scene);
+  spot.intensity=2.8; spot.diffuse=new BABYLON.Color3(1,0.93,0.72);
+  shadowGen=new BABYLON.ShadowGenerator(2048,spot);
+  shadowGen.useBlurExponentialShadowMap=true; shadowGen.blurKernel=12;
+  mkPt(-7,4,0,0.5,new BABYLON.Color3(0.7,0.55,0.9));
+  mkPt( 7,4,0,0.5,new BABYLON.Color3(1,0.78,0.45));
+  mkPt( 0,3,-9,0.3,new BABYLON.Color3(0.2,0.35,1));
+  mkPt( 0,3, 9,0.25,new BABYLON.Color3(1,0.5,0.2));
+}
+function mkPt(x,y,z,i,col){
+  const l=new BABYLON.PointLight('pl',new BABYLON.Vector3(x,y,z),scene);
+  l.intensity=i; l.diffuse=col;
+}
+
+// ── Room ─────────────────────────────────────────────────
+function mkRoom(){
+  const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);
+  f.position.y=-0.22; f.receiveShadows=true;
+  const m=new BABYLON.StandardMaterial('fm',scene);
+  m.diffuseColor=new BABYLON.Color3(0.03,0.025,0.04);
+  m.specularColor=new BABYLON.Color3(0.25,0.12,0.32); m.specularPower=160;
+  f.material=m;
+}
+
+// ── Table ─────────────────────────────────────────────────
+function mkTable(){
+  const T=96;
+  const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.44,diameter:12.0,tessellation:T},scene);
+  base.scaling.x=TRX/6.0; base.scaling.z=TRZ/6.0; base.position.y=-0.01;
+  applyStdMat(base,0.11,0.055,0.026, 0.5,0.32,0.10, 160);
+
+  const rail=BABYLON.MeshBuilder.CreateTorus('rail',
+    {diameter:11.4,thickness:0.38,tessellation:T,radialSegments:20},scene);
+  rail.scaling.x=TRX/(11.4/2)*0.97; rail.scaling.z=TRZ/(11.4/2)*0.97; rail.position.y=0.18;
+  const rm=new BABYLON.StandardMaterial('rm',scene);
+  rm.diffuseColor=new BABYLON.Color3(0.70,0.50,0.05);
+  rm.specularColor=new BABYLON.Color3(1,0.88,0.32); rm.specularPower=300;
+  rm.emissiveColor=new BABYLON.Color3(0.10,0.07,0.006); rail.material=rm;
+
+  const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
+  felt.scaling.x=TRX/(10.8/2)*0.90; felt.scaling.z=TRZ/(10.8/2)*0.90; felt.position.y=0.22;
+  applyStdMat(felt,0.04,0.11,0.30, 0.01,0.01,0.04, 5); felt.receiveShadows=true;
+
+  // Gold logo disc (no zone inlay — removed to fix black line)
+  const logo=BABYLON.MeshBuilder.CreateDisc('logo',{radius:1.6,tessellation:T},scene);
+  logo.rotation.x=Math.PI/2; logo.position.y=0.258;
+  applyStdMat(logo,0.50,0.36,0.02, 1,0.82,0.22, 512, new BABYLON.Color3(0.07,0.05,0.002));
+}
+
+function applyStdMat(mesh,dr,dg,db, sr,sg,sb, spow, emit){
+  const m=new BABYLON.StandardMaterial(mesh.name+'M',scene);
+  m.diffuseColor=new BABYLON.Color3(dr,dg,db);
+  m.specularColor=new BABYLON.Color3(sr,sg,sb); m.specularPower=spow;
+  if(emit) m.emissiveColor=emit;
+  mesh.material=m;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CARD TEXTURES
+// ═══════════════════════════════════════════════════════════
+function buildCardMats(){
+  cardBackMat=new BABYLON.StandardMaterial('back',scene);
+  cardBackMat.diffuseTexture=mkBackTex();
+  cardBackMat.specularColor=new BABYLON.Color3(0.6,0.6,0.6);
+  cardBackMat.specularPower=90; cardBackMat.backFaceCulling=false;
+  for(const s of SUITS) for(const r of RANKS){
+    const k=r+s; const m=new BABYLON.StandardMaterial('f'+k,scene);
+    m.diffuseTexture=mkFrontTex(s,r);
+    m.specularColor=new BABYLON.Color3(0.45,0.45,0.45); m.specularPower=60;
+    m.backFaceCulling=false; cardFrontMats[k]=m;
+  }
+}
+function mkBackTex(){
+  const W=256,H=384;
+  const tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true);
+  const c=tex.getContext();
+  const g=c.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#0d1b62'); g.addColorStop(1,'#05091e');
+  c.fillStyle=g; c.fillRect(0,0,W,H);
+  c.strokeStyle='#c8a020'; c.lineWidth=10; rrect(c,5,5,W-10,H-10,16); c.stroke();
+  c.strokeStyle='rgba(200,160,32,0.5)'; c.lineWidth=2; rrect(c,14,14,W-28,H-28,10); c.stroke();
+  c.strokeStyle='rgba(200,160,32,0.12)'; c.lineWidth=1;
+  for(let x=22;x<W-10;x+=20) for(let y=22;y<H-10;y+=20){
+    c.save(); c.translate(x,y); c.rotate(Math.PI/4); c.strokeRect(-7,-7,14,14); c.restore();
+  }
+  c.fillStyle='rgba(210,172,28,0.55)';
+  c.font='bold 80px serif'; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText('♠',W/2,H/2);
+  tex.update(); return tex;
+}
+function mkFrontTex(suit,rank){
+  const W=256,H=384;
+  const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
+  const c=tex.getContext();
+  const isRed=suit==='♥'||suit==='♦';
+  const col=isRed?'#cc0000':'#0d0820';
+  const bg=c.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#fefcf8'); bg.addColorStop(1,'#f5f0e8');
+  c.fillStyle=bg; c.fillRect(0,0,W,H);
+  c.strokeStyle='#c8bfaa'; c.lineWidth=4; rrect(c,2,2,W-4,H-4,14); c.stroke();
+  c.strokeStyle='rgba(180,170,150,0.4)'; c.lineWidth=8; rrect(c,6,6,W-12,H-12,11); c.stroke();
+  c.fillStyle=col;
+  const big=rank==='10';
+  c.font=`bold ${big?34:40}px Georgia,serif`; c.textAlign='left'; c.textBaseline='top';
+  c.fillText(rank,13,8);
+  c.font=`${big?22:26}px Georgia,serif`; c.fillText(suit,big?14:16,big?48:54);
+  c.save(); c.translate(W,H); c.rotate(Math.PI);
+  c.font=`bold ${big?34:40}px Georgia,serif`; c.textAlign='left'; c.textBaseline='top';
+  c.fillText(rank,13,8);
+  c.font=`${big?22:26}px Georgia,serif`; c.fillText(suit,big?14:16,big?48:54);
+  c.restore();
+  if(rank==='A') drawAce(c,W,H,suit,col);
+  else if(['J','Q','K'].includes(rank)) drawFaceCard(c,W,H,suit,rank,col);
+  else drawPips(c,W,H,suit,rank,col);
+  tex.update(); return tex;
+}
+function drawAce(c,W,H,suit,col){
+  c.fillStyle=col; c.font='bold 130px Georgia,serif';
+  c.textAlign='center'; c.textBaseline='middle'; c.fillText(suit,W/2,H/2+8);
+  c.strokeStyle=col; c.lineWidth=3; c.globalAlpha=0.15;
+  c.beginPath(); c.arc(W/2,H/2+8,72,0,Math.PI*2); c.stroke();
+  c.beginPath(); c.arc(W/2,H/2+8,80,0,Math.PI*2); c.stroke(); c.globalAlpha=1;
+}
+function drawFaceCard(c,W,H,suit,rank,col){
+  c.strokeStyle=col; c.lineWidth=2; c.globalAlpha=0.2;
+  rrect(c,32,70,W-64,H-140,8); c.stroke(); c.globalAlpha=1;
+  c.fillStyle=col; c.font='bold 88px Georgia,serif';
+  c.textAlign='center'; c.textBaseline='middle'; c.fillText(rank,W/2,H/2-14);
+  c.font='40px Georgia,serif'; c.fillText(suit,W/2,H/2+62);
+  c.font='22px Georgia,serif'; c.globalAlpha=0.55;
+  c.fillText(suit,34,88); c.fillText(suit,W-34,H-76); c.globalAlpha=1;
+}
+function drawPips(c,W,H,suit,rank,col){
+  const positions=PIPS[rank]; if(!positions) return;
+  const n=positions.length;
+  const sz=n<=4?42:n<=6?36:n<=8?32:28;
+  c.fillStyle=col; c.font=`${sz}px Georgia,serif`;
+  c.textAlign='center'; c.textBaseline='middle';
+  const aT=90,aB=H-90,aL=28,aR=W-28,aH=aB-aT,aW=aR-aL;
+  for(const [px,py] of positions){
+    const x=aL+px*aW, y=aT+py*aH;
+    if(py>0.55){ c.save(); c.translate(x,y); c.rotate(Math.PI); c.fillText(suit,0,0); c.restore(); }
+    else c.fillText(suit,x,y);
+  }
+}
+function rrect(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CARD POOL
+// ═══════════════════════════════════════════════════════════
+const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.28,0);
+function buildCardPool(){
+  for(let i=0;i<60;i++){
+    const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:0.72,height:1.02},scene);
+    m.rotation.x=Math.PI/2; m.position=DECK_POS().clone();
+    m.material=cardBackMat; m.isVisible=false; m.renderingGroupId=1;
+    shadowGen.addShadowCaster(m); cardPool.push(m);
+  }
+}
+function nextCardMesh(){
+  const m=cardPool[cardIdx%cardPool.length]; cardIdx++;
+  m.position=DECK_POS().clone(); m.position.y+=0.26+cardIdx*0.001;
+  m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);
+  m.scaling=new BABYLON.Vector3(1,1,1);
+  m.material=cardBackMat; m.isVisible=true; return m;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CHIP POOL
+// ═══════════════════════════════════════════════════════════
+function buildChipPool(){
+  for(const denom of CHIP_DENOM){
+    for(let i=0;i<30;i++){
+      const chip=BABYLON.MeshBuilder.CreateCylinder('chip',
+        {height:0.068,diameter:0.32,tessellation:32},scene);
+      const m=new BABYLON.StandardMaterial('cpm',scene);
+      m.diffuseColor=new BABYLON.Color3(...denom.col);
+      m.specularColor=new BABYLON.Color3(1,1,1); m.specularPower=260;
+      m.emissiveColor=new BABYLON.Color3(...denom.col.map(v=>v*0.15));
+      chip.material=m; chip.isVisible=false; chip._dval=denom.val;
+      chipPool.push(chip);
+    }
+  }
+}
+function getChipForVal(amount){
+  const best=CHIP_DENOM.reduce((a,d)=>amount>=d.val&&d.val>a.val?d:a,CHIP_DENOM[0]);
+  const avail=chipPool.filter(c=>!c.isVisible&&c._dval===best.val);
+  const ch=avail.length?avail[0]:(chipPool.find(c=>!c.isVisible)||chipPool[0]);
+  ch.isVisible=true; return ch;
+}
+function freeChip(c){ c.isVisible=false; }
+
+// ═══════════════════════════════════════════════════════════
+//  SEAT DISCS & LABELS
+// ═══════════════════════════════════════════════════════════
+let seatDiscs=[],seatLabels=[];
+function seatPos(i){
+  const a=Math.PI/2+(i/NP)*Math.PI*2;
+  return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);
+}
+function mkSeatDiscs(){
+  for(let i=0;i<NP;i++){
+    const pos=seatPos(i);
+    const disc=BABYLON.MeshBuilder.CreateCylinder('disc'+i,{height:0.018,diameter:0.98,tessellation:48},scene);
+    disc.position=pos.clone(); disc.position.y=0.255;
+    const dm=new BABYLON.StandardMaterial('dm'+i,scene);
+    dm.diffuseColor=new BABYLON.Color3(0.16,0.08,0.20);
+    dm.emissiveColor=new BABYLON.Color3(0.02,0.005,0.015);
+    disc.material=dm; seatDiscs.push(disc);
+
+    const lp=BABYLON.MeshBuilder.CreatePlane('lp'+i,{width:2.3,height:0.60},scene);
+    lp.position=pos.clone(); lp.position.y=1.05;
+    lp.billboardMode=BABYLON.Mesh.BILLBOARDMODE_Y;
+    const ltex=new BABYLON.DynamicTexture('ltex'+i,{width:310,height:80},scene,false);
+    const lm=new BABYLON.StandardMaterial('lm'+i,scene);
+    lm.diffuseTexture=ltex; lm.emissiveColor=new BABYLON.Color3(1,1,1);
+    lm.disableLighting=true; lm.hasAlpha=true; lp.material=lm;
+    seatLabels.push({lp,ltex});
+    drawLabel(i);
+  }
+}
+function drawLabel(i){
+  const s=renderState.seats[i];
+  const {ltex}=seatLabels[i];
+  const c=ltex.getContext();
+  c.clearRect(0,0,310,80);
+  const isMe = i === mySeat;
+  c.fillStyle=isMe?'rgba(140,105,0,0.92)':'rgba(14,7,20,0.92)';
+  rrect(c,2,2,306,76,12); c.fill();
+  if(!s){ c.fillStyle='rgba(100,80,120,0.5)'; c.font='16px Arial,sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('Empty',155,40); ltex.update(); return; }
+  if(s.folded) c.globalAlpha=0.45;
+  c.fillStyle=isMe?'#fff8e0':'#e0d8f0';
+  c.font='bold 22px Arial,sans-serif'; c.textAlign='center'; c.textBaseline='top';
+  c.fillText(s.name,155,6);
+  c.fillStyle='#f0c028'; c.font='17px Arial,sans-serif';
+  c.fillText('£'+(s.chips/100).toFixed(2),155,32);
+  if(s.bet>0){ c.fillStyle='#ffe560'; c.font='bold 14px Arial,sans-serif'; c.fillText('Bet: £'+(s.bet/100).toFixed(2),155,54); }
+  c.globalAlpha=1; ltex.update();
+
+  // Highlight our seat disc gold, others purple
+  const dm=seatDiscs[i].material;
+  if(isMe){ dm.diffuseColor=new BABYLON.Color3(0.7,0.52,0.04); dm.emissiveColor=new BABYLON.Color3(0.10,0.07,0); }
+  else { dm.diffuseColor=new BABYLON.Color3(0.16,0.08,0.20); dm.emissiveColor=new BABYLON.Color3(0.02,0.005,0.015); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UI (Babylon GUI)
+// ═══════════════════════════════════════════════════════════
+let UI={};
+function mkUI(){
+  gui=BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI('UI');
+  addRect('100%','62px',0,'rgba(0,0,0,0.82)');
+  UI.phaseText=addTxt('','#c8a820','bold 19px Georgia',0,0,'16px','10px');
+  UI.potText  =addTxt('POT: £0.00','#ffd700','bold 27px Georgia',1,0,'0px','10px');
+  UI.msgText  =addTxt('','#ffffff','bold 28px Georgia',1,1,'0px','-75px');
+  UI.msgText.shadowColor='rgba(0,0,0,0.9)'; UI.msgText.shadowOffsetX=2; UI.msgText.shadowOffsetY=2;
+  addRect('100%','100px',2,'rgba(0,0,0,0.86)');
+  UI.chipsText=addTxt('YOUR CHIPS: £10.00','#c8a820','bold 17px Georgia',0,2,'18px','32px');
+  UI.callBtn =mkBtn('CALL',  '#164e16','-190px','18px');
+  UI.raiseBtn=mkBtn('RAISE', '#4e3a04',  '20px','18px');
+  UI.foldBtn =mkBtn('FOLD',  '#4e0808', '200px','18px');
+  UI.raiseInput=new BABYLON.GUI.InputText('ri');
+  UI.raiseInput.width='110px'; UI.raiseInput.height='52px';
+  UI.raiseInput.color='white'; UI.raiseInput.background='rgba(30,15,5,0.95)';
+  UI.raiseInput.text=(BB*2/100).toFixed(2); UI.raiseInput.fontSize='17px';
+  UI.raiseInput.fontFamily='Arial,sans-serif';
+  UI.raiseInput.horizontalAlignment=BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+  UI.raiseInput.verticalAlignment=BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+  UI.raiseInput.left='95px'; UI.raiseInput.top='-24px';
+  UI.raiseInput.thickness=1; UI.raiseInput.borderColor='rgba(200,160,32,0.6)';
+  gui.addControl(UI.raiseInput);
+  addTxt('£ raise:','rgba(200,160,32,0.8)','13px Arial',1,2,'95px','66px');
+  setBtns(false);
+  // Wire buttons
+  UI.callBtn.onPointerClickObservable.add(doCall);
+  UI.raiseBtn.onPointerClickObservable.add(doRaise);
+  UI.foldBtn.onPointerClickObservable.add(doFold);
+}
+function addRect(w,h,vA,bg){
+  const r=new BABYLON.GUI.Rectangle();
+  r.width=w; r.height=h; r.verticalAlignment=vA; r.background=bg; r.thickness=0;
+  gui.addControl(r); return r;
+}
+function addTxt(txt,col,font,hA,vA,left,top){
+  const t=new BABYLON.GUI.TextBlock();
+  t.text=txt; t.color=col; t.fontFamily=font; t.resizeToFit=true;
+  t.horizontalAlignment=hA; t.verticalAlignment=vA; t.left=left; t.top=top;
+  gui.addControl(t); return t;
+}
+function mkBtn(label,bg,hOff,vOff){
+  const b=BABYLON.GUI.Button.CreateSimpleButton('b_'+label,label);
+  b.width='145px'; b.height='54px'; b.color='#fff'; b.background=bg;
+  b.fontSize='16px'; b.fontFamily='Georgia,serif'; b.fontStyle='bold';
+  b.cornerRadius=9; b.thickness=2; b.borderColor='rgba(255,255,255,0.3)';
+  b.horizontalAlignment=BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+  b.verticalAlignment=BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+  b.left=hOff; b.top=vOff; gui.addControl(b); return b;
+}
+function setBtns(v){ [UI.callBtn,UI.raiseBtn,UI.foldBtn,UI.raiseInput].forEach(c=>{ if(c) c.isVisible=v; }); }
+function setPhase(p){ if(UI.phaseText) UI.phaseText.text=p.toUpperCase(); }
+function showMsg(m,ms=2400){
+  if(UI.msgText) UI.msgText.text=m;
+  if(ms>0) setTimeout(()=>{ if(UI.msgText) UI.msgText.text=''; },ms);
+}
+function refreshUI(){
+  const me=renderState.seats[mySeat];
+  if(UI.potText)   UI.potText.text='POT: £'+(renderState.pot/100).toFixed(2);
+  if(UI.chipsText&&me) UI.chipsText.text='YOUR CHIPS: £'+(me.chips/100).toFixed(2);
+  for(let i=0;i<NP;i++) drawLabel(i);
+}
+
+// ─── Player actions (send to server) ──────────────────────
+function showActionButtons(callAmt){
+  const ca = callAmt || 0;
+  UI.callBtn.text = ca > 0 ? 'CALL £'+(ca/100).toFixed(2) : 'CHECK';
+  if(UI.raiseInput) UI.raiseInput.text = (BB*2/100).toFixed(2);
+  setBtns(true);
+  showMsg('Your turn!', 0);
+}
+function doCall(){
+  setBtns(false); showMsg('');
+  ws.send(JSON.stringify({ type:'action', action:'call' }));
+}
+function doRaise(){
+  setBtns(false); showMsg('');
+  const amount = Math.round(parseFloat(UI.raiseInput?UI.raiseInput.text:0)*100) || BB*2;
+  ws.send(JSON.stringify({ type:'action', action:'raise', amount }));
+}
+function doFold(){
+  setBtns(false); showMsg('');
+  ws.send(JSON.stringify({ type:'action', action:'fold' }));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SERVER EVENT HANDLERS → 3D SCENE
+// ═══════════════════════════════════════════════════════════
+function onNewHand(msg){
+  // Reset all card meshes
+  cardIdx=0;
+  cardPool.forEach(m=>{ m.isVisible=false; m.scaling.setAll(1); });
+  communityMeshes.forEach(m=>m.isVisible=false); communityMeshes=[];
+  seatMeshCards.forEach(a=>a.forEach(m=>m.isVisible=false));
+  seatMeshCards=Array(NP).fill(null).map(()=>[]);
+  potChips.forEach(freeChip); potChips=[];
+  setBtns(false);
+  setPhase('Pre-Flop');
+}
+
+function onStateUpdate(msg){
+  // Sync render state
+  renderState.pot       = msg.pot;
+  renderState.phase     = msg.phase;
+  renderState.currentBet= msg.currentBet;
+  renderState.community = msg.community || [];
+  renderState.toActSeat = msg.toActSeat;
+  renderState.dealerSeat= msg.dealerSeat;
+
+  msg.players.forEach((p,i)=>{
+    if(!p){ renderState.seats[i]=null; return; }
+    renderState.seats[i] = {
+      name:   p.name,
+      chips:  p.chips,
+      bet:    p.bet,
+      folded: p.folded,
+      cards:  p.cards || []
+    };
+  });
+
+  // Reveal our cards from state
+  if(mySeat !== null){
+    const me = msg.players[mySeat];
+    if(me && me.cards && me.cards[0] !== 'back'){
+      me.cards.forEach((cd, ci)=>{
+        const meshes = seatMeshCards[mySeat];
+        if(meshes[ci] && cd !== 'back'){
+          meshes[ci].material = cardFrontMats[cd.r+cd.s] || cardBackMat;
+        }
+      });
+    }
+  }
+
+  // Showdown reveals
+  msg.players.forEach((p,i)=>{
+    if(!p || !p.revealCards) return;
+    p.revealCards.forEach((cd,ci)=>{
+      const m = seatMeshCards[i] && seatMeshCards[i][ci];
+      if(m && cd) m.material = cardFrontMats[cd.r+cd.s] || cardBackMat;
+    });
+  });
+
+  refreshUI();
+  setPhase(msg.phase ? msg.phase[0].toUpperCase()+msg.phase.slice(1) : '');
+}
+
+function onCommunityDealt(msg){
+  setPhase(msg.phase[0].toUpperCase()+msg.phase.slice(1));
+  const cards = msg.cards;
+  const alreadyDealt = communityMeshes.length;
+  const newCards = cards.slice(alreadyDealt);
+  let i = alreadyDealt;
+  const communityPositions=[
+    new BABYLON.Vector3(-1.64,0.275,0),
+    new BABYLON.Vector3(-0.82,0.275,0),
+    new BABYLON.Vector3( 0.00,0.275,0),
+    new BABYLON.Vector3( 0.82,0.275,0),
+    new BABYLON.Vector3( 1.64,0.275,0),
+  ];
+  const next=()=>{
+    if(!newCards.length) return;
+    const cd=newCards.shift();
+    const m=nextCardMesh(); communityMeshes.push(m);
+    animDeal(m,communityPositions[i],()=>{
+      snd_deal();
+      flipUp(m,cardFrontMats[cd.r+cd.s],()=>{ snd_flip(); i++; setTimeout(next,260); });
+    });
+  };
+  next();
+}
+
+function onPlayerAction(msg){
+  const p = renderState.seats[msg.seat];
+  const name = msg.name || (p?p.name:'?');
+  if(msg.action==='fold') showMsg(`${name} folds`,1100);
+  else if(msg.action==='check') showMsg(`${name} checks`,900);
+  else if(msg.action==='call') showMsg(`${name} calls £${(msg.amount/100).toFixed(2)}`,1100);
+  else if(msg.action==='raise') showMsg(`${name} raises £${(msg.amount/100).toFixed(2)}`,1100);
+  if(msg.amount>0){
+    animChips(msg.seat, msg.amount, null);
+    snd_chip();
+  }
+}
+
+function onShowdown(msg){
+  setPhase('Showdown');
+  msg.reveals.forEach(({seat, cards})=>{
+    cards.forEach((cd,ci)=>{
+      const m = seatMeshCards[seat] && seatMeshCards[seat][ci];
+      if(m && cd) flipUp(m, cardFrontMats[cd.r+cd.s], ()=>snd_flip());
+    });
+  });
+}
+
+function onWinner(msg){
+  snd_win();
+  showMsg(`🏆 ${msg.name} wins £${(msg.amount/100).toFixed(2)}\n${msg.label}!`, 0);
+  chipsFlyToWinner(msg.seat, ()=>{
+    setTimeout(()=>showMsg(''), 4000);
+  });
+}
+
+// ─── Deal hole cards (triggered by state update) ──────────
+// We deal cards when we receive state and seat has cards but no meshes yet
+let lastDealedHand = -1;
+function maybeRenderHoleCards(stateMsg){
+  stateMsg.players.forEach((p,si)=>{
+    if(!p || !p.cards || !p.cards.length) return;
+    if(seatMeshCards[si].length >= p.cards.length) return;
+    // Deal missing cards
+    const existing = seatMeshCards[si].length;
+    for(let ci=existing; ci<p.cards.length; ci++){
+      const cd = p.cards[ci];
+      const m = nextCardMesh();
+      seatMeshCards[si].push(m);
+      const tp = cardPos(si, ci);
+      animDeal(m, tp, ()=>{
+        snd_deal();
+        if(cd !== 'back' && cardFrontMats[cd.r+cd.s]){
+          flipUp(m, cardFrontMats[cd.r+cd.s], ()=>snd_flip());
+        }
+      });
+    }
+  });
+}
+
+function cardPos(si,cn){
+  const a=Math.PI/2+(si/NP)*Math.PI*2;
+  const rx=TRX*0.70, rz=TRZ*0.70;
+  const pa=a+Math.PI/2;
+  const off=(cn-0.5)*0.50;
+  return new BABYLON.Vector3(
+    Math.cos(a)*rx+Math.cos(pa)*off,
+    0.268+cn*0.001,
+    Math.sin(a)*rz+Math.sin(pa)*off
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ANIMATIONS
+// ═══════════════════════════════════════════════════════════
+function animDeal(mesh,target,done){
+  const start=mesh.position.clone();
+  const mid=new BABYLON.Vector3((start.x+target.x)*0.5,start.y+3.0,(start.z+target.z)*0.5);
+  const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+    [{frame:0,value:start},{frame:12,value:mid},{frame:28,value:target}],'easeout');
+  scene.stopAnimation(mesh); mesh.animations=[a];
+  scene.beginAnimation(mesh,0,28,false,1.5,done||null);
+}
+function flipUp(mesh,frontMat,done){
+  const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+    [{frame:0,value:1},{frame:11,value:0}],'easein');
+  scene.stopAnimation(mesh); mesh.animations=[a1];
+  scene.beginAnimation(mesh,0,11,false,1,()=>{
+    mesh.material=frontMat;
+    const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+      [{frame:0,value:0},{frame:11,value:1}],'easeout');
+    scene.stopAnimation(mesh); mesh.animations=[a2];
+    scene.beginAnimation(mesh,0,11,false,1,done||null);
+  });
+}
+function mkAnim(prop,type,keys,easeType){
+  const a=new BABYLON.Animation('an_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+  a.setKeys(keys);
+  const e=easeType==='easein'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();
+  e.setEasingMode(easeType==='easein'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);
+  a.setEasingFunction(e); return a;
+}
+function animChips(seat,amount,done){
+  const pos = seatPos(seat);
+  const n=Math.min(Math.ceil(amount/BB),7); let rem=n;
+  for(let i=0;i<n;i++){
+    const chip=getChipForVal(amount); potChips.push(chip);
+    chip.position=pos.clone(); chip.position.y+=0.35+i*0.06;
+    const angle=Math.random()*Math.PI*2, dr=Math.random()*0.55;
+    const target=new BABYLON.Vector3(Math.cos(angle)*dr,0.26+potChips.length*0.075,Math.sin(angle)*dr);
+    const start=chip.position.clone();
+    const mid=new BABYLON.Vector3((start.x+target.x)*0.5,start.y+1.8,(start.z+target.z)*0.5);
+    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+      [{frame:0,value:start},{frame:12,value:mid},{frame:24,value:target}],'easeout');
+    chip.animations=[a];
+    setTimeout(()=>{ scene.beginAnimation(chip,0,24,false,1.3,()=>{ rem--; if(rem===0&&done)done(); }); },i*75);
+  }
+  if(n===0&&done) setTimeout(done,80);
+}
+function chipsFlyToWinner(winSeat,done){
+  const wp=seatPos(winSeat); wp.y+=0.6;
+  let rem=potChips.length; if(!rem){ if(done)done(); return; }
+  for(const chip of potChips){
+    const start=chip.position.clone();
+    const mid=new BABYLON.Vector3((start.x+wp.x)*0.5,start.y+2.2,(start.z+wp.z)*0.5);
+    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+      [{frame:0,value:start},{frame:9,value:mid},{frame:20,value:wp}],'easein');
+    chip.animations=[a];
+    scene.beginAnimation(chip,0,20,false,1.4,()=>{ freeChip(chip); rem--; if(rem===0){ potChips=[]; if(done)done(); } });
+  }
+}
+
+// ── BOOT ─────────────────────────────────────────────────
+const s=createScene();
+engine.runRenderLoop(()=>s.render());
+</script>
+</body>
+</html>
