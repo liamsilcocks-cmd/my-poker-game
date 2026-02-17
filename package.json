@@ -1,10 +1,13 @@
 {
-  "name": "vegas-poker",
+  "name": "vegas-poker-server",
   "version": "1.0.0",
-  "description": "Multiplayer Texas Hold'em Poker",
+  "description": "WebSocket game server for Vegas Poker",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "ws": "^8.16.0"
