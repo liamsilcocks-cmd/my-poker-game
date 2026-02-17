@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vegas Poker</title>
+<title>SYFM Poker</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
@@ -85,10 +85,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   background:rgba(0,0,0,0.8);color:#fff;font-size:14px;text-align:center;
 }
 #msg{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  background:rgba(0,0,0,0.88);padding:22px 44px;border-radius:14px;
-  color:#fff;font-size:22px;font-weight:bold;text-align:center;
-  display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;
+  position:absolute;top:70px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.92);padding:16px 36px;border-radius:12px;
+  color:#fff;font-size:20px;font-weight:bold;text-align:center;
+  display:none;border:1px solid #c8a020;max-width:70%;white-space:pre-line;
+  pointer-events:none;
 }
 #chatBox{
   position:absolute;bottom:110px;left:10px;width:260px;
@@ -113,7 +114,27 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   background:rgba(0,0,0,0.88);padding:24px 40px;border-radius:14px;
   color:#c8a020;font-size:18px;text-align:center;display:none;
-  border:1px solid #6a5010;
+  border:1px solid #6a5010;pointer-events:none;
+}
+#joinRequestNotif{
+  position:absolute;top:70px;right:14px;background:rgba(10,40,10,0.95);
+  padding:14px 18px;border-radius:10px;color:#e0e0e0;font-size:14px;
+  display:none;border:1px solid #20a040;min-width:220px;
+}
+#joinRequestNotif h4{color:#40e060;margin-bottom:8px;font-size:15px}
+#joinReqList{display:flex;flex-direction:column;gap:6px}
+.jr-row{display:flex;justify-content:space-between;align-items:center;
+  background:rgba(255,255,255,0.07);padding:6px 10px;border-radius:6px}
+.jr-name{color:#ffd700;font-weight:bold}
+.jr-btns{display:flex;gap:5px}
+.jr-admit{background:#1a6a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
+.jr-reject{background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
+#turnIndicator{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  color:#ffd700;font-size:17px;font-weight:bold;pointer-events:none;
+  text-shadow:0 0 8px rgba(0,0,0,0.9),0 0 16px rgba(0,0,0,0.9);
+  display:none;background:rgba(0,0,0,0.60);padding:8px 20px;
+  border-radius:8px;
 }
 </style>
 </head>
@@ -123,7 +144,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <!-- ══ LOGIN ══ -->
 <div id="loginOverlay" class="overlay">
   <div class="panel">
-    <h1>🃏 VEGAS POKER</h1>
+    <h1>🃏 SYFM POKER</h1>
     <p>Enter your name and a room number to play</p>
     <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
     <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
@@ -173,6 +194,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   </div>
   <div id="msg"></div>
   <div id="waitingMsg"></div>
+  <div id="joinRequestNotif">
+    <h4>⏳ Players want to join</h4>
+    <div id="joinReqList"></div>
+  </div>
+  <div id="turnIndicator"></div>
   <div id="chatBox">
     <div id="chatLog"></div>
     <input type="text" id="chatInput" placeholder="Chat…" maxlength="100">
@@ -242,8 +268,9 @@ let mySeat   = null;
 let isHost   = false;
 let myRoomId = null;
 let ws       = null;
-let lastState= null;  // most recent server state snapshot
-let dealing  = false; // true while deal animation is in progress
+let lastState= null;
+let lastLobbyMsg = null;
+let dealing  = false;
 
 // ═══════════════════════════════════════════════════════════
 //  BABYLON SCENE
@@ -257,9 +284,11 @@ let scene, spotLight, shadowGen;
 let cardBackMat, cardFrontMats={};
 let cardPool=[], cardIdx=0;
 let chipPool=[], potChips=[];
-let playerLabels=[];             // billboard labels per seat
-let seatCardMeshes=[];           // [seat][cardIndex] = mesh
-let communityCardMeshes=[];      // meshes for board cards
+let playerLabels=[];
+let seatCardMeshes=[];
+let communityCardMeshes=[];
+// D / SB / BB tokens
+let dealerToken=null, sbToken=null, bbToken=null;
 
 // ────────────────────────────────────────────────────
 // Seat & card positions
@@ -321,61 +350,64 @@ function mkFrontTex(suit,rank){
   const W=256,H=384,tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true),c=tex.getContext();
   const isRed=suit==='♥'||suit==='♦', col=isRed?'#cc0000':'#111111';
 
-  // White card face
-  c.fillStyle='#fafafa'; c.fillRect(0,0,W,H);
-  // Subtle border
-  c.strokeStyle='#b8b8b8'; c.lineWidth=3; c.strokeRect(1.5,1.5,W-3,H-3);
-  // Inner light line
-  c.strokeStyle='#e0e0e0'; c.lineWidth=1; c.strokeRect(8,8,W-16,H-16);
+  // White card face with slight warm tint
+  c.fillStyle='#fefefe'; c.fillRect(0,0,W,H);
+  // Border
+  c.strokeStyle='#cccccc'; c.lineWidth=4; c.strokeRect(2,2,W-4,H-4);
 
-  c.fillStyle=col;
+  // ── Top-left corner pip ──
+  // Rank
+  const rFontSize = rank==='10' ? 42 : 48;
+  c.fillStyle=col; c.textAlign='center'; c.textBaseline='top';
+  c.font=`bold ${rFontSize}px Arial`;
+  c.fillText(rank, rank==='10'?30:26, 8);
+  // Suit below rank (corner)
+  c.font='34px Arial';
+  c.fillText(suit, 26, rank==='10'?52:58);
 
-  // ── Top-left corner ──
-  c.textAlign='center'; c.textBaseline='top';
-  c.font=`bold ${rank==='10'?38:42}px Arial`;
-  c.fillText(rank, rank==='10'?26:22, 10);
-  c.font='30px Arial';
-  c.fillText(suit, 22, rank==='10'?50:54);
-
-  // ── Bottom-right corner (rotated 180°) ──
+  // ── Bottom-right corner (rotate 180) ──
   c.save();
   c.translate(W,H); c.rotate(Math.PI);
-  c.font=`bold ${rank==='10'?38:42}px Arial`;
-  c.fillText(rank, rank==='10'?26:22, 10);
-  c.font='30px Arial';
-  c.fillText(suit, 22, rank==='10'?50:54);
+  c.font=`bold ${rFontSize}px Arial`;
+  c.fillText(rank, rank==='10'?30:26, 8);
+  c.font='34px Arial';
+  c.fillText(suit, 26, rank==='10'?52:58);
   c.restore();
 
-  // ── Centre content ──
+  // ── Centre of card ──
   if(rank==='A'){
-    // Large centred suit
-    c.font='190px Arial';
+    c.fillStyle=col; c.font='200px Arial';
     c.textAlign='center'; c.textBaseline='middle';
-    c.fillText(suit, W/2, H/2+6);
+    c.fillText(suit, W/2, H/2+8);
 
   } else if(['J','Q','K'].includes(rank)){
-    // Decorative face card
-    // Filigree border
-    c.strokeStyle=col+'55'; c.lineWidth=3;
-    c.strokeRect(22,22,W-44,H-44);
-    c.strokeStyle=col+'22'; c.lineWidth=1;
-    c.strokeRect(28,28,W-56,H-56);
+    // Coloured background rectangle
+    c.fillStyle=isRed?'#fff0f0':'#f0f0ff';
+    c.fillRect(18,90,W-36,H-180);
 
-    // Large rank letter
-    c.fillStyle=col; c.font=`bold 128px Georgia,serif`;
+    // Decorative border around face area
+    c.strokeStyle=col+'44'; c.lineWidth=2;
+    c.strokeRect(20,92,W-40,H-184);
+
+    // Large face letter
+    c.fillStyle=col; c.font=`bold 110px Georgia,serif`;
     c.textAlign='center'; c.textBaseline='middle';
-    c.fillText(rank, W/2, H/2-22);
+    c.fillText(rank, W/2, H/2-18);
 
-    // Suit below rank
-    c.font='58px Arial';
-    c.fillText(suit, W/2, H/2+82);
+    // Large suit symbol below
+    c.font='64px Arial';
+    c.fillText(suit, W/2, H/2+80);
+
+    // Corner decorations
+    c.font='22px Arial'; c.fillStyle=col+'88';
+    c.fillText(suit,14,H-72); c.fillText(suit,W-14,96);
 
   } else {
-    // Pip card
+    // Pip card – use layout grid
     const pips=PIP_LAYOUTS[rank]||[];
-    // Pip area: centre strip of card excluding corners
-    const ax=W*0.10, ay=H*0.18, aw=W*0.80, ah=H*0.64;
-    const pSize=Math.round(W*0.155);
+    const ax=W*0.12, ay=H*0.16, aw=W*0.76, ah=H*0.68;
+    // Pip font size scales with count
+    const pSize = pips.length<=4 ? 64 : pips.length<=6 ? 52 : pips.length<=8 ? 46 : 40;
     c.fillStyle=col; c.font=`${pSize}px Arial`;
     c.textAlign='center'; c.textBaseline='middle';
     for(const[fx,fy] of pips){
@@ -449,6 +481,56 @@ function getChip(amount){
   ch.isVisible=true; return ch;
 }
 function freeChip(c){ c.isVisible=false; }
+
+// ────────────────────────────────────────────────────
+// Dealer / SB / BB tokens
+// ────────────────────────────────────────────────────
+function buildTokens(){
+  function makeToken(name, r, g, b, label){
+    const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene);
+    const m=new BABYLON.StandardMaterial(name+'m',scene);
+    m.diffuseColor=new BABYLON.Color3(r,g,b);
+    m.specularColor=new BABYLON.Color3(1,1,1); m.specularPower=300;
+    m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);
+    tok.material=m; tok.isVisible=false; tok.renderingGroupId=1;
+
+    // Text disc on top
+    const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false);
+    const dc=discTex.getContext();
+    dc.fillStyle=`rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;
+    dc.beginPath(); dc.arc(64,64,62,0,Math.PI*2); dc.fill();
+    dc.strokeStyle='rgba(0,0,0,0.5)'; dc.lineWidth=3; dc.stroke();
+    dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';
+    dc.font='bold 42px Arial'; dc.textAlign='center'; dc.textBaseline='middle';
+    dc.fillText(label,64,64); discTex.update();
+
+    const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene);
+    const dm=new BABYLON.StandardMaterial(name+'dm',scene);
+    dm.diffuseTexture=discTex; dm.emissiveColor=new BABYLON.Color3(1,1,1);
+    dm.disableLighting=true; dm.backFaceCulling=false;
+    disc.material=dm; disc.rotation.x=Math.PI/2;
+    disc.position.y=0.07; disc.parent=tok; disc.renderingGroupId=2;
+    return tok;
+  }
+  dealerToken = makeToken('dealer', 0.95, 0.95, 0.95, 'D');   // white
+  sbToken     = makeToken('sb',     0.15, 0.40, 0.90, 'SB');  // blue
+  bbToken     = makeToken('bb',     0.90, 0.80, 0.10, 'BB');  // yellow
+}
+
+function positionTokens(dSeat, sbSeat, bbSeat){
+  function placeToken(tok, seat){
+    if(seat===null||seat===undefined){ tok.isVisible=false; return; }
+    const a=Math.PI/2+(seat/NP)*Math.PI*2;
+    const rx=TRX*0.58, rz=TRZ*0.58;
+    // offset clockwise slightly so it doesn't overlap cards
+    const oa=a-0.28;
+    tok.position=new BABYLON.Vector3(Math.cos(oa)*rx, 0.35, Math.sin(oa)*rz);
+    tok.isVisible=true;
+  }
+  placeToken(dealerToken, dSeat);
+  placeToken(sbToken,     sbSeat);
+  placeToken(bbToken,     bbSeat);
+}
 
 // ────────────────────────────────────────────────────
 // Player label billboards
@@ -644,6 +726,7 @@ function createScene(){
   buildCardPool();
   buildChipPool();
   buildPlayerLabels();
+  buildTokens();
 
   // Init seat card mesh arrays
   for(let i=0;i<NP;i++) seatCardMeshes.push([null,null]);
@@ -833,10 +916,39 @@ function handleServerMsg(msg){
 
     case 'lobby':
       renderLobby(msg);
+      // Sync in-game pending requests so host sees them even in game
+      if(isHost && msg.pending){
+        for(const p of msg.pending){
+          if(!pendingInGame[p.id]) pendingInGame[p.id]={id:p.id,name:p.name};
+        }
+        // Remove any that have been resolved
+        for(const id of Object.keys(pendingInGame)){
+          if(!msg.pending.find(p=>p.id===id)) delete pendingInGame[id];
+        }
+        refreshInGameJoinNotif();
+      }
       break;
 
     case 'joinRequest':
-      // Host gets notified of a pending player – lobby re-render handles it
+      // Show in-game popup if we are host (may be in game or lobby)
+      if(isHost){
+        addInGameJoinRequest(msg.id, msg.name);
+        // Also re-render lobby if open
+        if(document.getElementById('lobbyOverlay').style.display!=='none' && lastLobbyMsg){
+          // add to pending manually so lobby shows it
+          if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))
+            lastLobbyMsg.pending.push({id:msg.id,name:msg.name});
+          renderLobby(lastLobbyMsg);
+        }
+      }
+      break;
+
+    case 'winner':
+      snd_win();
+      hideTurnIndicator();
+      showMsg(`🏆 ${msg.name} wins £${(msg.amount/100).toFixed(2)}\n${msg.label||''}!`, 0);
+      chipsFlyToWinner(msg.seat, ()=>{});
+      setTimeout(()=>showMsg(''),5500);
       break;
 
     case 'gameStarting':
@@ -849,12 +961,14 @@ function handleServerMsg(msg){
       seatActions={};
       showMsg('');
       setActions(false);
+      hideTurnIndicator();
       document.getElementById('waitingMsg').style.display='none';
+      // Position D/SB/BB tokens
+      positionTokens(msg.dealerSeat, msg.sbSeat, msg.bbSeat);
       // Start deal animation; state will be applied via 'state' message
       startDealAnimation(msg.activeSeats||[], ()=>{
         if(lastState) applyState(lastState);
       });
-      updateLabel_dealer(msg.dealerSeat, msg.sbSeat, msg.bbSeat);
       break;
 
     case 'state':
@@ -868,24 +982,31 @@ function handleServerMsg(msg){
       seatActions[msg.seat]=ac;
       addChat(`${name}: ${ac}`);
       if(msg.amount>0) animChips(msg.seat, msg.amount, null);
-      // Re-render labels
+      // Hide turn indicator once action taken
+      hideTurnIndicator();
       if(lastState) applyState(lastState);
       break;
     }
 
     case 'yourTurn': {
       const ca=msg.callAmt||0;
-      document.getElementById('callBtn').textContent=ca>0?`CALL £${(ca/100).toFixed(2)}`:'CHECK';
-      document.getElementById('raiseAmt').value=((msg.minRaise||40)/100).toFixed(2);
-      setActions(true);
-      showMsg('⭐ Your turn!', 0);
-      document.getElementById('waitingMsg').style.display='none';
+      if(msg.seat === mySeat){
+        // Only the acting player sees buttons and "your turn" message
+        document.getElementById('callBtn').textContent=ca>0?`CALL £${(ca/100).toFixed(2)}`:'CHECK';
+        document.getElementById('raiseAmt').value=((msg.minRaise||40)/100).toFixed(2);
+        setActions(true);
+        showMsg('⭐ Your turn!', 0);
+        document.getElementById('waitingMsg').style.display='none';
+      } else {
+        // All other players see who's acting
+        setActions(false);
+        showMsg('');
+        const actingPlayer = lastState && lastState.players[msg.seat];
+        const actingName = actingPlayer ? actingPlayer.name : `Seat ${msg.seat+1}`;
+        showTurnIndicator(`⏳ ${actingName} is thinking…`);
+      }
       break;
     }
-
-    case 'act':
-      // Same seat-level cue handled by 'yourTurn' broadcast
-      break;
 
     case 'communityDealt':
       // State message handles actual cards; 'state' triggers animation via applyState
@@ -893,32 +1014,29 @@ function handleServerMsg(msg){
 
     case 'showdown':
       setPhase('Showdown');
+      hideTurnIndicator();
       showMsg('🃏 Showdown!', 2000);
-      break;
-
-    case 'winner':
-      snd_win();
-      showMsg(`🏆 ${msg.name} wins £${(msg.amount/100).toFixed(2)}\n${msg.label||''}!`, 0);
-      chipsFlyToWinner(msg.seat, ()=>{});
-      setTimeout(()=>showMsg(''),5000);
       break;
 
     case 'waitingForPlayers':
       showMsg('⏳ Waiting for more players…', 0);
+      hideTurnIndicator();
       break;
 
     case 'playerLeft':
       addChat(`${msg.name} left the table`);
       seatActions[msg.seat]='';
+      if(pendingInGame[msg.id]){ delete pendingInGame[msg.id]; refreshInGameJoinNotif(); }
       if(lastState) applyState(lastState);
       break;
 
-    case 'sittingOut':
+    case 'sittingOut': {
       document.getElementById('gameUI').style.display='block';
       document.getElementById('lobbyOverlay').style.display='none';
-      const wm=document.getElementById('waitingMsg');
-      wm.textContent=msg.reason||'Sitting out…'; wm.style.display='block';
+      const wmEl=document.getElementById('waitingMsg');
+      wmEl.textContent=msg.reason||'Sitting out…'; wmEl.style.display='block';
       break;
+    }
 
     case 'chat':
       addChat(`${msg.name}: ${msg.text}`);
@@ -934,6 +1052,7 @@ function handleServerMsg(msg){
 // Lobby renderer
 // ─────────────────────────────────────────────────────
 function renderLobby(msg){
+  lastLobbyMsg=msg;
   myRoomId=msg.roomId;
   document.getElementById('lobbyRoomId').textContent=msg.roomId;
 
@@ -1001,9 +1120,43 @@ function approvePlayer(id, accept){
   wsSend({ type:'approve', id, accept });
 }
 
-function updateLabel_dealer(dSeat, sbSeat, bbSeat){
-  // Show D/SB/BB badges – currently just shown in chat
-  addChat(`Dealer: Seat ${dSeat+1}  SB: Seat ${sbSeat+1}  BB: Seat ${bbSeat+1}`);
+// In-game join request notification (for host)
+let pendingInGame={};
+function addInGameJoinRequest(id, name){
+  pendingInGame[id]={id,name};
+  refreshInGameJoinNotif();
+}
+function refreshInGameJoinNotif(){
+  const notif=document.getElementById('joinRequestNotif');
+  const list=document.getElementById('joinReqList');
+  const entries=Object.values(pendingInGame);
+  if(!entries.length||!isHost){ notif.style.display='none'; return; }
+  notif.style.display='block';
+  list.innerHTML='';
+  for(const p of entries){
+    const row=document.createElement('div');
+    row.className='jr-row';
+    row.innerHTML=`<span class="jr-name">${p.name}</span>
+      <span class="jr-btns">
+        <button class="jr-admit" onclick="inGameApprove('${p.id}',true)">Admit</button>
+        <button class="jr-reject" onclick="inGameApprove('${p.id}',false)">Reject</button>
+      </span>`;
+    list.appendChild(row);
+  }
+}
+function inGameApprove(id, accept){
+  wsSend({ type:'approve', id, accept });
+  delete pendingInGame[id];
+  refreshInGameJoinNotif();
+}
+
+// Turn indicator (centre screen, doesn't cover cards)
+function showTurnIndicator(txt){
+  const el=document.getElementById('turnIndicator');
+  el.textContent=txt; el.style.display='block';
+}
+function hideTurnIndicator(){
+  document.getElementById('turnIndicator').style.display='none';
 }
 
 // ─────────────────────────────────────────────────────
