@@ -3,233 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vegas Poker</title>
+<title>SYFM Poker</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:Arial,sans-serif}
 #c{width:100%;height:100%;display:block;touch-action:none}
-
-/* ── OVERLAYS ─────────────────────────────── */
-.overlay{
-  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-  background:rgba(10,5,2,0.88);z-index:200;
-}
-.panel{
-  background:linear-gradient(160deg,#1c0e06 0%,#2a1408 100%);
-  border:2px solid #c8a020;border-radius:16px;padding:36px 44px;
-  min-width:340px;max-width:480px;width:90%;text-align:center;
-  box-shadow:0 0 60px rgba(200,160,32,0.20);
-}
-.panel h1{color:#ffd700;font-size:2.2rem;margin-bottom:8px;letter-spacing:2px}
-.panel h2{color:#ffd700;font-size:1.5rem;margin-bottom:18px}
-.panel h3{color:#c8a020;font-size:1rem;margin:14px 0 8px}
-.panel p{color:#c8a060;margin-bottom:14px;line-height:1.5}
-.panel input[type=text],.panel input[type=number]{
-  width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;
-  background:#0d0704;border:1px solid #6a5010;color:#ffd700;
-  font-size:1.1rem;outline:none;text-align:center;
-}
-.panel input:focus{border-color:#c8a020}
-.btn-gold{
-  width:100%;padding:14px;margin-top:14px;border-radius:8px;border:none;
-  background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;
-  font-size:1.1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;
-  transition:opacity .2s;
-}
-.btn-gold:hover{opacity:.85}
-.btn-gold:disabled{opacity:.4;cursor:not-allowed}
-.btn-sm{
-  padding:8px 18px;border-radius:6px;border:none;font-size:.9rem;
-  font-weight:bold;cursor:pointer;color:#fff;margin:4px;
-}
-.btn-approve{background:#1a6a1a}
-.btn-reject{background:#6a1a1a}
-.player-row{
-  display:flex;justify-content:space-between;align-items:center;
-  background:rgba(255,255,255,0.05);border-radius:8px;
-  padding:10px 14px;margin:6px 0;color:#e0c060;font-size:.95rem;
-}
-.player-row .chips{color:#ffd700;font-weight:bold}
-.host-badge{
-  font-size:.7rem;background:#c8a020;color:#000;
-  padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px;
-}
-.pending-row{
-  display:flex;justify-content:space-between;align-items:center;
-  background:rgba(200,160,32,0.1);border-radius:8px;
-  padding:8px 12px;margin:4px 0;color:#e0c060;
-}
-
-/* ── IN-GAME UI ───────────────────────────── */
-#gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
-#gameUI > *{pointer-events:auto}
-#topBar{
-  position:absolute;top:10px;left:10px;right:10px;
-  background:rgba(0,0,0,0.72);padding:10px 18px;border-radius:8px;
-  color:#ffd700;display:flex;justify-content:space-between;align-items:center;
-}
+#ui{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:100}
+#ui > *{pointer-events:auto}
+#topBar{position:absolute;top:10px;left:10px;right:10px;background:rgba(0,0,0,0.7);padding:12px 18px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center}
 #phase{font-size:16px;font-weight:bold}
 #pot{font-size:20px;font-weight:bold}
-#roomBadge{font-size:13px;color:#c8a060;padding:4px 12px;background:rgba(200,160,32,0.15);border-radius:6px}
-#bottomBar{
-  position:absolute;bottom:10px;left:10px;right:10px;
-  background:rgba(0,0,0,0.72);padding:12px 18px;border-radius:8px;
-  color:#c8a820;text-align:center;
-}
-#myInfo{font-size:15px;font-weight:bold;margin-bottom:8px;color:#ffd700}
+#bottomBar{position:absolute;bottom:10px;left:10px;right:10px;background:rgba(0,0,0,0.7);padding:12px 18px;border-radius:8px;color:#c8a820;text-align:center}
+#chips{font-size:15px;font-weight:bold;margin-bottom:8px}
 #actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.abtn{padding:12px 24px;border-radius:6px;border:none;font-size:14px;font-weight:bold;cursor:pointer;color:#fff}
-.abtn-call{background:#1a7a1a}.abtn-raise{background:#7a5800}.abtn-fold{background:#7a1a1a}
-#raiseAmt{
-  width:90px;padding:9px;border-radius:4px;border:1px solid #c8a020;
-  background:rgba(0,0,0,0.8);color:#fff;font-size:14px;text-align:center;
-}
-#msg{
-  position:absolute;top:70px;left:50%;transform:translateX(-50%);
-  background:rgba(0,0,0,0.92);padding:16px 36px;border-radius:12px;
-  color:#fff;font-size:20px;font-weight:bold;text-align:center;
-  display:none;border:1px solid #c8a020;max-width:70%;white-space:pre-line;
-  pointer-events:none;
-}
-#chatBox{
-  position:absolute;bottom:110px;right:10px;width:240px;
-  background:rgba(0,0,0,0.70);border-radius:8px;padding:10px;
-  border:1px solid #3a2a10;
-}
-#chatLog{
-  height:100px;overflow-y:auto;font-size:12px;color:#c8c8a0;
-  margin-bottom:6px;display:flex;flex-direction:column;gap:3px;
-}
-#chatInput{
-  width:100%;padding:6px 10px;border-radius:4px;border:1px solid #4a3a15;
-  background:rgba(0,0,0,0.7);color:#ffd700;font-size:12px;
-}
-#activityBox{
-  position:absolute;bottom:110px;left:10px;width:270px;
-  background:rgba(0,0,0,0.70);border-radius:8px;
-  border:1px solid #2a3a1a;
-}
-#activityHeader{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:8px 12px;cursor:pointer;color:#60c840;font-size:12px;font-weight:bold;
-  user-select:none;
-}
-#activityHeader span{color:#a0d070;font-size:11px}
-#activityLog{
-  height:160px;overflow-y:auto;font-size:11px;color:#b0d890;
-  padding:6px 10px 8px;display:flex;flex-direction:column;gap:2px;
-  border-top:1px solid #1a2a10;
-}
-#activityLog .log-hand{color:#ffd700;font-weight:bold;margin-top:4px}
-#activityLog .log-action{color:#90c870}
-#activityLog .log-win{color:#40e870;font-weight:bold}
-#activityLog .log-community{color:#a0b8ff}
-#brightness{
-  position:absolute;top:70px;left:14px;background:rgba(0,0,0,0.65);
-  padding:10px 14px;border-radius:8px;color:#c8a820;
-}
-#brightness label{display:block;font-size:11px;margin-bottom:4px}
-#brightSlider{width:110px}
-#waitingMsg{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  background:rgba(0,0,0,0.88);padding:24px 40px;border-radius:14px;
-  color:#c8a020;font-size:18px;text-align:center;display:none;
-  border:1px solid #6a5010;pointer-events:none;
-}
-#joinRequestNotif{
-  position:absolute;top:70px;right:260px;background:rgba(10,40,10,0.95);
-  padding:14px 18px;border-radius:10px;color:#e0e0e0;font-size:14px;
-  display:none;border:1px solid #20a040;min-width:220px;z-index:10;
-}
-#joinRequestNotif h4{color:#40e060;margin-bottom:8px;font-size:15px}
-#joinReqList{display:flex;flex-direction:column;gap:6px}
-.jr-row{display:flex;justify-content:space-between;align-items:center;
-  background:rgba(255,255,255,0.07);padding:6px 10px;border-radius:6px}
-.jr-name{color:#ffd700;font-weight:bold}
-.jr-btns{display:flex;gap:5px}
-.jr-admit{background:#1a6a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
-.jr-reject{background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
-#turnIndicator{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  color:#ffd700;font-size:17px;font-weight:bold;pointer-events:none;
-  text-shadow:0 0 8px rgba(0,0,0,0.9),0 0 16px rgba(0,0,0,0.9);
-  display:none;background:rgba(0,0,0,0.60);padding:8px 20px;
-  border-radius:8px;
-}
+.btn{padding:12px 24px;border-radius:6px;border:none;font-size:14px;font-weight:bold;cursor:pointer;color:#fff}
+.btn-call{background:#1a7a1a}
+.btn-raise{background:#7a5800}
+.btn-fold{background:#7a1a1a}
+#raiseAmt{width:80px;padding:8px;border-radius:4px;border:1px solid #c8a020;background:rgba(0,0,0,0.8);color:#fff;font-size:14px;text-align:center}
+#msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);padding:20px 40px;border-radius:12px;color:#fff;font-size:24px;font-weight:bold;text-align:center;display:none}
+#brightness{position:absolute;top:80px;right:20px;background:rgba(0,0,0,0.7);padding:10px 14px;border-radius:8px;color:#c8a820}
+#brightness label{display:block;font-size:12px;margin-bottom:4px}
+#brightSlider{width:120px}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<!-- ══ LOGIN ══ -->
-<div id="loginOverlay" class="overlay">
-  <div class="panel">
-    <h1>🃏 VEGAS POKER</h1>
-    <p>Enter your name and a room number to play</p>
-    <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
-    <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
-    <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
-    <p id="loginErr" style="color:#e05050;margin-top:10px;font-size:.9rem"></p>
-  </div>
-</div>
-
-<!-- ══ WAITING ══ -->
-<div id="waitingOverlay" class="overlay" style="display:none">
-  <div class="panel">
-    <h2>⏳ Waiting for host…</h2>
-    <p id="waitingTxt">The host will approve your entry shortly.</p>
-    <button class="btn-gold" onclick="location.reload()" style="margin-top:10px">Cancel</button>
-  </div>
-</div>
-
-<!-- ══ LOBBY ══ -->
-<div id="lobbyOverlay" class="overlay" style="display:none">
-  <div class="panel">
-    <h2>🎰 Room <span id="lobbyRoomId"></span></h2>
-    <div id="playerList"></div>
-    <div id="pendingSection" style="display:none">
-      <h3>⏳ Requesting to join:</h3>
-      <div id="pendingItems"></div>
-    </div>
-    <p id="lobbyStatus" style="color:#c8a060;margin-top:14px;font-size:.9rem"></p>
-    <button class="btn-gold" id="startBtn" style="display:none;margin-top:18px">▶ START GAME</button>
-  </div>
-</div>
-
-<!-- ══ GAME UI ══ -->
-<div id="gameUI">
+<div id="ui">
   <div id="topBar">
     <div id="phase">PRE-FLOP</div>
     <div id="pot">POT: £0.00</div>
-    <div id="roomBadge">ROOM —</div>
   </div>
   <div id="bottomBar">
-    <div id="myInfo">YOUR CHIPS: £10.00</div>
+    <div id="chips">YOUR CHIPS: £10.00</div>
     <div id="actions" style="display:none">
-      <button class="abtn abtn-call" id="callBtn">CALL</button>
-      <input type="number" id="raiseAmt" value="0.40" step="0.20" min="0.40">
-      <button class="abtn abtn-raise" id="raiseBtn">RAISE</button>
-      <button class="abtn abtn-fold" id="foldBtn">FOLD</button>
+      <button class="btn btn-call" id="callBtn">CALL</button>
+      <input type="number" id="raiseAmt" value="0.40" step="0.20">
+      <button class="btn btn-raise" id="raiseBtn">RAISE</button>
+      <button class="btn btn-fold" id="foldBtn">FOLD</button>
     </div>
   </div>
   <div id="msg"></div>
-  <div id="waitingMsg"></div>
-  <div id="joinRequestNotif">
-    <h4>⏳ Players want to join</h4>
-    <div id="joinReqList"></div>
-  </div>
-  <div id="turnIndicator"></div>
-  <div id="activityBox">
-    <div id="activityHeader" onclick="toggleActivityLog()">
-      📋 ACTIVITY LOG <span id="activityToggle">▼ minimise</span>
-    </div>
-    <div id="activityLog"></div>
-  </div>
-  <div id="chatBox">
-    <div style="font-size:11px;color:#c8a060;margin-bottom:5px;font-weight:bold">💬 CHAT</div>
-    <div id="chatLog"></div>
-    <input type="text" id="chatInput" placeholder="Type and press Enter…" maxlength="100">
-  </div>
   <div id="brightness">
     <label>☀ Brightness</label>
     <input type="range" id="brightSlider" min="0.5" max="3.5" step="0.1" value="1.8">
@@ -240,9 +54,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <script>
 'use strict';
 
-// ═══════════════════════════════════════════════════════════
-//  AUDIO
-// ═══════════════════════════════════════════════════════════
+// Audio
 let audioCtx;
 function ensureAudio(){ if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); }
 function snd_deal(){
@@ -251,23 +63,23 @@ function snd_deal(){
   for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/len),0.6);
   const src=audioCtx.createBufferSource(), bp=audioCtx.createBiquadFilter();
   bp.type='bandpass'; bp.Q.value=0.6; bp.frequency.setValueAtTime(4200,t); bp.frequency.exponentialRampToValueAtTime(1600,t+0.12);
-  const g=audioCtx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.28,t+0.015); g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+  const g=audioCtx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.32,t+0.015); g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
   src.buffer=buf; src.connect(bp); bp.connect(g); g.connect(audioCtx.destination); src.start(t);
 }
 function snd_flip(){
   ensureAudio(); const t=audioCtx.currentTime, b=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.055),audioCtx.sampleRate), d=b.getChannelData(0);
   for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);
   const src=audioCtx.createBufferSource(), g=audioCtx.createGain(), hp=audioCtx.createBiquadFilter();
-  hp.type='highpass'; hp.frequency.value=2200; g.gain.setValueAtTime(0.32,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.055);
+  hp.type='highpass'; hp.frequency.value=2200; g.gain.setValueAtTime(0.38,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.055);
   src.buffer=b; src.connect(hp); hp.connect(g); g.connect(audioCtx.destination); src.start(t);
 }
 function snd_chip(){
   ensureAudio(); const t=audioCtx.currentTime, base=1600+Math.random()*500;
-  [[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{
+  [[1.0,0.18],[1.52,0.10],[2.51,0.06],[3.97,0.03],[5.80,0.015]].forEach(([r,v])=>{
     const osc=audioCtx.createOscillator(), g=audioCtx.createGain();
     osc.type='sine'; osc.frequency.value=base*r*(0.97+Math.random()*0.06);
-    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);
-    osc.connect(g); g.connect(audioCtx.destination); osc.start(t); osc.stop(t+0.14);
+    g.gain.setValueAtTime(v,t); g.gain.setValueAtTime(v*0.6,t+0.003); g.gain.exponentialRampToValueAtTime(0.0001,t+0.08+r*0.025);
+    osc.connect(g); g.connect(audioCtx.destination); osc.start(t); osc.stop(t+0.15);
   });
 }
 function snd_win(){
@@ -275,1066 +87,282 @@ function snd_win(){
   [523,659,784,1047,1319].forEach((f,i)=>{
     const o=audioCtx.createOscillator(), g=audioCtx.createGain();
     o.type='triangle'; o.frequency.value=f;
-    g.gain.setValueAtTime(0,t+i*0.10); g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);
+    g.gain.setValueAtTime(0,t+i*0.10); g.gain.linearRampToValueAtTime(0.14,t+i*0.10+0.04); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);
     o.connect(g); g.connect(audioCtx.destination); o.start(t+i*0.10); o.stop(t+i*0.10+0.6);
   });
 }
-function snd_joinAlert(){
-  ensureAudio(); const t=audioCtx.currentTime;
-  // Two distinct rising beeps
-  [[0,880],[0.22,1100]].forEach(([delay,freq])=>{
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(freq*0.8,t+delay);
-    o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);
-    g.gain.setValueAtTime(0,t+delay); g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);
-    g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(t+delay); o.stop(t+delay+0.3);
-  });
-}
 
-// ═══════════════════════════════════════════════════════════
-//  CONSTANTS
-// ═══════════════════════════════════════════════════════════
+// Constants
 const SUITS=['♠','♥','♦','♣'], RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-const NP=9, BB=20;
-const TRX=5.4, TRZ=3.5, SRX=7.0, SRZ=5.2;
+const RVAL={2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13,A:14};
+const NP=9, START_CHIPS=1000, SB=10, BB=20, TRX=5.4, TRZ=3.5, SRX=7.0, SRZ=5.2;
 
-// ═══════════════════════════════════════════════════════════
-//  CLIENT STATE
-// ═══════════════════════════════════════════════════════════
-let myId     = localStorage.getItem('pokerPlayerId') || null;
-let mySeat   = null;
-let isHost   = false;
-let myRoomId = null;
-let ws       = null;
-let lastState= null;
-let lastLobbyMsg = null;
-let dealing  = false;
+// Scene
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true);
+window.addEventListener('resize',()=>engine.resize());
+canvas.addEventListener('click',()=>ensureAudio(),{once:true});
 
-// ═══════════════════════════════════════════════════════════
-//  BABYLON SCENE
-// ═══════════════════════════════════════════════════════════
-const canvas = document.getElementById('c');
-const engine = new BABYLON.Engine(canvas, true);
-window.addEventListener('resize', () => engine.resize());
-canvas.addEventListener('click', () => ensureAudio(), {once:true});
-
-let scene, spotLight, shadowGen;
+let scene, shadowGen, spotLight;
 let cardBackMat, cardFrontMats={};
 let cardPool=[], cardIdx=0;
 let chipPool=[], potChips=[];
-let playerLabels=[];
-let seatCardMeshes=[];
-let communityCardMeshes=[];
-// D / SB / BB tokens
-let dealerToken=null, sbToken=null, bbToken=null;
 
-// ────────────────────────────────────────────────────
-// Seat & card positions
-// ────────────────────────────────────────────────────
-function seatPos(i){
-  // -PI/2 puts seat 0 nearest camera (bottom). Positive increment = clockwise from camera view.
-  const a=-Math.PI/2+(i/NP)*Math.PI*2;
-  return new BABYLON.Vector3(Math.cos(a)*SRX, 0.26, Math.sin(a)*SRZ);
-}
-function cardPos(si, cn){
-  const a=-Math.PI/2+(si/NP)*Math.PI*2, rx=TRX*0.70, rz=TRZ*0.70;
-  const pa=a+Math.PI/2, off=(cn-0.5)*0.55;
-  return new BABYLON.Vector3(Math.cos(a)*rx+Math.cos(pa)*off, 0.30+cn*0.003, Math.sin(a)*rz+Math.sin(pa)*off);
-}
-const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76, 0.32, 0);
-const COM_POS=[
-  new BABYLON.Vector3(-1.64,0.305,0),new BABYLON.Vector3(-0.82,0.305,0),
-  new BABYLON.Vector3(0,0.305,0),new BABYLON.Vector3(0.82,0.305,0),
-  new BABYLON.Vector3(1.64,0.305,0)
-];
-
-// ────────────────────────────────────────────────────
-// Card textures  –  properly rendered casino cards
-// ────────────────────────────────────────────────────
-const PIP_LAYOUTS={
-  '2': [[.5,.17],[.5,.83]],
-  '3': [[.5,.17],[.5,.5],[.5,.83]],
-  '4': [[.28,.17],[.72,.17],[.28,.83],[.72,.83]],
-  '5': [[.28,.17],[.72,.17],[.5,.5],[.28,.83],[.72,.83]],
-  '6': [[.28,.17],[.72,.17],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],
-  '7': [[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],
-  '8': [[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.5,.66],[.28,.83],[.72,.83]],
-  '9': [[.28,.12],[.72,.12],[.28,.36],[.72,.36],[.5,.5],[.28,.64],[.72,.64],[.28,.88],[.72,.88]],
-  '10':[[.28,.12],[.72,.12],[.5,.25],[.28,.38],[.72,.38],[.28,.62],[.72,.62],[.5,.75],[.28,.88],[.72,.88]]
+let G={
+  deck:[], players:[], community:[], communityMeshes:[],
+  pot:0, currentBet:BB, phase:'idle', dealerSeat:0, toAct:[], animating:false
 };
 
-function mkBackTex(){
-  const W=256,H=384,tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true),c=tex.getContext();
-  // Deep navy gradient
-  const g=c.createLinearGradient(0,0,W,H);
-  g.addColorStop(0,'#0b1850'); g.addColorStop(1,'#060c2a');
-  c.fillStyle=g; c.fillRect(0,0,W,H);
-  // Outer gold border
-  c.strokeStyle='#c8a020'; c.lineWidth=10; c.strokeRect(5,5,W-10,H-10);
-  // Inner gold border
-  c.strokeStyle='rgba(200,160,32,0.5)'; c.lineWidth=2; c.strokeRect(18,18,W-36,H-36);
-  // Diagonal cross-hatch pattern
-  c.strokeStyle='rgba(200,160,32,0.15)'; c.lineWidth=1;
-  for(let x=-H; x<W+H; x+=14){
-    c.beginPath(); c.moveTo(x,0); c.lineTo(x+H,H); c.stroke();
-    c.beginPath(); c.moveTo(x+H,0); c.lineTo(x,H); c.stroke();
-  }
-  // Center diamond logo
-  c.fillStyle='rgba(200,160,32,0.35)'; c.font='72px Arial';
-  c.textAlign='center'; c.textBaseline='middle'; c.fillText('♠',W/2,H/2);
-  tex.update(); return tex;
-}
-
-function mkFrontTex(suit,rank){
-  const W=320,H=450;
-  const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
-  const c=tex.getContext();
-  const isRed=suit==='♥'||suit==='♦';
-  const col=isRed?'#cc0000':'#111111';
-  const suitLetter={♠:'S',♥:'H',♦:'D',♣:'C'}[suit];
-
-  // ── Card face ──
-  c.fillStyle='#fefefe'; c.fillRect(0,0,W,H);
-  // Rounded-looking border lines
-  c.strokeStyle='#bbbbbb'; c.lineWidth=5; c.strokeRect(2.5,2.5,W-5,H-5);
-  c.strokeStyle='#dddddd'; c.lineWidth=1.5; c.strokeRect(9,9,W-18,H-18);
-
-  // ── TOP-LEFT corner: Rank big + suit symbol ──
-  c.fillStyle=col;
-  c.textAlign='center'; c.textBaseline='top';
-  const rnkSize = rank==='10'?52:58;
-  c.font=`bold ${rnkSize}px Arial`;
-  const rnkX = rank==='10'?34:29;
-  c.fillText(rank, rnkX, 10);
-  c.font='38px Arial';
-  c.fillText(suit, 29, rank==='10'?66:72);
-
-  // ── TOP-RIGHT corner: suit LETTER (H/S/D/C) ──
-  c.fillStyle=col;
-  c.textAlign='center'; c.textBaseline='top';
-  c.font=`bold 36px Arial`;
-  c.fillText(suitLetter, W-26, 12);
-  // small suit symbol below letter
-  c.font='26px Arial';
-  c.fillText(suit, W-26, 52);
-
-  // ── BOTTOM-RIGHT corner (rotated 180°): rank + suit symbol ──
-  c.save();
-  c.translate(W,H); c.rotate(Math.PI);
-  c.fillStyle=col;
-  c.textAlign='center'; c.textBaseline='top';
-  c.font=`bold ${rnkSize}px Arial`;
-  c.fillText(rank, rnkX, 10);
-  c.font='38px Arial';
-  c.fillText(suit, 29, rank==='10'?66:72);
-  c.restore();
-
-  // ── BOTTOM-LEFT corner (rotated 180°): suit LETTER ──
-  c.save();
-  c.translate(W,H); c.rotate(Math.PI);
-  c.fillStyle=col;
-  c.textAlign='center'; c.textBaseline='top';
-  c.font=`bold 36px Arial`;
-  c.fillText(suitLetter, W-26, 12);
-  c.font='26px Arial';
-  c.fillText(suit, W-26, 52);
-  c.restore();
-
-  // ── Centre of card ──
-  if(rank==='A'){
-    c.fillStyle=col; c.font='220px Arial';
-    c.textAlign='center'; c.textBaseline='middle';
-    c.fillText(suit, W/2, H/2+8);
-
-  } else if(['J','Q','K'].includes(rank)){
-    // Tinted panel
-    c.fillStyle=isRed?'#fff4f4':'#f4f4ff';
-    c.fillRect(16,105,W-32,H-210);
-    c.strokeStyle=col+'33'; c.lineWidth=2;
-    c.strokeRect(18,107,W-36,H-214);
-
-    // Big serif rank letter centred
-    c.fillStyle=col; c.font=`bold 130px Georgia,serif`;
-    c.textAlign='center'; c.textBaseline='middle';
-    c.fillText(rank, W/2, H/2-20);
-
-    // Suit below
-    c.font='72px Arial';
-    c.fillText(suit, W/2, H/2+90);
-
-    // Four corner suit symbols in the panel
-    c.font='28px Arial'; c.fillStyle=col+'66';
-    c.fillText(suit,22,H-100); c.fillText(suit,W-22,110);
-    c.save(); c.translate(W,H); c.rotate(Math.PI);
-    c.fillText(suit,22,H-100); c.fillText(suit,W-22,110);
-    c.restore();
-
-  } else {
-    // ── Pip card – proper pip layout ──
-    const pips=PIP_LAYOUTS[rank]||[];
-    // pip area: inner portion of card excluding corners
-    const ax=W*0.13, ay=H*0.17, aw=W*0.74, ah=H*0.66;
-    const pSize = pips.length<=4?72 : pips.length<=6?60 : pips.length<=8?52 : 44;
-    c.fillStyle=col; c.font=`${pSize}px Arial`;
-    c.textAlign='center'; c.textBaseline='middle';
-    for(const[fx,fy] of pips){
-      c.fillText(suit, ax+fx*aw, ay+fy*ah);
-    }
-  }
-
-  tex.update(); return tex;
-}
-
-function buildCardMats(){
-  cardBackMat=new BABYLON.StandardMaterial('back',scene);
-  cardBackMat.diffuseTexture=mkBackTex();
-  cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);
-  cardBackMat.specularPower=30; cardBackMat.backFaceCulling=false;
-
-  for(const s of SUITS) for(const r of RANKS){
-    const k=r+s, m=new BABYLON.StandardMaterial('f'+k,scene);
-    m.diffuseTexture=mkFrontTex(s,r);
-    m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);
-    m.specularPower=20; m.backFaceCulling=false;
-    cardFrontMats[k]=m;
-  }
-}
-
-// ────────────────────────────────────────────────────
-// Card mesh pool
-// ────────────────────────────────────────────────────
-function buildCardPool(){
-  for(let i=0;i<80;i++){
-    const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.0,height:1.40},scene);
-    m.rotation.x=Math.PI/2; m.position=DECK_POS(); m.material=cardBackMat;
-    m.isVisible=false; m.renderingGroupId=1;
-    shadowGen.addShadowCaster(m); cardPool.push(m);
-  }
-}
-
-function nextCardMesh(){
-  const m=cardPool[cardIdx%cardPool.length]; cardIdx=(cardIdx+1)%cardPool.length;
-  m.position=DECK_POS().clone(); m.position.y+=0.28;
-  m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);
-  m.scaling=new BABYLON.Vector3(1,1,1);
-  m.material=cardBackMat; m.isVisible=true; return m;
-}
-
-// ────────────────────────────────────────────────────
-// Chip pool
-// ────────────────────────────────────────────────────
-const CHIP_DENOM=[
-  {val:1,  col:[0.90,0.88,0.86]},
-  {val:5,  col:[0.85,0.10,0.10]},
-  {val:25, col:[0.10,0.60,0.16]},
-  {val:100,col:[0.14,0.20,0.88]},
-  {val:500,col:[0.52,0.06,0.62]}
-];
-function buildChipPool(){
-  for(const d of CHIP_DENOM){
-    for(let i=0;i<30;i++){
-      const chip=BABYLON.MeshBuilder.CreateCylinder('chip',{height:0.068,diameter:0.32,tessellation:32},scene);
-      const m=new BABYLON.StandardMaterial('cm',scene);
-      m.diffuseColor=new BABYLON.Color3(...d.col);
-      m.specularColor=new BABYLON.Color3(1,1,1); m.specularPower=280;
-      m.emissiveColor=new BABYLON.Color3(...d.col.map(v=>v*0.12));
-      chip.material=m; chip.isVisible=false; chip._dval=d.val; chipPool.push(chip);
-    }
-  }
-}
-function getChip(amount){
-  const best=CHIP_DENOM.reduce((a,d)=>amount>=d.val&&d.val>a.val?d:a,CHIP_DENOM[0]);
-  const ch=chipPool.find(c=>!c.isVisible&&c._dval===best.val)||chipPool.find(c=>!c.isVisible)||chipPool[0];
-  ch.isVisible=true; return ch;
-}
-function freeChip(c){ c.isVisible=false; }
-
-// ────────────────────────────────────────────────────
-// Dealer / SB / BB tokens
-// ────────────────────────────────────────────────────
-function buildTokens(){
-  function makeToken(name, r, g, b, label){
-    const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene);
-    const m=new BABYLON.StandardMaterial(name+'m',scene);
-    m.diffuseColor=new BABYLON.Color3(r,g,b);
-    m.specularColor=new BABYLON.Color3(1,1,1); m.specularPower=300;
-    m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);
-    tok.material=m; tok.isVisible=false; tok.renderingGroupId=1;
-
-    // Text disc on top
-    const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false);
-    const dc=discTex.getContext();
-    dc.fillStyle=`rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;
-    dc.beginPath(); dc.arc(64,64,62,0,Math.PI*2); dc.fill();
-    dc.strokeStyle='rgba(0,0,0,0.5)'; dc.lineWidth=3; dc.stroke();
-    dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';
-    dc.font='bold 42px Arial'; dc.textAlign='center'; dc.textBaseline='middle';
-    dc.fillText(label,64,64); discTex.update();
-
-    const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene);
-    const dm=new BABYLON.StandardMaterial(name+'dm',scene);
-    dm.diffuseTexture=discTex; dm.emissiveColor=new BABYLON.Color3(1,1,1);
-    dm.disableLighting=true; dm.backFaceCulling=false;
-    disc.material=dm; disc.rotation.x=-Math.PI/2;  // front face UP
-    disc.position.y=0.07; disc.parent=tok; disc.renderingGroupId=2;
-    return tok;
-  }
-  dealerToken = makeToken('dealer', 0.95, 0.95, 0.95, 'D');   // white
-  sbToken     = makeToken('sb',     0.15, 0.40, 0.90, 'SB');  // blue
-  bbToken     = makeToken('bb',     0.90, 0.80, 0.10, 'BB');  // yellow
-}
-
-function positionTokens(dSeat, sbSeat, bbSeat){
-  function placeToken(tok, seat){
-    if(seat===null||seat===undefined){ tok.isVisible=false; return; }
-    const a=-Math.PI/2+(seat/NP)*Math.PI*2;
-    const rx=TRX*0.56, rz=TRZ*0.56;
-    // Offset anticlockwise slightly to avoid card overlap
-    const oa=a+0.30;
-    tok.position=new BABYLON.Vector3(Math.cos(oa)*rx, 0.36, Math.sin(oa)*rz);
-    tok.isVisible=true;
-  }
-  placeToken(dealerToken, dSeat);
-  placeToken(sbToken,     sbSeat);
-  placeToken(bbToken,     bbSeat);
-}
-
-// ────────────────────────────────────────────────────
-// Player label billboards
-// ────────────────────────────────────────────────────
-const LW=320, LH=110;
-function buildPlayerLabels(){
-  for(let i=0;i<NP;i++){
-    const tex=new BABYLON.DynamicTexture('plbtex'+i,{width:LW,height:LH},scene,false);
-    tex.hasAlpha=true;
-    const mat=new BABYLON.StandardMaterial('plbm'+i,scene);
-    mat.diffuseTexture=tex; mat.hasAlpha=true;
-    mat.emissiveColor=new BABYLON.Color3(1,1,1);
-    mat.disableLighting=true; mat.backFaceCulling=false;
-    const plane=BABYLON.MeshBuilder.CreatePlane('plbp'+i,{width:2.2,height:0.76},scene);
-    plane.material=mat;
-    const sp=seatPos(i);
-    plane.position=new BABYLON.Vector3(sp.x*0.78, 0.95, sp.z*0.78);
-    plane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
-    plane.isVisible=false; plane.renderingGroupId=2;
-    playerLabels.push({plane,tex});
-  }
-}
-
-function updateLabel(seat, name, chips, action, isMe, isDead){
-  const lb=playerLabels[seat]; if(!lb) return;
-  const ctx=lb.tex.getContext();
-  ctx.clearRect(0,0,LW,LH);
-  if(!name){ lb.plane.isVisible=false; lb.tex.update(); return; }
-
-  // Background
-  const bgCol=isDead?'rgba(80,20,20,0.82)': isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';
-  ctx.fillStyle=bgCol;
-  ctx.beginPath();
-  if(ctx.roundRect) ctx.roundRect(2,2,LW-4,LH-4,10);
-  else ctx.rect(2,2,LW-4,LH-4);
-  ctx.fill();
-  const borderCol=isMe?'#20c040': isDead?'#802020':'#c8a020';
-  ctx.strokeStyle=borderCol; ctx.lineWidth=2;
-  ctx.beginPath();
-  if(ctx.roundRect) ctx.roundRect(2,2,LW-4,LH-4,10);
-  else ctx.rect(2,2,LW-4,LH-4);
-  ctx.stroke();
-
-  // Name
-  ctx.fillStyle='#ffffff'; ctx.font='bold 26px Arial';
-  ctx.textAlign='center'; ctx.textBaseline='top';
-  const dispName=(name.length>14?name.slice(0,13)+'…':name).toUpperCase();
-  ctx.fillText(dispName, LW/2, 10);
-
-  // Chips
-  ctx.fillStyle='#ffd700'; ctx.font='20px Arial';
-  ctx.fillText('£'+(chips/100).toFixed(2), LW/2, 42);
-
-  // Action badge
-  if(action){
-    const ac=action.toUpperCase();
-    const acCol=ac.startsWith('FOLD')?'#c04040': ac.startsWith('RAISE')?'#c08020':'#20a040';
-    ctx.fillStyle=acCol; ctx.font='bold 18px Arial'; ctx.fillText(ac, LW/2, 78);
-  }
-  lb.tex.update(); lb.plane.isVisible=true;
-}
-
-// ────────────────────────────────────────────────────
-// Animation helpers
-// ────────────────────────────────────────────────────
-function mkAnim(prop,type,keys,ease){
-  const a=new BABYLON.Animation('a_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
-  a.setKeys(keys);
-  const ef=ease==='in'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();
-  ef.setEasingMode(ease==='in'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);
-  a.setEasingFunction(ef); return a;
-}
-
-function animDeal(mesh,target,cb){
-  const start=mesh.position.clone();
-  const mid=new BABYLON.Vector3((start.x+target.x)*.5, start.y+2.8, (start.z+target.z)*.5);
-  const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
-    [{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');
-  scene.stopAnimation(mesh); mesh.animations=[a];
-  scene.beginAnimation(mesh,0,24,false,1.5,cb||null);
-}
-
-function animFlipUp(mesh,frontMat,cb){
-  const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,
-    [{frame:0,value:1},{frame:9,value:0}],'in');
-  scene.stopAnimation(mesh); mesh.animations=[a1];
-  scene.beginAnimation(mesh,0,9,false,1,()=>{
-    mesh.material=frontMat;
-    const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,
-      [{frame:0,value:0},{frame:9,value:1}],'out');
-    scene.stopAnimation(mesh); mesh.animations=[a2];
-    scene.beginAnimation(mesh,0,9,false,1,cb||null);
-  });
-}
-
-function animChips(seat,amount,cb){
-  const pos=seatPos(seat), n=Math.min(Math.ceil(amount/BB),7);
-  let rem=n;
-  if(n===0){ if(cb) setTimeout(cb,80); return; }
-  for(let i=0;i<n;i++){
-    const chip=getChip(amount); potChips.push(chip);
-    chip.position=pos.clone(); chip.position.y+=0.40+i*0.06;
-    const angle=Math.random()*Math.PI*2, dr=Math.random()*0.50;
-    const target=new BABYLON.Vector3(Math.cos(angle)*dr, 0.30+potChips.length*0.072, Math.sin(angle)*dr);
-    const start=chip.position.clone();
-    const mid=new BABYLON.Vector3((start.x+target.x)*.5, start.y+1.6, (start.z+target.z)*.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
-      [{frame:0,value:start},{frame:10,value:mid},{frame:22,value:target}],'out');
-    chip.animations=[a];
-    setTimeout(()=>{
-      scene.beginAnimation(chip,0,22,false,1.3,()=>{
-        snd_chip(); rem--; if(rem===0&&cb)cb();
-      });
-    }, i*70);
-  }
-}
-
-function chipsFlyToWinner(winSeat,cb){
-  const wp=seatPos(winSeat); wp.y+=0.7;
-  let rem=potChips.length;
-  if(!rem){ if(cb)cb(); return; }
-  for(const chip of potChips){
-    const start=chip.position.clone();
-    const mid=new BABYLON.Vector3((start.x+wp.x)*.5, start.y+2.0, (start.z+wp.z)*.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
-      [{frame:0,value:start},{frame:8,value:mid},{frame:18,value:wp}],'in');
-    chip.animations=[a];
-    scene.beginAnimation(chip,0,18,false,1.4,()=>{
-      snd_chip(); freeChip(chip); rem--;
-      if(rem===0){ potChips=[]; if(cb)cb(); }
-    });
-  }
-}
-
-// ────────────────────────────────────────────────────
-// Scene setup
-// ────────────────────────────────────────────────────
 function createScene(){
   scene=new BABYLON.Scene(engine);
-  scene.clearColor=new BABYLON.Color4(0.055,0.025,0.010,1);
-
+  scene.clearColor=new BABYLON.Color4(0.015,0.01,0.025,1);
+  
   // Camera
   const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.8,17,new BABYLON.Vector3(0,0.5,0),scene);
   cam.lowerRadiusLimit=7; cam.upperRadiusLimit=26; cam.lowerBetaLimit=0.20; cam.upperBetaLimit=1.35;
   cam.wheelPrecision=22; cam.attachControl(canvas,true);
-
+  
   // Lights
   const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
-  h.intensity=0.20; h.diffuse=new BABYLON.Color3(0.55,0.48,0.60);
-  h.groundColor=new BABYLON.Color3(0.06,0.04,0.08);
-
-  spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.1,1.4,scene);
-  spotLight.intensity=1.8; spotLight.diffuse=new BABYLON.Color3(1,0.97,0.88);
+  h.intensity=0.18; h.diffuse=new BABYLON.Color3(0.50,0.45,0.60); h.groundColor=new BABYLON.Color3(0.06,0.04,0.08);
+  spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.5,scene);
+  spotLight.intensity=1.8; spotLight.diffuse=new BABYLON.Color3(1,0.96,0.85);
   shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);
   shadowGen.useBlurExponentialShadowMap=true; shadowGen.blurKernel=12;
-
-  // Floor – dark walnut
+  
+  // Floor
   const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);
   f.position.y=-0.22; f.receiveShadows=true;
   const fm=new BABYLON.StandardMaterial('fm',scene);
-  fm.diffuseColor=new BABYLON.Color3(0.10,0.048,0.020);
-  fm.specularColor=new BABYLON.Color3(0.20,0.10,0.04); fm.specularPower=80;
+  fm.diffuseColor=new BABYLON.Color3(0.03,0.025,0.04); fm.specularColor=new BABYLON.Color3(0.25,0.12,0.32); fm.specularPower=160;
   f.material=fm;
-
+  
+  // Table
   const T=96;
-
-  // Table base – dark walnut brown (matching screenshot rail)
   const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.44,diameter:12,tessellation:T},scene);
   base.scaling.x=TRX/6; base.scaling.z=TRZ/6; base.position.y=-0.01;
   const bm=new BABYLON.StandardMaterial('bm',scene);
-  bm.diffuseColor=new BABYLON.Color3(0.22,0.10,0.04);
-  bm.specularColor=new BABYLON.Color3(0.55,0.32,0.08); bm.specularPower=160;
+  bm.diffuseColor=new BABYLON.Color3(0.18,0.09,0.04); bm.specularColor=new BABYLON.Color3(0.5,0.32,0.10); bm.specularPower=160;
   base.material=bm;
-
-  // Rail – warm brown wood (screenshot wood rail)
-  const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.42,tessellation:T,radialSegments:20},scene);
+  
+  const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.38,tessellation:T,radialSegments:20},scene);
   rail.scaling.x=TRX/(11.4/2)*0.97; rail.scaling.z=TRZ/(11.4/2)*0.97; rail.position.y=0.18;
   const rm=new BABYLON.StandardMaterial('rm',scene);
-  rm.diffuseColor=new BABYLON.Color3(0.30,0.14,0.05);
-  rm.specularColor=new BABYLON.Color3(0.80,0.50,0.15); rm.specularPower=220;
-  rm.emissiveColor=new BABYLON.Color3(0.04,0.02,0.005);
-  rail.material=rm;
-
-  // Felt – casino green matching screenshot
+  rm.diffuseColor=new BABYLON.Color3(0.72,0.54,0.08); rm.specularColor=new BABYLON.Color3(1,0.88,0.32); rm.specularPower=300;
+  rm.emissiveColor=new BABYLON.Color3(0.08,0.06,0.006); rail.material=rm;
+  
   const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
   felt.scaling.x=TRX/(10.8/2)*0.90; felt.scaling.z=TRZ/(10.8/2)*0.90; felt.position.y=0.22;
   const ftm=new BABYLON.StandardMaterial('ftm',scene);
-  ftm.diffuseColor=new BABYLON.Color3(0.10,0.52,0.18);  // bright casino green
-  ftm.specularColor=new BABYLON.Color3(0.015,0.06,0.025); ftm.specularPower=6;
+  ftm.diffuseColor=new BABYLON.Color3(0.08,0.52,0.18); ftm.specularColor=new BABYLON.Color3(0.02,0.08,0.04); ftm.specularPower=8;
   felt.material=ftm; felt.receiveShadows=true;
-
-  buildCardMats();
-  buildCardPool();
-  buildChipPool();
-  buildPlayerLabels();
-  buildTokens();
-
-  // Init seat card mesh arrays
-  for(let i=0;i<NP;i++) seatCardMeshes.push([null,null]);
-
+  
+  buildCardMats(); buildCardPool(); buildChipPool(); mkPlayers();
+  setTimeout(startNewHand,1500);
   return scene;
 }
 
-// ────────────────────────────────────────────────────
-// Game state → 3D scene update
-// ────────────────────────────────────────────────────
-let seatActions={};  // seat->actionLabel string
-
-function applyState(st){
-  if(!st) return;
-  lastState=st;
-
-  // Update player labels
-  for(let i=0;i<NP;i++){
-    const p=st.players[i];
-    if(p){
-      updateLabel(i, p.name, p.chips, seatActions[i]||'', i===mySeat, p.folded);
-    } else {
-      updateLabel(i, null, 0, '', false, false);
-    }
+// Card textures
+function buildCardMats(){
+  cardBackMat=new BABYLON.StandardMaterial('back',scene);
+  cardBackMat.diffuseTexture=mkBackTex();
+  cardBackMat.specularColor=new BABYLON.Color3(0.15,0.15,0.15); cardBackMat.specularPower=30; cardBackMat.backFaceCulling=false;
+  for(const s of SUITS) for(const r of RANKS){
+    const k=r+s, m=new BABYLON.StandardMaterial('f'+k,scene);
+    m.diffuseTexture=mkFrontTex(s,r); m.specularColor=new BABYLON.Color3(0.10,0.10,0.10); m.specularPower=20; m.backFaceCulling=false;
+    cardFrontMats[k]=m;
   }
-
-  // Update community cards
-  const comm=st.community||[];
-  for(let ci=0;ci<5;ci++){
-    const mesh=communityCardMeshes[ci];
-    if(ci<comm.length){
-      if(!mesh||!mesh.isVisible){
-        // New community card – animate
-        const m=getOrCreateCommunityMesh(ci);
-        const target=COM_POS[ci].clone();
-        m.material=cardBackMat; m.isVisible=true;
-        animDeal(m, target, ()=>{
-          snd_deal();
-          const cd=comm[ci];
-          if(cd&&cd!=='back'){
-            animFlipUp(m, cardFrontMats[cd.r+cd.s]||cardBackMat, ()=>snd_flip());
-          }
-        });
-      }
-    } else {
-      if(mesh) mesh.isVisible=false;
-    }
-  }
-
-  // Update player hole cards
-  for(let i=0;i<NP;i++){
-    const p=st.players[i];
-    const meshes=seatCardMeshes[i];
-    if(!p||!p.cards||p.cards.length===0){
-      for(const m of meshes){ if(m) m.isVisible=false; }
-      seatCardMeshes[i]=[null,null]; continue;
-    }
-    // Check if we need to flip face-up
-    p.cards.forEach((cd,cn)=>{
-      const m=meshes[cn];
-      if(!m||!m.isVisible) return; // will be handled by deal sequence
-      if(cd&&cd!=='back'){
-        const fmat=cardFrontMats[cd.r+cd.s];
-        if(fmat&&m.material!==fmat){
-          animFlipUp(m,fmat,()=>snd_flip());
-        }
-      }
-    });
-  }
-
-  // Update UI text
-  const p0=st.players[mySeat];
-  if(p0){
-    document.getElementById('myInfo').textContent=
-      `YOUR CHIPS: £${(p0.chips/100).toFixed(2)}  |  BET: £${(p0.bet/100).toFixed(2)}`;
-  }
-  document.getElementById('pot').textContent='POT: £'+((st.pot||0)/100).toFixed(2);
-  document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');
+}
+function mkBackTex(){
+  const W=256,H=384, tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true), c=tex.getContext();
+  const g=c.createLinearGradient(0,0,W,H); g.addColorStop(0,'#0d1b62'); g.addColorStop(1,'#05091e');
+  c.fillStyle=g; c.fillRect(0,0,W,H); c.strokeStyle='#c8a020'; c.lineWidth=10; c.strokeRect(5,5,W-10,H-10);
+  tex.update(); return tex;
+}
+function mkFrontTex(suit,rank){
+  const W=256,H=384, tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true), c=tex.getContext();
+  const isRed=suit==='♥'||suit==='♦', col=isRed?'#d00':'#000';
+  c.fillStyle='#fff'; c.fillRect(0,0,W,H); c.strokeStyle='#ddd'; c.lineWidth=3; c.strokeRect(1.5,1.5,W-3,H-3);
+  c.fillStyle=col; c.textAlign='left'; c.textBaseline='top';
+  c.font='bold 52px Arial'; c.fillText(rank,16,12); c.font='42px Arial'; c.fillText(suit,rank==='10'?18:20,rank==='10'?68:72);
+  c.save(); c.translate(W,H); c.rotate(Math.PI); c.font='bold 52px Arial'; c.fillText(rank,16,12); c.font='42px Arial'; c.fillText(suit,rank==='10'?18:20,rank==='10'?68:72); c.restore();
+  if(rank==='A'){ c.font='160px Arial'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(suit,W/2,H/2); }
+  else if(['J','Q','K'].includes(rank)){ c.textAlign='center'; c.textBaseline='middle'; c.font='bold 120px Arial'; c.fillText(rank,W/2,H/2-20); c.font='56px Arial'; c.fillText(suit,W/2,H/2+70); }
+  tex.update(); return tex;
 }
 
-function getOrCreateCommunityMesh(idx){
-  if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined){
-    return communityCardMeshes[idx];
+// Card pool
+const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
+function buildCardPool(){
+  for(let i=0;i<60;i++){
+    const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:0.72,height:1.02},scene);
+    m.rotation.x=Math.PI/2; m.position=DECK_POS().clone(); m.material=cardBackMat; m.isVisible=false; m.renderingGroupId=1;
+    shadowGen.addShadowCaster(m); cardPool.push(m);
   }
-  const m=nextCardMesh();
-  communityCardMeshes[idx]=m;
-  return m;
+}
+function nextCardMesh(){
+  const m=cardPool[cardIdx%cardPool.length]; cardIdx++;
+  m.position=DECK_POS().clone(); m.position.y+=0.26+cardIdx*0.001;
+  m.rotation=new BABYLON.Vector3(Math.PI/2,0,0); m.scaling=new BABYLON.Vector3(1,1,1);
+  m.material=cardBackMat; m.isVisible=true; return m;
 }
 
-// ────────────────────────────────────────────────────
-// Deal animation sequence (called on newHand)
-// ────────────────────────────────────────────────────
-function startDealAnimation(activeSeats, afterDone){
-  dealing=true;
-  // Hide all existing card meshes
-  for(let i=0;i<NP;i++){
-    for(const m of seatCardMeshes[i]){ if(m) m.isVisible=false; }
-    seatCardMeshes[i]=[null,null];
+// Chip pool
+function buildChipPool(){
+  const CHIP_DENOM=[{val:1,col:[0.92,0.90,0.88]},{val:5,col:[0.85,0.10,0.10]},{val:25,col:[0.10,0.62,0.16]},{val:100,col:[0.14,0.20,0.88]},{val:500,col:[0.52,0.06,0.62]}];
+  for(const denom of CHIP_DENOM){
+    for(let i=0;i<30;i++){
+      const chip=BABYLON.MeshBuilder.CreateCylinder('chip',{height:0.068,diameter:0.32,tessellation:32},scene);
+      const m=new BABYLON.StandardMaterial('cpm',scene);
+      m.diffuseColor=new BABYLON.Color3(...denom.col); m.specularColor=new BABYLON.Color3(1,1,1); m.specularPower=260;
+      m.emissiveColor=new BABYLON.Color3(...denom.col.map(v=>v*0.15)); chip.material=m; chip.isVisible=false; chip._dval=denom.val; chipPool.push(chip);
+    }
   }
-  for(const m of communityCardMeshes){ if(m) m.isVisible=false; }
-  communityCardMeshes=[];
+}
+function getChipForVal(amount){
+  const CHIP_DENOM=[{val:1,col:[0.92,0.90,0.88]},{val:5,col:[0.85,0.10,0.10]},{val:25,col:[0.10,0.62,0.16]},{val:100,col:[0.14,0.20,0.88]},{val:500,col:[0.52,0.06,0.62]}];
+  const best=CHIP_DENOM.reduce((a,d)=>amount>=d.val&&d.val>a.val?d:a,CHIP_DENOM[0]);
+  const avail=chipPool.filter(c=>!c.isVisible&&c._dval===best.val);
+  const ch=avail.length?avail[0]:(chipPool.find(c=>!c.isVisible)||chipPool[0]); ch.isVisible=true; return ch;
+}
+function freeChip(c){ c.isVisible=false; }
+
+// Players
+function seatPos(i){ const a=Math.PI/2+(i/NP)*Math.PI*2; return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ); }
+function cardPos(si,cn){ const a=Math.PI/2+(si/NP)*Math.PI*2, rx=TRX*0.70, rz=TRZ*0.70, pa=a+Math.PI/2, off=(cn-0.5)*0.50; return new BABYLON.Vector3(Math.cos(a)*rx+Math.cos(pa)*off,0.30+cn*0.002,Math.sin(a)*rz+Math.sin(pa)*off); }
+function mkPlayers(){
+  const NAMES=['YOU','Viktor','Sophia','James','Mei','Carlos','Anna','Duke','Roxy'];
+  for(let i=0;i<NP;i++){
+    G.players.push({seat:i,name:NAMES[i],chips:START_CHIPS,cards:[],cardMeshes:[],folded:false,bet:0,isHuman:i===0});
+  }
+}
+
+// Game
+function shuffle(d){ for(let i=d.length-1;i>0;i--){ const j=0|Math.random()*(i+1); [d[i],d[j]]=[d[j],d[i]]; } return d; }
+function buildDeck(){ const d=[]; for(const s of SUITS) for(const r of RANKS) d.push({s,r}); return shuffle(d); }
+function startNewHand(){
+  if(G.animating) return; G.animating=true; setBtns(false); showMsg('');
+  G.deck=buildDeck(); G.community=[]; G.pot=0; G.currentBet=BB; G.phase='preflop'; cardIdx=0;
+  for(const m of cardPool){ m.isVisible=false; m.scaling.setAll(1); }
+  for(const m of G.communityMeshes) m.isVisible=false; G.communityMeshes=[];
   for(const ch of potChips) freeChip(ch); potChips=[];
-
-  // Deal 2 cards to each active seat sequentially
-  const seq=[];
-  for(let rd=0;rd<2;rd++) for(const si of activeSeats) seq.push(si);
-
-  const dealt={}; for(const si of activeSeats) dealt[si]=0;
-
+  for(const p of G.players){ for(const m of p.cardMeshes) m.isVisible=false; p.cards=[]; p.cardMeshes=[]; p.folded=false; p.bet=0; }
+  const sb=(G.dealerSeat+1)%NP, bb=(G.dealerSeat+2)%NP;
+  G.players[sb].chips-=SB; G.players[sb].bet=SB; G.players[bb].chips-=BB; G.players[bb].bet=BB; G.pot=SB+BB;
+  setPhase('Pre-Flop'); refreshUI(); dealHoleCards(()=>{ G.animating=false; initBet((bb+1)%NP); });
+}
+function dealHoleCards(done){
+  const seq=[]; for(let rd=0;rd<2;rd++) for(let i=0;i<NP;i++) seq.push(i);
   let idx=0;
-  function next(){
-    if(idx>=seq.length){ dealing=false; if(afterDone) afterDone(); return; }
-    const si=seq[idx++], cn=dealt[si]||0; dealt[si]=cn+1;
-    const m=nextCardMesh();
-    seatCardMeshes[si][cn]=m;
-    const target=cardPos(si,cn);
-    animDeal(m,target,()=>{
-      snd_deal();
-      // Apply face if we already have state
-      if(lastState&&lastState.players[si]){
-        const cd=lastState.players[si].cards[cn];
-        if(cd&&cd!=='back'){
-          animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
-        }
-      }
-      setTimeout(next,80);
-    });
-  }
+  const next=()=>{
+    if(idx>=seq.length){ done(); return; }
+    const si=seq[idx++], p=G.players[si], card=G.deck.shift(); p.cards.push(card);
+    const m=nextCardMesh(); p.cardMeshes.push(m); const tp=cardPos(si,p.cards.length-1);
+    animDeal(m,tp,()=>{ snd_deal(); if(p.isHuman){ flipUp(m,cardFrontMats[card.r+card.s],()=>{ snd_flip(); setTimeout(next,90); }); } else setTimeout(next,90); });
+  };
   next();
 }
-
-// ═══════════════════════════════════════════════════════════
-//  WEBSOCKET CLIENT
-// ═══════════════════════════════════════════════════════════
-function connectWS(name, roomId, playerId){
-  const proto = location.protocol==='https:'?'wss:':'ws:';
-  ws = new WebSocket(`${proto}//${location.host}`);
-
-  ws.onopen=()=>{
-    ws.send(JSON.stringify({ type:'join', id:playerId, name, room:roomId }));
+function initBet(startSeat){
+  G.toAct=[]; for(let i=0;i<NP;i++){ const s=(startSeat+i)%NP; if(!G.players[s].folded&&G.players[s].chips>0) G.toAct.push(s); }
+  doTurn();
+}
+function doTurn(){
+  if(G.players.filter(p=>!p.folded).length<=1){ endRound(); return; }
+  if(!G.toAct.length){ advPhase(); return; }
+  const seat=G.toAct[0], p=G.players[seat];
+  if(p.folded||p.chips===0){ G.toAct.shift(); doTurn(); return; }
+  if(p.isHuman){ const ca=Math.min(G.currentBet-p.bet,p.chips); document.getElementById('callBtn').textContent=ca>0?'CALL £'+(ca/100).toFixed(2):'CHECK'; document.getElementById('raiseAmt').value=(BB*2/100).toFixed(2); setBtns(true); showMsg('Your turn!',0); }
+  else setTimeout(()=>aiAct(seat),500+Math.random()*900);
+}
+function acted(seat,isRaise){
+  G.toAct.shift();
+  if(isRaise){ G.toAct=[]; for(let i=1;i<=NP;i++){ const s=(seat+i)%NP, p=G.players[s]; if(!p.folded&&p.chips>0&&p.bet<G.currentBet) G.toAct.push(s); } }
+  setTimeout(doTurn,200);
+}
+function advPhase(){
+  for(const p of G.players) p.bet=0; G.currentBet=0;
+  const map={preflop:'flop',flop:'turn',turn:'river'};
+  if(G.phase in map){ G.phase=map[G.phase]; setPhase(G.phase[0].toUpperCase()+G.phase.slice(1)); const dealers={flop:dealFlop,turn:dealTurn,river:dealRiver}; dealers[G.phase](()=>initBet((G.dealerSeat+1)%NP)); }
+  else{ G.phase='showdown'; showdown(); }
+}
+function dealFlop(done){ dealCommunity(3,done); }
+function dealTurn(done){ dealCommunity(1,done); }
+function dealRiver(done){ dealCommunity(1,done); }
+function dealCommunity(count, done){
+  const communityPositions=[new BABYLON.Vector3(-1.64,0.305,0),new BABYLON.Vector3(-0.82,0.305,0),new BABYLON.Vector3(0,0.305,0),new BABYLON.Vector3(0.82,0.305,0),new BABYLON.Vector3(1.64,0.305,0)];
+  let i=G.communityMeshes.length, end=i+count;
+  const next=()=>{
+    if(i>=end){ done(); return; }
+    const cd=G.deck.shift(); G.community.push(cd); const m=nextCardMesh(); G.communityMeshes.push(m); const tp=communityPositions[i]; i++;
+    animDeal(m,tp,()=>{ snd_deal(); flipUp(m,cardFrontMats[cd.r+cd.s],()=>{ snd_flip(); setTimeout(next,260); }); });
   };
-
-  ws.onmessage=(ev)=>{
-    let msg;
-    try{ msg=JSON.parse(ev.data); }catch{ return; }
-    handleServerMsg(msg);
-  };
-
-  ws.onclose=()=>{
-    showMsg('⚠ Disconnected from server', 0);
-    setTimeout(()=>location.reload(), 4000);
-  };
-
-  ws.onerror=()=>{
-    document.getElementById('loginErr').textContent='Could not connect to server.';
-    document.getElementById('loginOverlay').style.display='flex';
-    document.getElementById('waitingOverlay').style.display='none';
-    document.getElementById('lobbyOverlay').style.display='none';
-  };
+  next();
 }
-
-function wsSend(obj){ if(ws&&ws.readyState===1) ws.send(JSON.stringify(obj)); }
-
-// ─────────────────────────────────────────────────────
-// Server message handler
-// ─────────────────────────────────────────────────────
-function handleServerMsg(msg){
-  switch(msg.type){
-
-    case 'joined':
-      myId   = msg.id; mySeat = msg.seat; isHost = msg.isHost;
-      localStorage.setItem('pokerPlayerId', myId);
-      document.getElementById('loginOverlay').style.display='none';
-      document.getElementById('waitingOverlay').style.display='none';
-      break;
-
-    case 'waiting':
-      document.getElementById('loginOverlay').style.display='none';
-      document.getElementById('waitingOverlay').style.display='flex';
-      break;
-
-    case 'rejected':
-      document.getElementById('waitingOverlay').style.display='none';
-      document.getElementById('loginOverlay').style.display='flex';
-      document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';
-      break;
-
-    case 'lobby':
-      renderLobby(msg);
-      // Sync in-game pending requests so host sees them even in game
-      if(isHost && msg.pending){
-        for(const p of msg.pending){
-          if(!pendingInGame[p.id]) pendingInGame[p.id]={id:p.id,name:p.name};
-        }
-        // Remove any that have been resolved
-        for(const id of Object.keys(pendingInGame)){
-          if(!msg.pending.find(p=>p.id===id)) delete pendingInGame[id];
-        }
-        refreshInGameJoinNotif();
-      }
-      break;
-
-    case 'joinRequest':
-      // Show in-game popup if we are host (may be in game or lobby)
-      if(isHost){
-        ensureAudio(); snd_joinAlert();
-        addInGameJoinRequest(msg.id, msg.name);
-        if(document.getElementById('lobbyOverlay').style.display!=='none' && lastLobbyMsg){
-          if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))
-            lastLobbyMsg.pending.push({id:msg.id,name:msg.name});
-          renderLobby(lastLobbyMsg);
-        }
-      }
-      break;
-
-    case 'winner':
-      snd_win();
-      hideTurnIndicator();
-      addLog(`🏆 ${msg.name} wins £${(msg.amount/100).toFixed(2)} — ${msg.label||''}`, 'log-win');
-      showMsg(`🏆 ${msg.name} wins £${(msg.amount/100).toFixed(2)}\n${msg.label||''}!`, 0);
-      chipsFlyToWinner(msg.seat, ()=>{});
-      setTimeout(()=>showMsg(''),5500);
-      break;
-
-    case 'gameStarting':
-      document.getElementById('lobbyOverlay').style.display='none';
-      document.getElementById('gameUI').style.display='block';
-      document.getElementById('roomBadge').textContent='ROOM '+myRoomId;
-      break;
-
-    case 'newHand':
-      seatActions={};
-      showMsg('');
-      setActions(false);
-      hideTurnIndicator();
-      document.getElementById('waitingMsg').style.display='none';
-      handNumber++;
-      addLog(`━━ Hand #${handNumber} | Dealer: Seat ${(msg.dealerSeat+1)} ━━`, 'log-hand');
-      addLog(`SB: Seat ${msg.sbSeat+1} · BB: Seat ${msg.bbSeat+1}`);
-      positionTokens(msg.dealerSeat, msg.sbSeat, msg.bbSeat);
-      startDealAnimation(msg.activeSeats||[], ()=>{
-        if(lastState) applyState(lastState);
-      });
-      break;
-
-    case 'state':
-      lastState=msg;
-      if(!dealing) applyState(msg);
-      break;
-
-    case 'playerAction': {
-      const pname=msg.name||'Player';
-      const ac=msg.action==='fold'?'FOLD': msg.action==='check'?'CHECK': msg.action==='call'?`CALL £${((msg.amount||0)/100).toFixed(2)}`: `RAISE £${((msg.amount||0)/100).toFixed(2)}`;
-      seatActions[msg.seat]=ac;
-      addLog(`${pname}: ${ac}`);
-      if(msg.amount>0) animChips(msg.seat, msg.amount, null);
-      hideTurnIndicator();
-      if(lastState) applyState(lastState);
-      break;
-    }
-
-    case 'yourTurn': {
-      const ca=msg.callAmt||0;
-      if(msg.seat === mySeat){
-        // Only the acting player sees buttons and "your turn" message
-        document.getElementById('callBtn').textContent=ca>0?`CALL £${(ca/100).toFixed(2)}`:'CHECK';
-        document.getElementById('raiseAmt').value=((msg.minRaise||40)/100).toFixed(2);
-        setActions(true);
-        showMsg('⭐ Your turn!', 0);
-        document.getElementById('waitingMsg').style.display='none';
-      } else {
-        // All other players see who's acting
-        setActions(false);
-        showMsg('');
-        const actingPlayer = lastState && lastState.players[msg.seat];
-        const actingName = actingPlayer ? actingPlayer.name : `Seat ${msg.seat+1}`;
-        showTurnIndicator(`⏳ ${actingName} is thinking…`);
-      }
-      break;
-    }
-
-    case 'communityDealt':
-      if(msg.phase) addLog(`▶ ${msg.phase.toUpperCase()}: ${(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' ')}`, 'log-community');
-      break;
-
-    case 'showdown':
-      setPhase('Showdown');
-      hideTurnIndicator();
-      addLog('── SHOWDOWN ──', 'log-hand');
-      showMsg('🃏 Showdown!', 2000);
-      break;
-
-    case 'waitingForPlayers':
-      showMsg('⏳ Waiting for more players…', 0);
-      hideTurnIndicator();
-      break;
-
-    case 'playerLeft':
-      addLog(`${msg.name} left the table`);
-      addChat(`⬅ ${msg.name} left`);
-      seatActions[msg.seat]='';
-      if(pendingInGame[msg.id]){ delete pendingInGame[msg.id]; refreshInGameJoinNotif(); }
-      if(lastState) applyState(lastState);
-      break;
-
-    case 'sittingOut': {
-      document.getElementById('gameUI').style.display='block';
-      document.getElementById('lobbyOverlay').style.display='none';
-      const wmEl=document.getElementById('waitingMsg');
-      wmEl.textContent=msg.reason||'Sitting out…'; wmEl.style.display='block';
-      break;
-    }
-
-    case 'chat':
-      addChat(`${msg.name}: ${msg.text}`);
-      break;
-
-    case 'error':
-      addChat(`⚠ ${msg.msg}`);
-      break;
-  }
+function aiAct(seat){
+  const p=G.players[seat]; if(p.folded){ acted(seat,false); return; }
+  const str=handStrength(p.cards,G.community), ca=Math.min(G.currentBet-p.bet,p.chips), r=Math.random();
+  let dec;
+  if(ca===0) dec=str>0.55&&r<0.35?'raise':'check';
+  else if(str>0.78) dec=r<0.55?'raise':'call';
+  else if(str>0.42) dec=r<0.12?'fold':'call';
+  else dec=r<0.50?'fold':'call';
+  if(dec==='fold'){ p.folded=true; showMsg(`${p.name} folds`,1100); refreshUI(); setTimeout(()=>acted(seat,false),350); }
+  else if(dec==='raise'&&p.chips>BB*2){ const ra=Math.min(BB*(2+Math.floor(r*3)),p.chips); p.chips-=ra; p.bet+=ra; G.pot+=ra; G.currentBet=Math.max(G.currentBet,p.bet); showMsg(`${p.name} raises £${(ra/100).toFixed(2)}`,1100); refreshUI(); animChips(seat,ra,()=>acted(seat,true)); }
+  else if(ca>0){ p.chips-=ca; p.bet+=ca; G.pot+=ca; showMsg(`${p.name} calls`,900); refreshUI(); animChips(seat,ca,()=>acted(seat,false)); }
+  else{ showMsg(`${p.name} checks`,700); setTimeout(()=>acted(seat,false),400); }
 }
-
-// ─────────────────────────────────────────────────────
-// Lobby renderer
-// ─────────────────────────────────────────────────────
-function renderLobby(msg){
-  lastLobbyMsg=msg;
-  myRoomId=msg.roomId;
-  document.getElementById('lobbyRoomId').textContent=msg.roomId;
-
-  // Are we in the lobby or in game?
-  if(msg.gameActive){
-    // If game active and we're seated, we're in game already
-    return;
-  }
-
-  document.getElementById('loginOverlay').style.display='none';
-  document.getElementById('waitingOverlay').style.display='none';
-  document.getElementById('lobbyOverlay').style.display='flex';
-
-  // Player list
-  const pl=document.getElementById('playerList');
-  pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';
-  const seated=msg.seats.filter(Boolean);
-  for(const s of seated){
-    const div=document.createElement('div');
-    div.className='player-row';
-    div.innerHTML=`<span>${s.name}${s.id===msg.hostId?'<span class="host-badge">HOST</span>':''}</span><span class="chips">£${(s.chips/100).toFixed(2)}</span>`;
-    pl.appendChild(div);
-  }
-
-  // Pending approvals (host only)
-  const ps=document.getElementById('pendingSection');
-  const pi=document.getElementById('pendingItems');
-  const pending=msg.pending||[];
-  if(isHost&&pending.length>0){
-    ps.style.display='block';
-    pi.innerHTML='';
-    for(const p of pending){
-      const row=document.createElement('div');
-      row.className='pending-row';
-      row.innerHTML=`<span>${p.name}</span>
-        <span>
-          <button class="btn-sm btn-approve" onclick="approvePlayer('${p.id}',true)">✓ Admit</button>
-          <button class="btn-sm btn-reject" onclick="approvePlayer('${p.id}',false)">✗ Reject</button>
-        </span>`;
-      pi.appendChild(row);
-    }
-  } else {
-    ps.style.display='none';
-  }
-
-  // Status line
-  const statusEl=document.getElementById('lobbyStatus');
-  if(isHost){
-    statusEl.textContent=seated.length<2?'Waiting for more players to join…':'Ready to start!';
-  } else {
-    statusEl.textContent='Waiting for host to start the game…';
-  }
-
-  // Start button (host only, 2+ players)
-  const sb=document.getElementById('startBtn');
-  if(isHost){
-    sb.style.display='block';
-    sb.disabled=seated.length<2;
-  } else {
-    sb.style.display='none';
-  }
+function showdown(){
+  setPhase('Showdown'); const reveals=G.players.filter(p=>!p.folded&&!p.isHuman&&p.cardMeshes.length>0);
+  let ri=0;
+  const next=()=>{ if(ri>=reveals.length){ setTimeout(pickWinner,600); return; } const p=reveals[ri++]; let ci2=0; const fn=()=>{ if(ci2>=p.cardMeshes.length){ setTimeout(next,340); return; } const m=p.cardMeshes[ci2], cd=p.cards[ci2]; ci2++; flipUp(m,cardFrontMats[cd.r+cd.s],()=>{ snd_flip(); setTimeout(fn,200); }); }; fn(); };
+  setTimeout(next,500);
 }
-
-function approvePlayer(id, accept){
-  wsSend({ type:'approve', id, accept });
+function pickWinner(){
+  const active=G.players.filter(p=>!p.folded); if(active.length===1){ finish(active[0],'Last player standing'); return; }
+  let best=null, bestScore=-1; for(const p of active){ const sc=evalBest([...p.cards,...G.community]); if(sc>bestScore){ bestScore=sc; best=p; } }
+  finish(best,handName(bestScore));
 }
-
-// In-game join request notification (for host)
-let pendingInGame={};
-function addInGameJoinRequest(id, name){
-  pendingInGame[id]={id,name};
-  refreshInGameJoinNotif();
+function finish(winner,label){
+  const won=G.pot; snd_win(); showMsg(`🏆 ${winner.name} wins £${(won/100).toFixed(2)}\n${label}!`,0);
+  chipsFlyToWinner(winner.seat,()=>{ winner.chips+=won; G.pot=0; refreshUI(); setTimeout(()=>{ showMsg(''); nextHand(); },4000); });
 }
-function refreshInGameJoinNotif(){
-  const notif=document.getElementById('joinRequestNotif');
-  const list=document.getElementById('joinReqList');
-  const entries=Object.values(pendingInGame);
-  if(!entries.length||!isHost){ notif.style.display='none'; return; }
-  notif.style.display='block';
-  list.innerHTML='';
-  for(const p of entries){
-    const row=document.createElement('div');
-    row.className='jr-row';
-    row.innerHTML=`<span class="jr-name">${p.name}</span>
-      <span class="jr-btns">
-        <button class="jr-admit" onclick="inGameApprove('${p.id}',true)">Admit</button>
-        <button class="jr-reject" onclick="inGameApprove('${p.id}',false)">Reject</button>
-      </span>`;
-    list.appendChild(row);
-  }
+function nextHand(){ G.dealerSeat=(G.dealerSeat+1)%NP; for(const p of G.players) if(p.chips<=0) p.chips=START_CHIPS; setTimeout(startNewHand,700); }
+function endRound(){ const a=G.players.filter(p=>!p.folded); if(a.length) finish(a[0],'Last player standing'); }
+
+// Hand evaluation
+function rv(r){ return RVAL[r]||parseInt(r)||0; }
+function evalBest(cards){ const cs=combs(cards,Math.min(cards.length,5)); let best=0; for(const c of cs){ const s=score5(c); if(s>best)best=s; } return best; }
+function combs(arr,k){ if(arr.length<=k) return [arr]; if(k===1) return arr.map(x=>[x]); const out=[]; for(let i=0;i<=arr.length-k;i++) for(const c of combs(arr.slice(i+1),k-1)) out.push([arr[i],...c]); return out; }
+function score5(cards){
+  const ranks=cards.map(c=>rv(c.r)).sort((a,b)=>b-a), suits=cards.map(c=>c.s), cnt={}; for(const r of ranks) cnt[r]=(cnt[r]||0)+1;
+  const freq=Object.values(cnt).sort((a,b)=>b-a), flush=suits.every(s=>s===suits[0]), uniq=[...new Set(ranks)].sort((a,b)=>b-a);
+  let straight=uniq.length>=5&&(uniq[0]-uniq[4]===4); if(!straight&&uniq[0]===14){ const low=uniq.slice(1); if(low.length>=4&&low[0]-low[3]===3&&low[3]===2) straight=true; }
+  const base=ranks.reduce((a,r,i)=>a+r*Math.pow(15,4-i),0)/1e8, hi=ranks[0];
+  if(flush&&straight&&hi===14) return 9+base; if(flush&&straight) return 8+base; if(freq[0]===4) return 7+base; if(freq[0]===3&&freq[1]===2) return 6+base;
+  if(flush) return 5+base; if(straight) return 4+base; if(freq[0]===3) return 3+base; if(freq[0]===2&&freq[1]===2) return 2+base; if(freq[0]===2) return 1+base; return base;
 }
-function inGameApprove(id, accept){
-  wsSend({ type:'approve', id, accept });
-  delete pendingInGame[id];
-  refreshInGameJoinNotif();
-}
+function handName(s){ if(s>=9) return 'Royal Flush 👑'; if(s>=8) return 'Straight Flush'; if(s>=7) return 'Four of a Kind'; if(s>=6) return 'Full House'; if(s>=5) return 'Flush'; if(s>=4) return 'Straight'; if(s>=3) return 'Three of a Kind'; if(s>=2) return 'Two Pair'; if(s>=1) return 'One Pair'; return 'High Card'; }
+function handStrength(hole,comm){ if(!hole.length) return 0.3; const vals=hole.map(c=>rv(c.r)), mx=Math.max(...vals), paired=hole.length===2&&hole[0].r===hole[1].r, suited=hole.length===2&&hole[0].s===hole[1].s; if(!comm.length){ if(paired) return 0.5+(mx/14)*0.38; if(suited&&mx>=11) return 0.56; if(mx===14) return 0.54; return 0.18+(mx/14)*0.30; } return Math.min(evalBest([...hole,...comm])/8,1.0); }
 
-// Turn indicator (centre screen, doesn't cover cards)
-function showTurnIndicator(txt){
-  const el=document.getElementById('turnIndicator');
-  el.textContent=txt; el.style.display='block';
-}
-function hideTurnIndicator(){
-  document.getElementById('turnIndicator').style.display='none';
-}
+// Animations
+function animDeal(mesh,target,done){ const start=mesh.position.clone(), mid=new BABYLON.Vector3((start.x+target.x)*0.5,start.y+3.0,(start.z+target.z)*0.5), a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:12,value:mid},{frame:28,value:target}],'easeout'); scene.stopAnimation(mesh); mesh.animations=[a]; scene.beginAnimation(mesh,0,28,false,1.5,done||null); }
+function flipUp(mesh,frontMat,done){ const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:11,value:0}],'easein'); scene.stopAnimation(mesh); mesh.animations=[a1]; scene.beginAnimation(mesh,0,11,false,1,()=>{ mesh.material=frontMat; const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:11,value:1}],'easeout'); scene.stopAnimation(mesh); mesh.animations=[a2]; scene.beginAnimation(mesh,0,11,false,1,done||null); }); }
+function mkAnim(prop,type,keys,easeType){ const a=new BABYLON.Animation('an_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT); a.setKeys(keys); const e=easeType==='easein'?new BABYLON.QuadraticEase():new BABYLON.CubicEase(); e.setEasingMode(easeType==='easein'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT); a.setEasingFunction(e); return a; }
+function animChips(seat,amount,done){ const pos=seatPos(seat), n=Math.min(Math.ceil(amount/BB),7); let rem=n; for(let i=0;i<n;i++){ const chip=getChipForVal(amount); potChips.push(chip); chip.position=pos.clone(); chip.position.y+=0.40+i*0.06; const angle=Math.random()*Math.PI*2, dr=Math.random()*0.55, target=new BABYLON.Vector3(Math.cos(angle)*dr,0.30+potChips.length*0.075,Math.sin(angle)*dr), start=chip.position.clone(), mid=new BABYLON.Vector3((start.x+target.x)*0.5,start.y+1.8,(start.z+target.z)*0.5), a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:12,value:mid},{frame:24,value:target}],'easeout'); chip.animations=[a]; setTimeout(()=>{ scene.beginAnimation(chip,0,24,false,1.3,()=>{ snd_chip(); rem--; if(rem===0&&done)done(); }); },i*75); } if(n===0&&done) setTimeout(done,80); }
+function chipsFlyToWinner(winSeat,done){ const wp=seatPos(winSeat); wp.y+=0.6; let rem=potChips.length; if(!rem){ if(done)done(); return; } for(const chip of potChips){ const start=chip.position.clone(), mid=new BABYLON.Vector3((start.x+wp.x)*0.5,start.y+2.2,(start.z+wp.z)*0.5), a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:9,value:mid},{frame:20,value:wp}],'easein'); chip.animations=[a]; scene.beginAnimation(chip,0,20,false,1.4,()=>{ snd_chip(); freeChip(chip); rem--; if(rem===0){ potChips=[]; if(done)done(); } }); } }
 
-// ─────────────────────────────────────────────────────
-// In-game UI helpers
-// ─────────────────────────────────────────────────────
-function setActions(v){
-  document.getElementById('actions').style.display=v?'flex':'none';
-}
-function setPhase(p){
-  document.getElementById('phase').textContent=p.toUpperCase();
-}
-function showMsg(m,ms=2400){
-  const el=document.getElementById('msg');
-  el.textContent=m; el.style.display=m?'block':'none';
-  if(ms>0) setTimeout(()=>el.style.display='none',ms);
-}
-function addChat(txt){
-  const log=document.getElementById('chatLog');
-  const div=document.createElement('div');
-  div.textContent=txt;
-  log.appendChild(div);
-  log.scrollTop=log.scrollHeight;
-  while(log.children.length>60) log.removeChild(log.firstChild);
-}
+// UI
+function setBtns(v){ document.getElementById('actions').style.display=v?'flex':'none'; }
+function setPhase(p){ document.getElementById('phase').textContent=p.toUpperCase(); }
+function showMsg(m,ms=2400){ const el=document.getElementById('msg'); el.textContent=m; el.style.display=m?'block':'none'; if(ms>0) setTimeout(()=>el.style.display='none',ms); }
+function refreshUI(){ const hp=G.players[0]; document.getElementById('pot').textContent='POT: £'+(G.pot/100).toFixed(2); document.getElementById('chips').textContent='YOUR CHIPS: £'+(hp.chips/100).toFixed(2); }
+document.getElementById('callBtn').onclick=()=>{ ensureAudio(); setBtns(false); showMsg(''); const p=G.players[0], a=Math.min(G.currentBet-p.bet,p.chips); p.chips-=a; p.bet+=a; G.pot+=a; refreshUI(); animChips(0,a,()=>acted(0,false)); };
+document.getElementById('raiseBtn').onclick=()=>{ ensureAudio(); setBtns(false); showMsg(''); const p=G.players[0], minR=BB*2, inputVal=Math.round(parseFloat(document.getElementById('raiseAmt').value)*100)||minR, r=Math.min(Math.max(inputVal,minR),p.chips); p.chips-=r; p.bet+=r; G.pot+=r; G.currentBet=Math.max(G.currentBet,p.bet); refreshUI(); animChips(0,r,()=>acted(0,true)); };
+document.getElementById('foldBtn').onclick=()=>{ ensureAudio(); setBtns(false); showMsg(''); G.players[0].folded=true; refreshUI(); acted(0,false); };
+document.getElementById('brightSlider').oninput=(e)=>{ if(spotLight) spotLight.intensity=parseFloat(e.target.value); };
 
-let handNumber=0;
-function addLog(txt, cls='log-action'){
-  const log=document.getElementById('activityLog');
-  if(!log) return;
-  const div=document.createElement('div');
-  div.className=cls; div.textContent=txt;
-  log.appendChild(div);
-  log.scrollTop=log.scrollHeight;
-  while(log.children.length>200) log.removeChild(log.firstChild);
-}
-
-let activityCollapsed=false;
-function toggleActivityLog(){
-  activityCollapsed=!activityCollapsed;
-  const logEl=document.getElementById('activityLog');
-  const toggle=document.getElementById('activityToggle');
-  logEl.style.display=activityCollapsed?'none':'flex';
-  toggle.textContent=activityCollapsed?'▶ maximise':'▼ minimise';
-}
-
-// ─────────────────────────────────────────────────────
-// Action buttons
-// ─────────────────────────────────────────────────────
-document.getElementById('callBtn').onclick=()=>{
-  ensureAudio(); setActions(false); showMsg('');
-  wsSend({ type:'action', action:'call' });
-};
-document.getElementById('raiseBtn').onclick=()=>{
-  ensureAudio(); setActions(false); showMsg('');
-  const val=Math.round(parseFloat(document.getElementById('raiseAmt').value)*100)||40;
-  wsSend({ type:'action', action:'raise', amount:val });
-};
-document.getElementById('foldBtn').onclick=()=>{
-  ensureAudio(); setActions(false); showMsg('');
-  wsSend({ type:'action', action:'fold' });
-};
-
-document.getElementById('chatInput').addEventListener('keydown', e=>{
-  if(e.key==='Enter'){
-    const t=e.target.value.trim();
-    if(t){ wsSend({ type:'chat', text:t }); e.target.value=''; }
-  }
-});
-
-document.getElementById('brightSlider').oninput=(e)=>{
-  if(spotLight) spotLight.intensity=parseFloat(e.target.value);
-};
-
-// ─────────────────────────────────────────────────────
-// Start button
-// ─────────────────────────────────────────────────────
-document.getElementById('startBtn').onclick=()=>{
-  wsSend({ type:'startGame' });
-};
-
-// ─────────────────────────────────────────────────────
-// Login form
-// ─────────────────────────────────────────────────────
-document.getElementById('joinBtn').onclick=()=>{
-  const name=document.getElementById('nameInput').value.trim();
-  const room=document.getElementById('roomInput').value.trim();
-  if(!name){ document.getElementById('loginErr').textContent='Please enter your name.'; return; }
-  if(!room){ document.getElementById('loginErr').textContent='Please enter a room number.'; return; }
-  document.getElementById('loginErr').textContent='';
-  document.getElementById('loginOverlay').style.display='none';
-  document.getElementById('waitingOverlay').style.display='flex';
-  document.getElementById('waitingTxt').textContent='Connecting…';
-  myRoomId=room;
-  if(!myId){ myId='p_'+Math.random().toString(36).slice(2,10); localStorage.setItem('pokerPlayerId',myId); }
-  connectWS(name, room, myId);
-};
-
-// Allow Enter key on inputs
-['nameInput','roomInput'].forEach(id=>{
-  document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('joinBtn').click(); });
-});
-
-// ═══════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════
-const scn=createScene();
-engine.runRenderLoop(()=>scn.render());
+const s=createScene();
+engine.runRenderLoop(()=>s.render());
 </script>
 </body>
 </html>
