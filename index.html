@@ -441,7 +441,7 @@ const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true});
 window.addEventListener('resize',()=>engine.resize());
 
-let scene,gui,shadowGen;
+let scene,gui,shadowGen,spotLight;
 let cardBackMat,cardFrontMats={};
 let cardPool=[],cardIdx=0;
 let chipPool=[],potChips=[];
@@ -480,17 +480,17 @@ function mkCamera(){
 // ── Lights ────────────────────────────────────────────────
 function mkLights(){
   const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
-  h.intensity=0.10; h.diffuse=new BABYLON.Color3(0.45,0.38,0.55);
-  h.groundColor=new BABYLON.Color3(0.04,0.02,0.05);
-  const spot=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),
+  h.intensity=0.18; h.diffuse=new BABYLON.Color3(0.50,0.45,0.60);
+  h.groundColor=new BABYLON.Color3(0.06,0.04,0.08);
+  spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),
     new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.5,scene);
-  spot.intensity=2.8; spot.diffuse=new BABYLON.Color3(1,0.93,0.72);
-  shadowGen=new BABYLON.ShadowGenerator(2048,spot);
+  spotLight.intensity=1.8; spotLight.diffuse=new BABYLON.Color3(1,0.96,0.85);
+  shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);
   shadowGen.useBlurExponentialShadowMap=true; shadowGen.blurKernel=12;
-  mkPt(-7,4,0,0.5,new BABYLON.Color3(0.7,0.55,0.9));
-  mkPt( 7,4,0,0.5,new BABYLON.Color3(1,0.78,0.45));
-  mkPt( 0,3,-9,0.3,new BABYLON.Color3(0.2,0.35,1));
-  mkPt( 0,3, 9,0.25,new BABYLON.Color3(1,0.5,0.2));
+  mkPt(-7,4,0,0.4,new BABYLON.Color3(0.6,0.50,0.85));
+  mkPt( 7,4,0,0.4,new BABYLON.Color3(0.9,0.70,0.40));
+  mkPt( 0,3,-9,0.25,new BABYLON.Color3(0.2,0.32,0.9));
+  mkPt( 0,3, 9,0.20,new BABYLON.Color3(0.9,0.45,0.18));
 }
 function mkPt(x,y,z,i,col){
   const l=new BABYLON.PointLight('pl',new BABYLON.Vector3(x,y,z),scene);
@@ -512,24 +512,25 @@ function mkTable(){
   const T=96;
   const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.44,diameter:12.0,tessellation:T},scene);
   base.scaling.x=TRX/6.0; base.scaling.z=TRZ/6.0; base.position.y=-0.01;
-  applyStdMat(base,0.11,0.055,0.026, 0.5,0.32,0.10, 160);
+  applyStdMat(base,0.18,0.09,0.04, 0.5,0.32,0.10, 160);
 
   const rail=BABYLON.MeshBuilder.CreateTorus('rail',
     {diameter:11.4,thickness:0.38,tessellation:T,radialSegments:20},scene);
   rail.scaling.x=TRX/(11.4/2)*0.97; rail.scaling.z=TRZ/(11.4/2)*0.97; rail.position.y=0.18;
   const rm=new BABYLON.StandardMaterial('rm',scene);
-  rm.diffuseColor=new BABYLON.Color3(0.70,0.50,0.05);
+  rm.diffuseColor=new BABYLON.Color3(0.72,0.54,0.08);
   rm.specularColor=new BABYLON.Color3(1,0.88,0.32); rm.specularPower=300;
-  rm.emissiveColor=new BABYLON.Color3(0.10,0.07,0.006); rail.material=rm;
+  rm.emissiveColor=new BABYLON.Color3(0.08,0.06,0.006); rail.material=rm;
 
+  // Bright green felt like reference
   const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
   felt.scaling.x=TRX/(10.8/2)*0.90; felt.scaling.z=TRZ/(10.8/2)*0.90; felt.position.y=0.22;
-  applyStdMat(felt,0.04,0.11,0.30, 0.01,0.01,0.04, 5); felt.receiveShadows=true;
+  applyStdMat(felt,0.08,0.52,0.18, 0.02,0.08,0.04, 8); felt.receiveShadows=true;
 
-  // Gold logo disc (no zone inlay — removed to fix black line)
+  // Center logo disc
   const logo=BABYLON.MeshBuilder.CreateDisc('logo',{radius:1.6,tessellation:T},scene);
   logo.rotation.x=Math.PI/2; logo.position.y=0.258;
-  applyStdMat(logo,0.50,0.36,0.02, 1,0.82,0.22, 512, new BABYLON.Color3(0.07,0.05,0.002));
+  applyStdMat(logo,0.06,0.40,0.14, 0.02,0.06,0.02, 12);
 }
 
 function applyStdMat(mesh,dr,dg,db, sr,sg,sb, spow, emit){
@@ -546,12 +547,12 @@ function applyStdMat(mesh,dr,dg,db, sr,sg,sb, spow, emit){
 function buildCardMats(){
   cardBackMat=new BABYLON.StandardMaterial('back',scene);
   cardBackMat.diffuseTexture=mkBackTex();
-  cardBackMat.specularColor=new BABYLON.Color3(0.6,0.6,0.6);
-  cardBackMat.specularPower=90; cardBackMat.backFaceCulling=false;
+  cardBackMat.specularColor=new BABYLON.Color3(0.15,0.15,0.15);
+  cardBackMat.specularPower=30; cardBackMat.backFaceCulling=false;
   for(const s of SUITS) for(const r of RANKS){
     const k=r+s; const m=new BABYLON.StandardMaterial('f'+k,scene);
     m.diffuseTexture=mkFrontTex(s,r);
-    m.specularColor=new BABYLON.Color3(0.45,0.45,0.45); m.specularPower=60;
+    m.specularColor=new BABYLON.Color3(0.10,0.10,0.10); m.specularPower=20;
     m.backFaceCulling=false; cardFrontMats[k]=m;
   }
 }
@@ -578,50 +579,50 @@ function mkFrontTex(suit,rank){
   const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
   const c=tex.getContext();
   const isRed=suit==='♥'||suit==='♦';
-  const col=isRed?'#cc0000':'#0d0820';
-  const bg=c.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#fefcf8'); bg.addColorStop(1,'#f5f0e8');
-  c.fillStyle=bg; c.fillRect(0,0,W,H);
-  c.strokeStyle='#c8bfaa'; c.lineWidth=4; rrect(c,2,2,W-4,H-4,14); c.stroke();
-  c.strokeStyle='rgba(180,170,150,0.4)'; c.lineWidth=8; rrect(c,6,6,W-12,H-12,11); c.stroke();
-  c.fillStyle=col;
-  const big=rank==='10';
-  c.font=`bold ${big?34:40}px Georgia,serif`; c.textAlign='left'; c.textBaseline='top';
-  c.fillText(rank,13,8);
-  c.font=`${big?22:26}px Georgia,serif`; c.fillText(suit,big?14:16,big?48:54);
+  const col=isRed?'#d00':'#000';
+
+  // Pure white background
+  c.fillStyle='#fff'; c.fillRect(0,0,W,H);
+  
+  // Simple border
+  c.strokeStyle='#ddd'; c.lineWidth=3; c.strokeRect(1.5,1.5,W-3,H-3);
+
+  // Top-left corner index
+  c.fillStyle=col; c.textAlign='left'; c.textBaseline='top';
+  c.font='bold 52px Arial,sans-serif'; c.fillText(rank,16,12);
+  c.font='42px Arial,sans-serif'; c.fillText(suit,rank==='10'?18:20,rank==='10'?68:72);
+
+  // Bottom-right corner index (rotated)
   c.save(); c.translate(W,H); c.rotate(Math.PI);
-  c.font=`bold ${big?34:40}px Georgia,serif`; c.textAlign='left'; c.textBaseline='top';
-  c.fillText(rank,13,8);
-  c.font=`${big?22:26}px Georgia,serif`; c.fillText(suit,big?14:16,big?48:54);
+  c.font='bold 52px Arial,sans-serif'; c.fillText(rank,16,12);
+  c.font='42px Arial,sans-serif'; c.fillText(suit,rank==='10'?18:20,rank==='10'?68:72);
   c.restore();
-  if(rank==='A') drawAce(c,W,H,suit,col);
-  else if(['J','Q','K'].includes(rank)) drawFaceCard(c,W,H,suit,rank,col);
-  else drawPips(c,W,H,suit,rank,col);
+
+  // Center design
+  if(rank==='A'){
+    // Large centered suit for Ace
+    c.fillStyle=col; c.font='160px Arial,sans-serif';
+    c.textAlign='center'; c.textBaseline='middle';
+    c.fillText(suit,W/2,H/2);
+  } else if(['J','Q','K'].includes(rank)){
+    // Face cards - large letter + suit
+    c.fillStyle=col; c.textAlign='center'; c.textBaseline='middle';
+    c.font='bold 120px Arial,sans-serif'; c.fillText(rank,W/2,H/2-20);
+    c.font='56px Arial,sans-serif'; c.fillText(suit,W/2,H/2+70);
+  } else {
+    // Pip cards
+    drawPips(c,W,H,suit,rank,col);
+  }
+
   tex.update(); return tex;
-}
-function drawAce(c,W,H,suit,col){
-  c.fillStyle=col; c.font='bold 130px Georgia,serif';
-  c.textAlign='center'; c.textBaseline='middle'; c.fillText(suit,W/2,H/2+8);
-  c.strokeStyle=col; c.lineWidth=3; c.globalAlpha=0.15;
-  c.beginPath(); c.arc(W/2,H/2+8,72,0,Math.PI*2); c.stroke();
-  c.beginPath(); c.arc(W/2,H/2+8,80,0,Math.PI*2); c.stroke(); c.globalAlpha=1;
-}
-function drawFaceCard(c,W,H,suit,rank,col){
-  c.strokeStyle=col; c.lineWidth=2; c.globalAlpha=0.2;
-  rrect(c,32,70,W-64,H-140,8); c.stroke(); c.globalAlpha=1;
-  c.fillStyle=col; c.font='bold 88px Georgia,serif';
-  c.textAlign='center'; c.textBaseline='middle'; c.fillText(rank,W/2,H/2-14);
-  c.font='40px Georgia,serif'; c.fillText(suit,W/2,H/2+62);
-  c.font='22px Georgia,serif'; c.globalAlpha=0.55;
-  c.fillText(suit,34,88); c.fillText(suit,W-34,H-76); c.globalAlpha=1;
 }
 function drawPips(c,W,H,suit,rank,col){
   const positions=PIPS[rank]; if(!positions) return;
   const n=positions.length;
-  const sz=n<=4?42:n<=6?36:n<=8?32:28;
-  c.fillStyle=col; c.font=`${sz}px Georgia,serif`;
+  const sz=n<=4?52:n<=6?46:n<=8?42:38;
+  c.fillStyle=col; c.font=`${sz}px Arial,sans-serif`;
   c.textAlign='center'; c.textBaseline='middle';
-  const aT=90,aB=H-90,aL=28,aR=W-28,aH=aB-aT,aW=aR-aL;
+  const aT=120,aB=H-120,aL=40,aR=W-40,aH=aB-aT,aW=aR-aL;
   for(const [px,py] of positions){
     const x=aL+px*aW, y=aT+py*aH;
     if(py>0.55){ c.save(); c.translate(x,y); c.rotate(Math.PI); c.fillText(suit,0,0); c.restore(); }
@@ -639,7 +640,7 @@ function rrect(c,x,y,w,h,r){
 // ═══════════════════════════════════════════════════════════
 //  CARD POOL
 // ═══════════════════════════════════════════════════════════
-const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.28,0);
+const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
 function buildCardPool(){
   for(let i=0;i<60;i++){
     const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:0.72,height:1.02},scene);
@@ -745,8 +746,8 @@ function mkUI(){
   UI.potText  =addTxt('POT: £0.00','#ffd700','bold 27px Georgia',1,0,'0px','10px');
   UI.msgText  =addTxt('','#ffffff','bold 28px Georgia',1,1,'0px','-75px');
   UI.msgText.shadowColor='rgba(0,0,0,0.9)'; UI.msgText.shadowOffsetX=2; UI.msgText.shadowOffsetY=2;
-  addRect('100%','100px',2,'rgba(0,0,0,0.86)');
-  UI.chipsText=addTxt('YOUR CHIPS: £10.00','#c8a820','bold 17px Georgia',0,2,'18px','32px');
+  addRect('100%','100px',2,'rgba(0,0,0,0.75)');
+  UI.chipsText=addTxt('YOUR CHIPS: £10.00','#c8a820','bold 17px Georgia',0,2,'18px','18px');
   UI.callBtn =mkBtn('CALL',  '#164e16','-190px','18px');
   UI.raiseBtn=mkBtn('RAISE', '#4e3a04',  '20px','18px');
   UI.foldBtn =mkBtn('FOLD',  '#4e0808', '200px','18px');
@@ -761,6 +762,38 @@ function mkUI(){
   UI.raiseInput.thickness=1; UI.raiseInput.borderColor='rgba(200,160,32,0.6)';
   gui.addControl(UI.raiseInput);
   addTxt('£ raise:','rgba(200,160,32,0.8)','13px Arial',1,2,'95px','66px');
+  
+  // Brightness slider
+  const sliderPanel = new BABYLON.GUI.StackPanel();
+  sliderPanel.width = '180px';
+  sliderPanel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+  sliderPanel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+  sliderPanel.top = '80px';
+  sliderPanel.left = '-20px';
+  gui.addControl(sliderPanel);
+
+  const brightLabel = new BABYLON.GUI.TextBlock();
+  brightLabel.text = '☀ Brightness';
+  brightLabel.height = '24px';
+  brightLabel.color = '#c8a820';
+  brightLabel.fontSize = '13px';
+  brightLabel.fontFamily = 'Arial,sans-serif';
+  sliderPanel.addControl(brightLabel);
+
+  const slider = new BABYLON.GUI.Slider();
+  slider.minimum = 0.5;
+  slider.maximum = 3.5;
+  slider.value = 1.8;
+  slider.height = '18px';
+  slider.width = '140px';
+  slider.color = '#c8a820';
+  slider.background = 'rgba(30,20,40,0.7)';
+  slider.borderColor = 'rgba(200,160,32,0.4)';
+  slider.onValueChangedObservable.add(val => {
+    if(spotLight) spotLight.intensity = val;
+  });
+  sliderPanel.addControl(slider);
+
   setBtns(false);
   // Wire buttons
   UI.callBtn.onPointerClickObservable.add(doCall);
@@ -890,11 +923,11 @@ function onCommunityDealt(msg){
   const newCards = cards.slice(alreadyDealt);
   let i = alreadyDealt;
   const communityPositions=[
-    new BABYLON.Vector3(-1.64,0.275,0),
-    new BABYLON.Vector3(-0.82,0.275,0),
-    new BABYLON.Vector3( 0.00,0.275,0),
-    new BABYLON.Vector3( 0.82,0.275,0),
-    new BABYLON.Vector3( 1.64,0.275,0),
+    new BABYLON.Vector3(-1.64,0.305,0),
+    new BABYLON.Vector3(-0.82,0.305,0),
+    new BABYLON.Vector3( 0.00,0.305,0),
+    new BABYLON.Vector3( 0.82,0.305,0),
+    new BABYLON.Vector3( 1.64,0.305,0),
   ];
   const next=()=>{
     if(!newCards.length) return;
@@ -970,7 +1003,7 @@ function cardPos(si,cn){
   const off=(cn-0.5)*0.50;
   return new BABYLON.Vector3(
     Math.cos(a)*rx+Math.cos(pa)*off,
-    0.268+cn*0.001,
+    0.30+cn*0.002,
     Math.sin(a)*rz+Math.sin(pa)*off
   );
 }
@@ -1010,9 +1043,9 @@ function animChips(seat,amount,done){
   const n=Math.min(Math.ceil(amount/BB),7); let rem=n;
   for(let i=0;i<n;i++){
     const chip=getChipForVal(amount); potChips.push(chip);
-    chip.position=pos.clone(); chip.position.y+=0.35+i*0.06;
+    chip.position=pos.clone(); chip.position.y+=0.40+i*0.06;
     const angle=Math.random()*Math.PI*2, dr=Math.random()*0.55;
-    const target=new BABYLON.Vector3(Math.cos(angle)*dr,0.26+potChips.length*0.075,Math.sin(angle)*dr);
+    const target=new BABYLON.Vector3(Math.cos(angle)*dr,0.30+potChips.length*0.075,Math.sin(angle)*dr);
     const start=chip.position.clone();
     const mid=new BABYLON.Vector3((start.x+target.x)*0.5,start.y+1.8,(start.z+target.z)*0.5);
     const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
