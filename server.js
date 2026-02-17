@@ -14,11 +14,26 @@ const SB    = 10, BB = 20;
 const START_CHIPS = 1000;   // pence
 
 // ═══════════════════════════════════════════════════════════
-//  HTTP server (Render needs an HTTP listener)
+//  HTTP server (serves the HTML game)
 // ═══════════════════════════════════════════════════════════
+const fs = require('fs');
+const path = require('path');
+
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Vegas Poker Server\n');
+  if (req.url === '/' || req.url === '/index.html') {
+    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading game');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(data);
+    });
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
+  }
 });
 
 const wss = new WebSocketServer({ server });
