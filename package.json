@@ -1,18 +1,15 @@
 {
-  "name": "poker-game",
+  "name": "vegas-poker-server",
   "version": "1.0.0",
-  "description": "Texas Hold'em Poker Game",
+  "description": "WebSocket game server for Vegas Poker",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.5.4",
-    "nodemailer": "^6.9.7",
-    "basic-ftp": "^5.0.3"
+    "ws": "^8.16.0"
   }
 }
