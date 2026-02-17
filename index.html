@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SYFM Poker</title>
+<title>Vegas Poker</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
@@ -92,20 +92,40 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   pointer-events:none;
 }
 #chatBox{
-  position:absolute;bottom:110px;left:10px;width:260px;
-  background:rgba(0,0,0,0.65);border-radius:8px;padding:10px;
+  position:absolute;bottom:110px;right:10px;width:240px;
+  background:rgba(0,0,0,0.70);border-radius:8px;padding:10px;
   border:1px solid #3a2a10;
 }
 #chatLog{
-  height:120px;overflow-y:auto;font-size:12px;color:#c8c8a0;
+  height:100px;overflow-y:auto;font-size:12px;color:#c8c8a0;
   margin-bottom:6px;display:flex;flex-direction:column;gap:3px;
 }
 #chatInput{
   width:100%;padding:6px 10px;border-radius:4px;border:1px solid #4a3a15;
   background:rgba(0,0,0,0.7);color:#ffd700;font-size:12px;
 }
+#activityBox{
+  position:absolute;bottom:110px;left:10px;width:270px;
+  background:rgba(0,0,0,0.70);border-radius:8px;
+  border:1px solid #2a3a1a;
+}
+#activityHeader{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 12px;cursor:pointer;color:#60c840;font-size:12px;font-weight:bold;
+  user-select:none;
+}
+#activityHeader span{color:#a0d070;font-size:11px}
+#activityLog{
+  height:160px;overflow-y:auto;font-size:11px;color:#b0d890;
+  padding:6px 10px 8px;display:flex;flex-direction:column;gap:2px;
+  border-top:1px solid #1a2a10;
+}
+#activityLog .log-hand{color:#ffd700;font-weight:bold;margin-top:4px}
+#activityLog .log-action{color:#90c870}
+#activityLog .log-win{color:#40e870;font-weight:bold}
+#activityLog .log-community{color:#a0b8ff}
 #brightness{
-  position:absolute;top:70px;right:14px;background:rgba(0,0,0,0.65);
+  position:absolute;top:70px;left:14px;background:rgba(0,0,0,0.65);
   padding:10px 14px;border-radius:8px;color:#c8a820;
 }
 #brightness label{display:block;font-size:11px;margin-bottom:4px}
@@ -117,9 +137,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   border:1px solid #6a5010;pointer-events:none;
 }
 #joinRequestNotif{
-  position:absolute;top:70px;right:14px;background:rgba(10,40,10,0.95);
+  position:absolute;top:70px;right:260px;background:rgba(10,40,10,0.95);
   padding:14px 18px;border-radius:10px;color:#e0e0e0;font-size:14px;
-  display:none;border:1px solid #20a040;min-width:220px;
+  display:none;border:1px solid #20a040;min-width:220px;z-index:10;
 }
 #joinRequestNotif h4{color:#40e060;margin-bottom:8px;font-size:15px}
 #joinReqList{display:flex;flex-direction:column;gap:6px}
@@ -144,7 +164,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <!-- ══ LOGIN ══ -->
 <div id="loginOverlay" class="overlay">
   <div class="panel">
-    <h1>🃏 SYFM POKER</h1>
+    <h1>🃏 VEGAS POKER</h1>
     <p>Enter your name and a room number to play</p>
     <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
     <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
@@ -199,9 +219,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="joinReqList"></div>
   </div>
   <div id="turnIndicator"></div>
+  <div id="activityBox">
+    <div id="activityHeader" onclick="toggleActivityLog()">
+      📋 ACTIVITY LOG <span id="activityToggle">▼ minimise</span>
+    </div>
+    <div id="activityLog"></div>
+  </div>
   <div id="chatBox">
+    <div style="font-size:11px;color:#c8a060;margin-bottom:5px;font-weight:bold">💬 CHAT</div>
     <div id="chatLog"></div>
-    <input type="text" id="chatInput" placeholder="Chat…" maxlength="100">
+    <input type="text" id="chatInput" placeholder="Type and press Enter…" maxlength="100">
   </div>
   <div id="brightness">
     <label>☀ Brightness</label>
@@ -252,6 +279,19 @@ function snd_win(){
     o.connect(g); g.connect(audioCtx.destination); o.start(t+i*0.10); o.stop(t+i*0.10+0.6);
   });
 }
+function snd_joinAlert(){
+  ensureAudio(); const t=audioCtx.currentTime;
+  // Two distinct rising beeps
+  [[0,880],[0.22,1100]].forEach(([delay,freq])=>{
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(freq*0.8,t+delay);
+    o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);
+    g.gain.setValueAtTime(0,t+delay); g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);
+    g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t+delay); o.stop(t+delay+0.3);
+  });
+}
 
 // ═══════════════════════════════════════════════════════════
 //  CONSTANTS
@@ -294,11 +334,12 @@ let dealerToken=null, sbToken=null, bbToken=null;
 // Seat & card positions
 // ────────────────────────────────────────────────────
 function seatPos(i){
-  const a=Math.PI/2+(i/NP)*Math.PI*2;
+  // -PI/2 puts seat 0 nearest camera (bottom). Positive increment = clockwise from camera view.
+  const a=-Math.PI/2+(i/NP)*Math.PI*2;
   return new BABYLON.Vector3(Math.cos(a)*SRX, 0.26, Math.sin(a)*SRZ);
 }
 function cardPos(si, cn){
-  const a=Math.PI/2+(si/NP)*Math.PI*2, rx=TRX*0.70, rz=TRZ*0.70;
+  const a=-Math.PI/2+(si/NP)*Math.PI*2, rx=TRX*0.70, rz=TRZ*0.70;
   const pa=a+Math.PI/2, off=(cn-0.5)*0.55;
   return new BABYLON.Vector3(Math.cos(a)*rx+Math.cos(pa)*off, 0.30+cn*0.003, Math.sin(a)*rz+Math.sin(pa)*off);
 }
@@ -347,67 +388,95 @@ function mkBackTex(){
 }
 
 function mkFrontTex(suit,rank){
-  const W=256,H=384,tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true),c=tex.getContext();
-  const isRed=suit==='♥'||suit==='♦', col=isRed?'#cc0000':'#111111';
+  const W=320,H=450;
+  const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
+  const c=tex.getContext();
+  const isRed=suit==='♥'||suit==='♦';
+  const col=isRed?'#cc0000':'#111111';
+  const suitLetter={♠:'S',♥:'H',♦:'D',♣:'C'}[suit];
 
-  // White card face with slight warm tint
+  // ── Card face ──
   c.fillStyle='#fefefe'; c.fillRect(0,0,W,H);
-  // Border
-  c.strokeStyle='#cccccc'; c.lineWidth=4; c.strokeRect(2,2,W-4,H-4);
+  // Rounded-looking border lines
+  c.strokeStyle='#bbbbbb'; c.lineWidth=5; c.strokeRect(2.5,2.5,W-5,H-5);
+  c.strokeStyle='#dddddd'; c.lineWidth=1.5; c.strokeRect(9,9,W-18,H-18);
 
-  // ── Top-left corner pip ──
-  // Rank
-  const rFontSize = rank==='10' ? 42 : 48;
-  c.fillStyle=col; c.textAlign='center'; c.textBaseline='top';
-  c.font=`bold ${rFontSize}px Arial`;
-  c.fillText(rank, rank==='10'?30:26, 8);
-  // Suit below rank (corner)
-  c.font='34px Arial';
-  c.fillText(suit, 26, rank==='10'?52:58);
+  // ── TOP-LEFT corner: Rank big + suit symbol ──
+  c.fillStyle=col;
+  c.textAlign='center'; c.textBaseline='top';
+  const rnkSize = rank==='10'?52:58;
+  c.font=`bold ${rnkSize}px Arial`;
+  const rnkX = rank==='10'?34:29;
+  c.fillText(rank, rnkX, 10);
+  c.font='38px Arial';
+  c.fillText(suit, 29, rank==='10'?66:72);
 
-  // ── Bottom-right corner (rotate 180) ──
+  // ── TOP-RIGHT corner: suit LETTER (H/S/D/C) ──
+  c.fillStyle=col;
+  c.textAlign='center'; c.textBaseline='top';
+  c.font=`bold 36px Arial`;
+  c.fillText(suitLetter, W-26, 12);
+  // small suit symbol below letter
+  c.font='26px Arial';
+  c.fillText(suit, W-26, 52);
+
+  // ── BOTTOM-RIGHT corner (rotated 180°): rank + suit symbol ──
   c.save();
   c.translate(W,H); c.rotate(Math.PI);
-  c.font=`bold ${rFontSize}px Arial`;
-  c.fillText(rank, rank==='10'?30:26, 8);
-  c.font='34px Arial';
-  c.fillText(suit, 26, rank==='10'?52:58);
+  c.fillStyle=col;
+  c.textAlign='center'; c.textBaseline='top';
+  c.font=`bold ${rnkSize}px Arial`;
+  c.fillText(rank, rnkX, 10);
+  c.font='38px Arial';
+  c.fillText(suit, 29, rank==='10'?66:72);
+  c.restore();
+
+  // ── BOTTOM-LEFT corner (rotated 180°): suit LETTER ──
+  c.save();
+  c.translate(W,H); c.rotate(Math.PI);
+  c.fillStyle=col;
+  c.textAlign='center'; c.textBaseline='top';
+  c.font=`bold 36px Arial`;
+  c.fillText(suitLetter, W-26, 12);
+  c.font='26px Arial';
+  c.fillText(suit, W-26, 52);
   c.restore();
 
   // ── Centre of card ──
   if(rank==='A'){
-    c.fillStyle=col; c.font='200px Arial';
+    c.fillStyle=col; c.font='220px Arial';
     c.textAlign='center'; c.textBaseline='middle';
     c.fillText(suit, W/2, H/2+8);
 
   } else if(['J','Q','K'].includes(rank)){
-    // Coloured background rectangle
-    c.fillStyle=isRed?'#fff0f0':'#f0f0ff';
-    c.fillRect(18,90,W-36,H-180);
+    // Tinted panel
+    c.fillStyle=isRed?'#fff4f4':'#f4f4ff';
+    c.fillRect(16,105,W-32,H-210);
+    c.strokeStyle=col+'33'; c.lineWidth=2;
+    c.strokeRect(18,107,W-36,H-214);
 
-    // Decorative border around face area
-    c.strokeStyle=col+'44'; c.lineWidth=2;
-    c.strokeRect(20,92,W-40,H-184);
-
-    // Large face letter
-    c.fillStyle=col; c.font=`bold 110px Georgia,serif`;
+    // Big serif rank letter centred
+    c.fillStyle=col; c.font=`bold 130px Georgia,serif`;
     c.textAlign='center'; c.textBaseline='middle';
-    c.fillText(rank, W/2, H/2-18);
+    c.fillText(rank, W/2, H/2-20);
 
-    // Large suit symbol below
-    c.font='64px Arial';
-    c.fillText(suit, W/2, H/2+80);
+    // Suit below
+    c.font='72px Arial';
+    c.fillText(suit, W/2, H/2+90);
 
-    // Corner decorations
-    c.font='22px Arial'; c.fillStyle=col+'88';
-    c.fillText(suit,14,H-72); c.fillText(suit,W-14,96);
+    // Four corner suit symbols in the panel
+    c.font='28px Arial'; c.fillStyle=col+'66';
+    c.fillText(suit,22,H-100); c.fillText(suit,W-22,110);
+    c.save(); c.translate(W,H); c.rotate(Math.PI);
+    c.fillText(suit,22,H-100); c.fillText(suit,W-22,110);
+    c.restore();
 
   } else {
-    // Pip card – use layout grid
+    // ── Pip card – proper pip layout ──
     const pips=PIP_LAYOUTS[rank]||[];
-    const ax=W*0.12, ay=H*0.16, aw=W*0.76, ah=H*0.68;
-    // Pip font size scales with count
-    const pSize = pips.length<=4 ? 64 : pips.length<=6 ? 52 : pips.length<=8 ? 46 : 40;
+    // pip area: inner portion of card excluding corners
+    const ax=W*0.13, ay=H*0.17, aw=W*0.74, ah=H*0.66;
+    const pSize = pips.length<=4?72 : pips.length<=6?60 : pips.length<=8?52 : 44;
     c.fillStyle=col; c.font=`${pSize}px Arial`;
     c.textAlign='center'; c.textBaseline='middle';
     for(const[fx,fy] of pips){
@@ -438,7 +507,7 @@ function buildCardMats(){
 // ────────────────────────────────────────────────────
 function buildCardPool(){
   for(let i=0;i<80;i++){
-    const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:0.72,height:1.02},scene);
+    const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.0,height:1.40},scene);
     m.rotation.x=Math.PI/2; m.position=DECK_POS(); m.material=cardBackMat;
     m.isVisible=false; m.renderingGroupId=1;
     shadowGen.addShadowCaster(m); cardPool.push(m);
@@ -508,7 +577,7 @@ function buildTokens(){
     const dm=new BABYLON.StandardMaterial(name+'dm',scene);
     dm.diffuseTexture=discTex; dm.emissiveColor=new BABYLON.Color3(1,1,1);
     dm.disableLighting=true; dm.backFaceCulling=false;
-    disc.material=dm; disc.rotation.x=Math.PI/2;
+    disc.material=dm; disc.rotation.x=-Math.PI/2;  // front face UP
     disc.position.y=0.07; disc.parent=tok; disc.renderingGroupId=2;
     return tok;
   }
@@ -520,11 +589,11 @@ function buildTokens(){
 function positionTokens(dSeat, sbSeat, bbSeat){
   function placeToken(tok, seat){
     if(seat===null||seat===undefined){ tok.isVisible=false; return; }
-    const a=Math.PI/2+(seat/NP)*Math.PI*2;
-    const rx=TRX*0.58, rz=TRZ*0.58;
-    // offset clockwise slightly so it doesn't overlap cards
-    const oa=a-0.28;
-    tok.position=new BABYLON.Vector3(Math.cos(oa)*rx, 0.35, Math.sin(oa)*rz);
+    const a=-Math.PI/2+(seat/NP)*Math.PI*2;
+    const rx=TRX*0.56, rz=TRZ*0.56;
+    // Offset anticlockwise slightly to avoid card overlap
+    const oa=a+0.30;
+    tok.position=new BABYLON.Vector3(Math.cos(oa)*rx, 0.36, Math.sin(oa)*rz);
     tok.isVisible=true;
   }
   placeToken(dealerToken, dSeat);
@@ -932,10 +1001,9 @@ function handleServerMsg(msg){
     case 'joinRequest':
       // Show in-game popup if we are host (may be in game or lobby)
       if(isHost){
+        ensureAudio(); snd_joinAlert();
         addInGameJoinRequest(msg.id, msg.name);
-        // Also re-render lobby if open
         if(document.getElementById('lobbyOverlay').style.display!=='none' && lastLobbyMsg){
-          // add to pending manually so lobby shows it
           if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))
             lastLobbyMsg.pending.push({id:msg.id,name:msg.name});
           renderLobby(lastLobbyMsg);
@@ -946,6 +1014,7 @@ function handleServerMsg(msg){
     case 'winner':
       snd_win();
       hideTurnIndicator();
+      addLog(`🏆 ${msg.name} wins £${(msg.amount/100).toFixed(2)} — ${msg.label||''}`, 'log-win');
       showMsg(`🏆 ${msg.name} wins £${(msg.amount/100).toFixed(2)}\n${msg.label||''}!`, 0);
       chipsFlyToWinner(msg.seat, ()=>{});
       setTimeout(()=>showMsg(''),5500);
@@ -963,9 +1032,10 @@ function handleServerMsg(msg){
       setActions(false);
       hideTurnIndicator();
       document.getElementById('waitingMsg').style.display='none';
-      // Position D/SB/BB tokens
+      handNumber++;
+      addLog(`━━ Hand #${handNumber} | Dealer: Seat ${(msg.dealerSeat+1)} ━━`, 'log-hand');
+      addLog(`SB: Seat ${msg.sbSeat+1} · BB: Seat ${msg.bbSeat+1}`);
       positionTokens(msg.dealerSeat, msg.sbSeat, msg.bbSeat);
-      // Start deal animation; state will be applied via 'state' message
       startDealAnimation(msg.activeSeats||[], ()=>{
         if(lastState) applyState(lastState);
       });
@@ -977,12 +1047,11 @@ function handleServerMsg(msg){
       break;
 
     case 'playerAction': {
-      const name=msg.name||'Player';
+      const pname=msg.name||'Player';
       const ac=msg.action==='fold'?'FOLD': msg.action==='check'?'CHECK': msg.action==='call'?`CALL £${((msg.amount||0)/100).toFixed(2)}`: `RAISE £${((msg.amount||0)/100).toFixed(2)}`;
       seatActions[msg.seat]=ac;
-      addChat(`${name}: ${ac}`);
+      addLog(`${pname}: ${ac}`);
       if(msg.amount>0) animChips(msg.seat, msg.amount, null);
-      // Hide turn indicator once action taken
       hideTurnIndicator();
       if(lastState) applyState(lastState);
       break;
@@ -1009,12 +1078,13 @@ function handleServerMsg(msg){
     }
 
     case 'communityDealt':
-      // State message handles actual cards; 'state' triggers animation via applyState
+      if(msg.phase) addLog(`▶ ${msg.phase.toUpperCase()}: ${(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' ')}`, 'log-community');
       break;
 
     case 'showdown':
       setPhase('Showdown');
       hideTurnIndicator();
+      addLog('── SHOWDOWN ──', 'log-hand');
       showMsg('🃏 Showdown!', 2000);
       break;
 
@@ -1024,7 +1094,8 @@ function handleServerMsg(msg){
       break;
 
     case 'playerLeft':
-      addChat(`${msg.name} left the table`);
+      addLog(`${msg.name} left the table`);
+      addChat(`⬅ ${msg.name} left`);
       seatActions[msg.seat]='';
       if(pendingInGame[msg.id]){ delete pendingInGame[msg.id]; refreshInGameJoinNotif(); }
       if(lastState) applyState(lastState);
@@ -1179,8 +1250,27 @@ function addChat(txt){
   div.textContent=txt;
   log.appendChild(div);
   log.scrollTop=log.scrollHeight;
-  // Keep max 50 messages
-  while(log.children.length>50) log.removeChild(log.firstChild);
+  while(log.children.length>60) log.removeChild(log.firstChild);
+}
+
+let handNumber=0;
+function addLog(txt, cls='log-action'){
+  const log=document.getElementById('activityLog');
+  if(!log) return;
+  const div=document.createElement('div');
+  div.className=cls; div.textContent=txt;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+  while(log.children.length>200) log.removeChild(log.firstChild);
+}
+
+let activityCollapsed=false;
+function toggleActivityLog(){
+  activityCollapsed=!activityCollapsed;
+  const logEl=document.getElementById('activityLog');
+  const toggle=document.getElementById('activityToggle');
+  logEl.style.display=activityCollapsed?'none':'flex';
+  toggle.textContent=activityCollapsed?'▶ maximise':'▼ minimise';
 }
 
 // ─────────────────────────────────────────────────────
