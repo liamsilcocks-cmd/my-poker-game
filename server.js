@@ -144,7 +144,6 @@ function tableSnapshot(room, forId) {
 function startActionTimer(room, seat, remainingMs) {
   clearActionTimer(room);
   if (room.paused) {
-    // Game is paused — record what we would have done, but don't start the clock
     room.actionTimerSeat = seat;
     room.actionTimerRemaining = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
     return;
@@ -162,7 +161,6 @@ function startActionTimer(room, seat, remainingMs) {
 
 function clearActionTimer(room) {
   if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
-  // Snapshot remaining time so resume can use it
   if (room.actionTimerStarted) {
     const elapsed = Date.now() - room.actionTimerStarted;
     room.actionTimerRemaining = Math.max(2000, (room.actionTimerRemaining || ACTION_TIMEOUT) - elapsed);
@@ -173,7 +171,6 @@ function clearActionTimer(room) {
 function pauseGame(room, byName) {
   if (room.paused) return;
   room.paused = true;
-  // Capture remaining time before clearing
   clearActionTimer(room);
   broadcastAll(room, { type: 'gamePaused', byName });
   console.log(`Room ${room.id} PAUSED by ${byName}`);
@@ -183,7 +180,6 @@ function resumeGame(room) {
   if (!room.paused) return;
   room.paused = false;
   broadcastAll(room, { type: 'gameResumed' });
-  // Restart the action timer with remaining time if a hand is in progress
   if (room.G && room.actionTimerSeat >= 0 && room.G.toAct[0] === room.actionTimerSeat) {
     startActionTimer(room, room.actionTimerSeat, room.actionTimerRemaining || ACTION_TIMEOUT);
   }
@@ -191,9 +187,6 @@ function resumeGame(room) {
 }
 
 // ─── Connections ──────────────────────────────────────────────────────────────
-// Reconnect grace period: how long we wait after a socket closes before
-// treating it as a real disconnect. Handles brief network blips, page reloads,
-// mobile radio switches, Render load-balancer health checks, etc.
 const RECONNECT_GRACE_MS = 8000;
 
 wss.on('connection', ws => {
@@ -212,22 +205,17 @@ wss.on('connection', ws => {
         const name = (msg.name || 'Player').slice(0, 18).trim() || 'Player';
         const room = getOrCreateRoom(myRoomId);
 
-        // ── Reconnect: player already has a seat ──────────────────────────────
+        // ── Reconnect ─────────────────────────────────────────────────────────
         const existing = room.seats.find(s => s?.id === myId);
         if (existing) {
-          // Cancel any pending disconnect timer — they're back
           if (existing._disconnectTimer) {
             clearTimeout(existing._disconnectTimer);
             existing._disconnectTimer = null;
           }
-
           if (existing.autoFold) {
-            // Was permanently disconnected — needs host re-admission
-            // But first make sure they're not already in pending from a previous attempt
             if (!room.pendingJoins.find(p => p.id === myId)) {
               room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
             } else {
-              // Update the ws in the existing pending entry to this newer socket
               const pj = room.pendingJoins.find(p => p.id === myId);
               if (pj) pj.ws = ws;
             }
@@ -236,7 +224,6 @@ wss.on('connection', ws => {
             if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
             broadcastAll(room, lobbySnapshot(room));
           } else {
-            // Normal reconnect — swap in the new socket, resume play
             existing.ws = ws;
             existing.disconnected = false;
             send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
@@ -250,7 +237,6 @@ wss.on('connection', ws => {
         // ── Brand-new player ──────────────────────────────────────────────────
         const hasSeatedPlayers = room.seats.some(s => s !== null);
         if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
-          // First player in the room becomes host
           room.seats[0] = mkPlayer(ws, myId, name, 0);
           room.hostId = myId;
           send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
@@ -258,10 +244,9 @@ wss.on('connection', ws => {
           return;
         }
 
-        // Avoid duplicate pending entries (e.g. double-click join)
         if (room.pendingJoins.find(p => p.id === myId)) {
           const pj = room.pendingJoins.find(p => p.id === myId);
-          pj.ws = ws; // update to latest socket
+          pj.ws = ws;
           send(ws, { type: 'waiting', id: myId });
           return;
         }
@@ -283,7 +268,6 @@ wss.on('connection', ws => {
         if (msg.accept) {
           const existSeat = room.seats.find(s => s?.id === p.id);
           if (existSeat) {
-            // Re-admitting a previously disconnected player back to their seat
             if (existSeat._disconnectTimer) {
               clearTimeout(existSeat._disconnectTimer);
               existSeat._disconnectTimer = null;
@@ -296,7 +280,6 @@ wss.on('connection', ws => {
             if (room.G) send(p.ws, tableSnapshot(room, p.id));
             broadcastAll(room, { type: 'chat', name: 'System', text: `${existSeat.name} re-admitted to the table` });
           } else {
-            // New player joining for the first time
             const seat = room.seats.findIndex(s => s === null);
             if (seat === -1) {
               send(p.ws, { type: 'rejected', reason: 'Table is full' });
@@ -355,7 +338,6 @@ wss.on('connection', ws => {
         if (!p) return;
         p.voluntaryAutoFold = msg.enabled === true;
         writeLog(room, `${p.name} voluntary auto-fold: ${p.voluntaryAutoFold}`);
-        // If it's currently their turn and they just enabled it, fold them now
         if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
           clearActionTimer(room);
           doFold(room, p.seat, 'auto-fold');
@@ -389,51 +371,36 @@ wss.on('connection', ws => {
     const room = rooms.get(myRoomId);
     if (!room) return;
 
-    // ── If this socket was waiting in pending, just remove it cleanly ─────────
     const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
     if (pi !== -1) {
       room.pendingJoins.splice(pi, 1);
       broadcastAll(room, lobbySnapshot(room));
-      return; // not seated, nothing more to do
+      return;
     }
 
-    // ── Find the seated player this socket belonged to ────────────────────────
     const s = room.seats.find(s => s?.id === myId);
     if (!s) return;
+    if (s.ws !== ws) return; // stale socket, player already reconnected
 
-    // ── CRITICAL: Stale socket guard ──────────────────────────────────────────
-    // If the seat's current socket is NOT the one that just closed, this player
-    // has already reconnected on a newer socket. Ignore this stale close event
-    // entirely — do not disconnect them.
-    if (s.ws !== ws) return;
-
-    // ── Real disconnect: start grace period before penalising ─────────────────
-    // Mark as temporarily disconnected but do NOT set autoFold yet.
-    // Give them RECONNECT_GRACE_MS to come back (handles page reloads,
-    // mobile radio switches, brief network blips, Render health checks).
     s.disconnected = true;
     s.ws = null;
     broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} disconnected — reconnecting...` });
     writeLog(room, `DISCONNECT: ${s.name} seat ${s.seat + 1} — grace period started`);
-    broadcastState(room); // UI can show the disconnected state visually
+    broadcastState(room);
 
-    // If it's their turn RIGHT NOW, fold immediately (game can't wait 8 seconds)
+    // Fold immediately if it's their turn — game can't wait
     if (room.G && room.G.toAct[0] === s.seat) {
       clearActionTimer(room);
       doFold(room, s.seat, 'disconnected');
     }
 
-    // Start the grace timer
     s._disconnectTimer = setTimeout(() => {
-      // Check they haven't reconnected during the grace period
       if (!s.disconnected || s.ws !== null) return;
-
       s.autoFold = true;
       s._disconnectTimer = null;
       broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out — auto-folding until host re-admits` });
       writeLog(room, `TIMEOUT: ${s.name} seat ${s.seat + 1} — autoFold enabled`);
 
-      // Fold them out of the current hand if still in it
       if (room.G && !s.folded) {
         s.folded = true;
         const idx = room.G.toAct.indexOf(s.seat);
@@ -444,7 +411,6 @@ wss.on('connection', ws => {
         if (alive.length <= 1) endRound(room);
       }
 
-      // Notify host they need to re-admit this player
       if (room.hostId) {
         const host = room.seats.find(h => h?.id === room.hostId);
         if (host?.ws?.readyState === 1) {
@@ -472,9 +438,6 @@ function buildDeck() {
   return shuffle(d);
 }
 
-// Active seats = seated, not sitting out, not permanently disconnected (autoFold)
-// Note: temporarily disconnected players (grace period) still count as active —
-// their turn will be handled by promptToAct which folds them immediately
 function activePlaying(room) {
   return room.seats
     .map((s, i) => (s && !s.sittingOut && !s.autoFold) ? i : null)
@@ -487,12 +450,9 @@ function nextSeat(from, active) {
   return nxt !== undefined ? nxt : sorted[0];
 }
 
-// Build act order starting from startSeat, cycling through active seats
-// Excludes folded, autoFold, and zero-chip players
 function buildActOrder(room, startSeat, active) {
   const sorted = [...active].sort((a, b) => a - b);
   let startIdx = sorted.indexOf(startSeat);
-  // If startSeat not in active (shouldn't happen but safety), start from 0
   if (startIdx === -1) startIdx = 0;
   const ordered = [...sorted.slice(startIdx), ...sorted.slice(0, startIdx)];
   return ordered.filter(i => {
@@ -505,7 +465,6 @@ function buildActOrder(room, startSeat, active) {
 function startNewHand(room) {
   clearActionTimer(room);
 
-  // Resume if paused — new hand always starts live
   if (room.paused) {
     room.paused = false;
     broadcastAll(room, { type: 'gameResumed' });
@@ -514,8 +473,6 @@ function startNewHand(room) {
   room.actionTimerRemaining = ACTION_TIMEOUT;
   room.actionTimerStarted = 0;
 
-  // Clear sittingOut for all (new hand = everyone plays)
-  // Also clear any stale disconnect timers — start fresh each hand
   room.seats.forEach(s => {
     if (s) {
       s.sittingOut = false;
@@ -523,7 +480,6 @@ function startNewHand(room) {
     }
   });
 
-  // Only include genuinely connected, non-auto-fold players
   const active = activePlaying(room);
 
   if (active.length < 2) {
@@ -533,27 +489,17 @@ function startNewHand(room) {
     return;
   }
 
-  // Advance dealer button (skip autoFold/disconnected)
   room.dealerSeat = room.dealerSeat < 0
     ? active[0]
     : nextSeat(room.dealerSeat, active);
 
   room.handNum = (room.handNum || 0) + 1;
 
-  // ── Heads-up rule (TDA Rule 34): dealer = SB, acts first preflop ──────────
-  // In 3-handed: dealer = UTG (acts first, no blinds posted by dealer)
-  //              SB = next left of dealer
-  //              BB = next left of SB
-  // In 4+ handed: UTG = next left of BB acts first
-  //               Dealer acts second-to-last (before SB, BB get option)
+  // ── Blind positions ───────────────────────────────────────────────────────
+  // Heads-up (TDA Rule 34): dealer = SB, acts first preflop
   const isHeadsUp = active.length === 2;
   const sbSeat = isHeadsUp ? room.dealerSeat : nextSeat(room.dealerSeat, active);
   const bbSeat = nextSeat(sbSeat, active);
-
-  // Preflop starting seat:
-  // Heads-up: SB/dealer acts first
-  // 3-handed: dealer = UTG, acts first (nextSeat(bbSeat) wraps back to dealer)
-  // 4+ handed: UTG (left of BB) acts first - dealer acts near the end
   const preflopStart = nextSeat(bbSeat, active);
 
   const logPath = handLogPath(room.id, room.handNum);
@@ -561,17 +507,15 @@ function startNewHand(room) {
   room.G = {
     deck: buildDeck(), phase: 'preflop', pot: 0,
     currentBet: BB,
-    lastRaiseIncrement: BB, // tracks the size of the most recent raise, for min-raise calculation
+    lastRaiseIncrement: BB,
     community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath
   };
 
-  // Reset per-player hand state
   room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; } });
 
-  // Write log header
   const playerSummary = active.map(i => {
     const s = room.seats[i];
-    return `${s.name}(seat${i+1}) \u00a3${(s.chips/100).toFixed(2)}`;
+    return `${s.name}(seat${i+1}) £${(s.chips/100).toFixed(2)}`;
   }).join(', ');
   fs.writeFileSync(logPath,
     `SYFM Poker | Room ${room.id} | Hand #${room.handNum}\n` +
@@ -588,15 +532,24 @@ function startNewHand(room) {
   room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB;
   room.G.pot = SB + BB;
 
-  // Deal 2 hole cards each
+  // ── Deal hole cards in correct order: SB first, dealer last ──────────────
+  // Standard poker rule: deal starts from player left of dealer (SB), clockwise,
+  // dealer receives their cards last in both rounds.
+  // Exception — heads-up: dealer=SB, so start from BB to keep dealer last.
+  const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
+  const dsIdx = active.indexOf(dealStartSeat);
+  const dealOrder = dsIdx >= 0
+    ? [...active.slice(dsIdx), ...active.slice(0, dsIdx)]
+    : active;
+
   for (let rd = 0; rd < 2; rd++)
-    for (const si of active)
+    for (const si of dealOrder)
       room.seats[si].cards.push(room.G.deck.shift());
 
   // Log hole cards
   active.forEach(i => {
     const s = room.seats[i];
-    writeLog(room, `DEAL: ${s.name} \u2192 ${s.cards.map(c => c.r + c.s).join(' ')}`);
+    writeLog(room, `DEAL: ${s.name} → ${s.cards.map(c => c.r + c.s).join(' ')}`);
   });
 
   // Build preflop act order
@@ -604,14 +557,14 @@ function startNewHand(room) {
 
   broadcastAll(room, {
     type: 'newHand', dealerSeat: room.dealerSeat, sbSeat, bbSeat,
-    pot: room.G.pot, activeSeats: active
+    pot: room.G.pot, activeSeats: dealOrder  // send in deal order so client animation matches
   });
 
   room.seats.forEach(s => {
     if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id));
   });
 
-  writeLog(room, `PREFLOP | Pot: ${room.G.pot}p | Act order: ${room.G.toAct.map(i => room.seats[i].name).join(' \u2192 ')}`);
+  writeLog(room, `PREFLOP | Pot: ${room.G.pot}p | Act order: ${room.G.toAct.map(i => room.seats[i].name).join(' → ')}`);
   promptToAct(room);
 }
 
@@ -619,7 +572,6 @@ function promptToAct(room) {
   const G = room.G;
   if (!G) return;
 
-  // Skip any players who are now ineligible
   while (G.toAct.length) {
     const si = G.toAct[0];
     const p = room.seats[si];
@@ -634,7 +586,6 @@ function promptToAct(room) {
   const seat = G.toAct[0];
   const p = room.seats[seat];
 
-  // Auto-fold disconnected/autoFold/voluntaryAutoFold player immediately
   if (p.disconnected || p.autoFold || p.voluntaryAutoFold) {
     clearActionTimer(room);
     const reason = p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
@@ -642,12 +593,6 @@ function promptToAct(room) {
     return;
   }
 
-  // ── Min-raise calculation (No-Limit Hold'em rules) ──────────────────────
-  // callAmt: what the player needs to put in just to call
-  // minRaise: TOTAL chips player must put in from their stack to make the minimum legal raise
-  //   = callAmt + lastRaiseIncrement
-  //   where lastRaiseIncrement = size of the last raise (or BB if no raise yet)
-  // Capped at player's remaining chips (for all-in scenarios)
   const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
   const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
 
@@ -679,14 +624,11 @@ function handleAction(room, seat, action, amount) {
     p.chips -= ca; p.bet += ca; G.pot += ca;
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    writeLog(room, `ACTION: ${p.name} ${act.toUpperCase()}${ca > 0 ? ` \u00a3${(ca/100).toFixed(2)}` : ''} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    writeLog(room, `ACTION: ${p.name} ${act.toUpperCase()}${ca > 0 ? ` £${(ca/100).toFixed(2)}` : ''} | Pot: £${(G.pot/100).toFixed(2)}`);
     broadcastState(room);
     acted(room, seat, false);
 
   } else if (action === 'raise') {
-    // ── Correct No-Limit min-raise ───────────────────────────────────────────
-    // minFromStack = callAmount + lastRaiseIncrement
-    // Player must put in at LEAST this much from their stack
     const callAmount     = G.currentBet - p.bet;
     const minFromStack   = Math.min(callAmount + G.lastRaiseIncrement, p.chips);
     const raiseFromStack = Math.min(Math.max(amount || minFromStack, minFromStack), p.chips);
@@ -697,17 +639,15 @@ function handleAction(room, seat, action, amount) {
     G.pot   += raiseFromStack;
     G.currentBet = Math.max(G.currentBet, p.bet);
 
-    // Update lastRaiseIncrement ONLY if this was a full (non-under) raise
-    // Under-raise (all-in less than min) does NOT reset the increment
     if (G.currentBet > prevCurrentBet) {
       G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
     }
 
     broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
     writeLog(room,
-      `ACTION: ${p.name} RAISES \u00a3${(raiseFromStack/100).toFixed(2)} from stack ` +
-      `(total bet: \u00a3${(p.bet/100).toFixed(2)}, new current bet: \u00a3${(G.currentBet/100).toFixed(2)}) ` +
-      `| Pot: \u00a3${(G.pot/100).toFixed(2)} | Next min raise increment: \u00a3${(G.lastRaiseIncrement/100).toFixed(2)}`
+      `ACTION: ${p.name} RAISES £${(raiseFromStack/100).toFixed(2)} from stack ` +
+      `(total bet: £${(p.bet/100).toFixed(2)}, new current bet: £${(G.currentBet/100).toFixed(2)}) ` +
+      `| Pot: £${(G.pot/100).toFixed(2)} | Next min raise increment: £${(G.lastRaiseIncrement/100).toFixed(2)}`
     );
     broadcastState(room);
     acted(room, seat, true);
@@ -723,11 +663,7 @@ function acted(room, seat, isRaise) {
   G.toAct.shift();
 
   if (isRaise) {
-    // After a raise: rebuild act order - everyone who hasn't matched currentBet gets another turn
     const active = activePlaying(room).sort((a, b) => a - b);
-    const si = active.indexOf(seat);
-    const ordered = [...active.slice((si+1)%active.length), ...active.slice(0, (si+1)%active.length)];
-    // Proper rotation: start from player after raiser
     const raiserIdx = active.indexOf(seat);
     const rotated = [...active.slice(raiserIdx + 1), ...active.slice(0, raiserIdx + 1)];
     G.toAct = rotated.filter(i => {
@@ -743,9 +679,8 @@ function advPhase(room) {
   const G = room.G;
   clearActionTimer(room);
   room.seats.forEach(s => { if (s) s.bet = 0; });
-  // Reset betting for new street
   G.currentBet = 0;
-  G.lastRaiseIncrement = BB; // min bet on a new street = BB
+  G.lastRaiseIncrement = BB;
 
   const next = { preflop: 'flop', flop: 'turn', turn: 'river' };
 
@@ -760,11 +695,9 @@ function advPhase(room) {
     broadcastState(room);
 
     const active = activePlaying(room);
-    // Postflop: SB (or first active left of dealer) acts first; dealer acts last
-    // Heads-up: BB (non-dealer) acts first postflop
     const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
     G.toAct = buildActOrder(room, postStart, active);
-    writeLog(room, `${G.phase.toUpperCase()} betting | Act order: ${G.toAct.map(i => room.seats[i].name).join(' \u2192 ')}`);
+    writeLog(room, `${G.phase.toUpperCase()} betting | Act order: ${G.toAct.map(i => room.seats[i].name).join(' → ')}`);
     setTimeout(() => promptToAct(room), 600);
 
   } else {
@@ -817,12 +750,11 @@ function finish(room, winner, label) {
   broadcastAll(room, { type: 'winner', seat: winner.seat, name: winner.name, amount: won, label });
   broadcastState(room);
 
-  const chipSummary = room.seats.filter(Boolean).map(s => `${s.name}:\u00a3${(s.chips/100).toFixed(2)}`).join(', ');
-  writeLog(room, `POT: \u00a3${(won/100).toFixed(2)} \u2192 ${winner.name}`);
+  const chipSummary = room.seats.filter(Boolean).map(s => `${s.name}:£${(s.chips/100).toFixed(2)}`).join(', ');
+  writeLog(room, `POT: £${(won/100).toFixed(2)} → ${winner.name}`);
   writeLog(room, `CHIPS: ${chipSummary}`);
   writeLog(room, '='.repeat(60));
 
-  // FTP upload the completed log asynchronously
   const logPath = room.G.logPath;
   if (logPath) setTimeout(() => ftpUpload(logPath), 500);
 
@@ -882,18 +814,17 @@ function score5(cards) {
   let isStraight = false, sHigh = 0;
   if (uniq.length === 5) {
     if (uniq[0] - uniq[4] === 4) {
-      isStraight = true; sHigh = uniq[0]; // normal straight
+      isStraight = true; sHigh = uniq[0];
     } else if (uniq[0] === 14 && uniq[1] === 5 && uniq[2] === 4 && uniq[3] === 3 && uniq[4] === 2) {
-      isStraight = true; sHigh = 5; // wheel A-2-3-4-5, Ace plays low → high card = 5
+      isStraight = true; sHigh = 5; // wheel A-2-3-4-5
     }
   }
 
   const pack = rArr => rArr.reduce((acc, r, i) => acc + r * Math.pow(15, 4 - i), 0);
   const freq = groups[0].n, freq2 = groups[1]?.n || 0;
 
-  // Royal flush: broadway (A-high) straight flush only — NOT wheel flush
-  if (flush && isStraight && sHigh === 14) return 9e8 + pack(ranks);
-  if (flush && isStraight)                  return 8e8 + sHigh * 1e6;  // straight flush inc. steel wheel
+  if (flush && isStraight && sHigh === 14) return 9e8 + pack(ranks); // royal flush
+  if (flush && isStraight)                  return 8e8 + sHigh * 1e6; // straight flush
   if (freq === 4)                           return 7e8 + pack(tbRanks);
   if (freq === 3 && freq2 === 2)            return 6e8 + pack(tbRanks);
   if (flush)                                return 5e8 + pack(ranks);
@@ -919,7 +850,7 @@ function handName(s) {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
-  console.log(`\n\u2663 SYFM Poker running on port ${PORT}`);
+  console.log(`\n♣ SYFM Poker running on port ${PORT}`);
   console.log(`   Game: http://localhost:${PORT}`);
   console.log(`   Logs: http://localhost:${PORT}/logs`);
   console.log(`   FTP:  ${process.env.FTP_HOST || '(not configured)'}\n`);
