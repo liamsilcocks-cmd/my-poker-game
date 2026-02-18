@@ -153,6 +153,11 @@ function clearActionTimer(room) {
 }
 
 // ─── Connections ──────────────────────────────────────────────────────────────
+// Reconnect grace period: how long we wait after a socket closes before
+// treating it as a real disconnect. Handles brief network blips, page reloads,
+// mobile radio switches, Render load-balancer health checks, etc.
+const RECONNECT_GRACE_MS = 8000;
+
 wss.on('connection', ws => {
   let myId = null, myRoomId = null;
 
@@ -169,18 +174,33 @@ wss.on('connection', ws => {
         const name = (msg.name || 'Player').slice(0, 18).trim() || 'Player';
         const room = getOrCreateRoom(myRoomId);
 
-        // Reconnect existing player
+        // ── Reconnect: player already has a seat ──────────────────────────────
         const existing = room.seats.find(s => s?.id === myId);
         if (existing) {
+          // Cancel any pending disconnect timer — they're back
+          if (existing._disconnectTimer) {
+            clearTimeout(existing._disconnectTimer);
+            existing._disconnectTimer = null;
+          }
+
           if (existing.autoFold) {
-            // Must get host approval to rejoin
-            room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
-            send(ws, { type: 'waiting', id: myId });
+            // Was permanently disconnected — needs host re-admission
+            // But first make sure they're not already in pending from a previous attempt
+            if (!room.pendingJoins.find(p => p.id === myId)) {
+              room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
+            } else {
+              // Update the ws in the existing pending entry to this newer socket
+              const pj = room.pendingJoins.find(p => p.id === myId);
+              if (pj) pj.ws = ws;
+            }
+            send(ws, { type: 'waiting', id: myId, reason: 'Waiting for host to re-admit you.' });
             const host = room.seats.find(s => s?.id === room.hostId);
-            if (host?.ws) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
+            if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
             broadcastAll(room, lobbySnapshot(room));
           } else {
-            existing.ws = ws; existing.disconnected = false;
+            // Normal reconnect — swap in the new socket, resume play
+            existing.ws = ws;
+            existing.disconnected = false;
             send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
             send(ws, lobbySnapshot(room));
             if (room.G) send(ws, tableSnapshot(room, myId));
@@ -189,19 +209,29 @@ wss.on('connection', ws => {
           return;
         }
 
-        // New player
-        const isEmpty = room.seats.every(s => s === null) && room.pendingJoins.length === 0;
-        if (isEmpty) {
+        // ── Brand-new player ──────────────────────────────────────────────────
+        const hasSeatedPlayers = room.seats.some(s => s !== null);
+        if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
+          // First player in the room becomes host
           room.seats[0] = mkPlayer(ws, myId, name, 0);
           room.hostId = myId;
           send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
           broadcastAll(room, lobbySnapshot(room));
           return;
         }
+
+        // Avoid duplicate pending entries (e.g. double-click join)
+        if (room.pendingJoins.find(p => p.id === myId)) {
+          const pj = room.pendingJoins.find(p => p.id === myId);
+          pj.ws = ws; // update to latest socket
+          send(ws, { type: 'waiting', id: myId });
+          return;
+        }
+
         room.pendingJoins.push({ ws, id: myId, name });
         send(ws, { type: 'waiting', id: myId });
         const host = room.seats.find(s => s?.id === room.hostId);
-        if (host?.ws) send(host.ws, { type: 'joinRequest', id: myId, name });
+        if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name });
         break;
       }
 
@@ -211,28 +241,40 @@ wss.on('connection', ws => {
         const idx = room.pendingJoins.findIndex(p => p.id === msg.id);
         if (idx === -1) return;
         const p = room.pendingJoins.splice(idx, 1)[0];
+
         if (msg.accept) {
           const existSeat = room.seats.find(s => s?.id === p.id);
           if (existSeat) {
-            // Re-admit after disconnect
-            existSeat.ws = p.ws; existSeat.disconnected = false; existSeat.autoFold = false;
+            // Re-admitting a previously disconnected player back to their seat
+            if (existSeat._disconnectTimer) {
+              clearTimeout(existSeat._disconnectTimer);
+              existSeat._disconnectTimer = null;
+            }
+            existSeat.ws = p.ws;
+            existSeat.disconnected = false;
+            existSeat.autoFold = false;
             send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
             send(p.ws, lobbySnapshot(room));
             if (room.G) send(p.ws, tableSnapshot(room, p.id));
-            broadcastAll(room, { type: 'chat', name: 'System', text: `${existSeat.name} re-admitted` });
+            broadcastAll(room, { type: 'chat', name: 'System', text: `${existSeat.name} re-admitted to the table` });
           } else {
+            // New player joining for the first time
             const seat = room.seats.findIndex(s => s === null);
-            if (seat === -1) { send(p.ws, { type: 'rejected', reason: 'Table full' }); broadcastAll(room, lobbySnapshot(room)); return; }
+            if (seat === -1) {
+              send(p.ws, { type: 'rejected', reason: 'Table is full' });
+              broadcastAll(room, lobbySnapshot(room));
+              return;
+            }
             room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat);
             send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
             if (room.gameActive) {
               room.seats[seat].sittingOut = true;
-              send(p.ws, { type: 'sittingOut', reason: 'Hand in progress - joining next hand.' });
+              send(p.ws, { type: 'sittingOut', reason: 'Hand in progress - you will join next hand.' });
               send(p.ws, tableSnapshot(room, p.id));
             }
           }
         } else {
-          send(p.ws, { type: 'rejected', reason: 'Host declined' });
+          send(p.ws, { type: 'rejected', reason: 'Host declined your request' });
         }
         broadcastAll(room, lobbySnapshot(room));
         break;
@@ -275,34 +317,77 @@ wss.on('connection', ws => {
     if (!myId || !myRoomId) return;
     const room = rooms.get(myRoomId);
     if (!room) return;
-    const pi = room.pendingJoins.findIndex(p => p.id === myId);
-    if (pi !== -1) room.pendingJoins.splice(pi, 1);
+
+    // ── If this socket was waiting in pending, just remove it cleanly ─────────
+    const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
+    if (pi !== -1) {
+      room.pendingJoins.splice(pi, 1);
+      broadcastAll(room, lobbySnapshot(room));
+      return; // not seated, nothing more to do
+    }
+
+    // ── Find the seated player this socket belonged to ────────────────────────
     const s = room.seats.find(s => s?.id === myId);
     if (!s) return;
-    s.ws = null; s.disconnected = true; s.autoFold = true;
-    broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} disconnected - auto-folding until host re-admits` });
-    writeLog(room, `DISCONNECT: ${s.name} (seat ${s.seat + 1}) - auto-fold enabled`);
+
+    // ── CRITICAL: Stale socket guard ──────────────────────────────────────────
+    // If the seat's current socket is NOT the one that just closed, this player
+    // has already reconnected on a newer socket. Ignore this stale close event
+    // entirely — do not disconnect them.
+    if (s.ws !== ws) return;
+
+    // ── Real disconnect: start grace period before penalising ─────────────────
+    // Mark as temporarily disconnected but do NOT set autoFold yet.
+    // Give them RECONNECT_GRACE_MS to come back (handles page reloads,
+    // mobile radio switches, brief network blips, Render health checks).
+    s.disconnected = true;
+    s.ws = null;
+    broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} disconnected — reconnecting...` });
+    writeLog(room, `DISCONNECT: ${s.name} seat ${s.seat + 1} — grace period started`);
+    broadcastState(room); // UI can show the disconnected state visually
+
+    // If it's their turn RIGHT NOW, fold immediately (game can't wait 8 seconds)
     if (room.G && room.G.toAct[0] === s.seat) {
       clearActionTimer(room);
       doFold(room, s.seat, 'disconnected');
-      return;
     }
-    if (room.G && !s.folded) {
-      s.folded = true;
-      const idx = room.G.toAct.indexOf(s.seat);
-      if (idx !== -1) room.G.toAct.splice(idx, 1);
-      broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (disconnected)' });
-      broadcastState(room);
-      const alive = room.seats.filter(p => p && !p.folded);
-      if (alive.length <= 1) endRound(room);
-    }
+
+    // Start the grace timer
+    s._disconnectTimer = setTimeout(() => {
+      // Check they haven't reconnected during the grace period
+      if (!s.disconnected || s.ws !== null) return;
+
+      s.autoFold = true;
+      s._disconnectTimer = null;
+      broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out — auto-folding until host re-admits` });
+      writeLog(room, `TIMEOUT: ${s.name} seat ${s.seat + 1} — autoFold enabled`);
+
+      // Fold them out of the current hand if still in it
+      if (room.G && !s.folded) {
+        s.folded = true;
+        const idx = room.G.toAct.indexOf(s.seat);
+        if (idx !== -1) room.G.toAct.splice(idx, 1);
+        broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (timed out)' });
+        broadcastState(room);
+        const alive = room.seats.filter(p => p && !p.folded);
+        if (alive.length <= 1) endRound(room);
+      }
+
+      // Notify host they need to re-admit this player
+      if (room.hostId) {
+        const host = room.seats.find(h => h?.id === room.hostId);
+        if (host?.ws?.readyState === 1) {
+          send(host.ws, { type: 'joinRequest', id: s.id, name: s.name });
+        }
+      }
+    }, RECONNECT_GRACE_MS);
   });
 
-  ws.on('error', err => console.error('WS error:', err));
+  ws.on('error', err => console.error('WS error:', err.message));
 });
 
 function mkPlayer(ws, id, name, seat) {
-  return { ws, id, name, chips: START_CHIPS, seat, cards: [], bet: 0, folded: false, disconnected: false, autoFold: false };
+  return { ws, id, name, chips: START_CHIPS, seat, cards: [], bet: 0, folded: false, disconnected: false, autoFold: false, _disconnectTimer: null };
 }
 
 // ─── Game helpers ─────────────────────────────────────────────────────────────
@@ -316,7 +401,9 @@ function buildDeck() {
   return shuffle(d);
 }
 
-// Active seats = seated, not sitting out, not autoFold/disconnected
+// Active seats = seated, not sitting out, not permanently disconnected (autoFold)
+// Note: temporarily disconnected players (grace period) still count as active —
+// their turn will be handled by promptToAct which folds them immediately
 function activePlaying(room) {
   return room.seats
     .map((s, i) => (s && !s.sittingOut && !s.autoFold) ? i : null)
@@ -348,7 +435,13 @@ function startNewHand(room) {
   clearActionTimer(room);
 
   // Clear sittingOut for all (new hand = everyone plays)
-  room.seats.forEach(s => { if (s) s.sittingOut = false; });
+  // Also clear any stale disconnect timers — start fresh each hand
+  room.seats.forEach(s => {
+    if (s) {
+      s.sittingOut = false;
+      if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
+    }
+  });
 
   // Only include genuinely connected, non-auto-fold players
   const active = activePlaying(room);
