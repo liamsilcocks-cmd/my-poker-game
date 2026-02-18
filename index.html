@@ -83,7 +83,30 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <canvas id="c"></canvas>
 <div id="loginOverlay" class="overlay">
   <div class="panel">
-    <h1>&#127921; SYFM POKER</h1>
+    <div style="margin-bottom:10px">
+      <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer ring -->
+        <circle cx="36" cy="36" r="34" fill="#1a1a1a" stroke="#c8a020" stroke-width="4"/>
+        <!-- Coloured segments (alternating gold/dark like a chip edge) -->
+        <g opacity="0.9">
+          <path d="M36 2 A34 34 0 0 1 62.4 19" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+          <path d="M62.4 19 A34 34 0 0 1 68.8 47" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+          <path d="M68.8 47 A34 34 0 0 1 50 66.5" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+          <path d="M50 66.5 A34 34 0 0 1 22 66.5" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+          <path d="M22 66.5 A34 34 0 0 1 3.2 47" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+          <path d="M3.2 47 A34 34 0 0 1 9.6 19" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+          <path d="M9.6 19 A34 34 0 0 1 36 2" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        </g>
+        <!-- Inner circle face -->
+        <circle cx="36" cy="36" r="24" fill="#1c0e06" stroke="#c8a020" stroke-width="2.5"/>
+        <!-- Inner ring detail -->
+        <circle cx="36" cy="36" r="20" fill="none" stroke="rgba(200,160,32,0.3)" stroke-width="1"/>
+        <!-- SYFM text on chip -->
+        <text x="36" y="40" font-family="Arial" font-weight="bold" font-size="9" fill="#ffd700" text-anchor="middle">SYFM</text>
+      </svg>
+    </div>
+    <h1 style="font-size:2.4rem;letter-spacing:4px;margin-bottom:4px">SYFM</h1>
+    <div style="color:#c8a060;font-size:0.95rem;letter-spacing:6px;margin-bottom:18px;text-transform:uppercase">Poker</div>
     <p>Enter your name and a room number to play</p>
     <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
     <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
@@ -191,9 +214,42 @@ function cardPos(si,cn){
 }
 const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
 const COM_POS=[new BABYLON.Vector3(-2.20,0.305,0),new BABYLON.Vector3(-1.05,0.305,0),new BABYLON.Vector3(0.10,0.305,0),new BABYLON.Vector3(1.50,0.305,0),new BABYLON.Vector3(2.65,0.305,0)];
-function mkBackTex(){const W=256,H=384,tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true),c=tex.getContext(),g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');c.fillStyle=g;c.fillRect(0,0,W,H);c.strokeStyle='#c8a020';c.lineWidth=10;c.strokeRect(5,5,W-10,H-10);c.strokeStyle='rgba(200,160,32,0.5)';c.lineWidth=2;c.strokeRect(18,18,W-36,H-36);c.strokeStyle='rgba(200,160,32,0.15)';c.lineWidth=1;for(let x=-H;x<W+H;x+=14){c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();}c.fillStyle='rgba(200,160,32,0.35)';c.font='72px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText('\u2660',W/2,H/2);tex.update();return tex;}
+function mkBackTex(){
+  const W=512,H=768;
+  const tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true);
+  const c=tex.getContext();
+  // Deep navy-to-midnight gradient
+  const g=c.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');
+  c.fillStyle=g;c.fillRect(0,0,W,H);
+  // Gold outer border
+  c.strokeStyle='#c8a020';c.lineWidth=14;c.strokeRect(7,7,W-14,H-14);
+  // Inner border
+  c.strokeStyle='rgba(200,160,32,0.55)';c.lineWidth=3;c.strokeRect(24,24,W-48,H-48);
+  // Subtle diagonal hatching
+  c.strokeStyle='rgba(200,160,32,0.10)';c.lineWidth=1;
+  for(let x=-H;x<W+H;x+=20){
+    c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();
+    c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();
+  }
+  // SYFM in large bold gold — same style as the suit on the felt
+  c.fillStyle='rgba(200,160,32,0.82)';
+  c.font='bold 118px Arial';
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillText('SYFM',W/2,H/2);
+  // Smaller SYFM top-left and bottom-right corners for orientation
+  c.font='bold 36px Arial';
+  c.fillStyle='rgba(200,160,32,0.55)';
+  c.textAlign='left';c.textBaseline='top';
+  c.fillText('SYFM',34,34);
+  c.save();c.translate(W,H);c.rotate(Math.PI);
+  c.textAlign='left';c.textBaseline='top';
+  c.fillText('SYFM',34,34);
+  c.restore();
+  tex.update();return tex;
+}
 function mkFrontTex(suit,rank){
-  // 512x768 (power-of-2) prevents Chrome WebGL texture clamping/clipping
+  // 512x768 power-of-2 avoids Chrome WebGL texture clamping
   const W=512,H=768;
   const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
   const c=tex.getContext();
@@ -205,35 +261,46 @@ function mkFrontTex(suit,rank){
   c.strokeStyle='#e0e0e0';c.lineWidth=2;c.strokeRect(22,22,W-44,H-44);
   // Large suit symbol centred on card
   c.fillStyle=col;
-  c.font='340px Arial';
-  c.textAlign='center';
-  c.textBaseline='middle';
-  c.fillText(suit,W/2,H/2+12);
-  // Corner indices: big rank + small suit pip
-  // All four corners drawn explicitly upright with direct coordinate placement — no transforms
-  const rnkSz=rank==='10'?118:136;
-  const pipSz=84;
-  const px=20,py=16;
-  const rowH=rnkSz+pipSz-4;
-  const byPy=H-py-rowH; // top of bottom-corner block
-  c.textBaseline='top';
+  c.font='300px Arial';
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillText(suit,W/2,H/2+10);
+  // For 6 and 9: write the word beneath the suit to prevent confusion
+  if(rank==='6'||rank==='9'){
+    const word=rank==='6'?'SIX':'NINE';
+    c.font='bold 64px Arial';
+    c.fillStyle='rgba('+((isRed)?'180,0,0':'30,30,30')+',0.55)';
+    c.textAlign='center';c.textBaseline='middle';
+    c.fillText(word,W/2,H/2+185);
+  }
+  // Corner indices: rank (or word for 6/9) + suit pip
+  // All four corners drawn explicitly upright — no mirror transforms
+  const is69=rank==='6'||rank==='9';
+  const cornerWord=rank==='6'?'SIX':rank==='9'?'NINE':null;
+  // For 6/9 use the word in the corner so it reads unambiguously
+  const displayRank=is69?cornerWord:rank;
+  const rnkSz=rank==='10'?108:is69?76:128;  // word fits smaller
+  const pipSz=80;
+  const px=18,py=14;
+  const rowH=rnkSz+pipSz+2;
+  const byPy=H-py-rowH;
   c.fillStyle=col;
+  c.textBaseline='top';
   // TOP-LEFT
   c.textAlign='left';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,px,py);
-  c.font=pipSz+'px Arial';c.fillText(suit,px+2,py+rnkSz-4);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,px,py);
+  c.font=pipSz+'px Arial';c.fillText(suit,px+2,py+rnkSz+2);
   // TOP-RIGHT
   c.textAlign='right';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-px,py);
-  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,py+rnkSz-4);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,W-px,py);
+  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,py+rnkSz+2);
   // BOTTOM-LEFT
   c.textAlign='left';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,px,byPy);
-  c.font=pipSz+'px Arial';c.fillText(suit,px+2,byPy+rnkSz-4);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,px,byPy);
+  c.font=pipSz+'px Arial';c.fillText(suit,px+2,byPy+rnkSz+2);
   // BOTTOM-RIGHT
   c.textAlign='right';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-px,byPy);
-  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,byPy+rnkSz-4);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,W-px,byPy);
+  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,byPy+rnkSz+2);
   tex.update();
   return tex;
 }
