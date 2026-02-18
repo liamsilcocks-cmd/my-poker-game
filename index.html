@@ -68,6 +68,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .jr-admit{background:#1a6a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
 .jr-reject{background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
 #turnIndicator{position:absolute;bottom:115px;left:290px;color:#ffd700;font-size:15px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.75);padding:7px 16px;border-radius:8px;border:1px solid #6a5010;max-width:260px;word-wrap:break-word}
+#toolsStrip{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.tbtn{padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;transition:background .15s,box-shadow .15s}
+.tbtn-pause{background:#1a4a7a}
+.tbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
+.tbtn-autofold{background:#3a1a5a}
+.tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
+.tbtn-fs{background:#1a3a1a}
+#pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
+#pauseBanner::after{content:'PAUSED - reviewing\2026';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,0,0.25);font-size:clamp(28px,5vw,60px);font-weight:bold;letter-spacing:4px;white-space:nowrap;pointer-events:none}
 </style>
 </head>
 <body>
@@ -106,6 +115,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="phase">PRE-FLOP</div>
     <div id="pot">POT: &pound;0.00</div>
     <div id="roomBadge">ROOM &mdash;</div>
+    <button class="tbtn tbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
   </div>
   <div id="bottomBar">
     <div id="myInfo">YOUR CHIPS: &pound;10.00</div>
@@ -115,7 +125,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       <button class="abtn abtn-raise" id="raiseBtn">RAISE</button>
       <button class="abtn abtn-fold" id="foldBtn">FOLD</button>
     </div>
+    <div id="toolsStrip">
+      <button class="tbtn tbtn-pause" id="pauseBtn" onclick="togglePause()">&#9646;&#9646; PAUSE</button>
+      <button class="tbtn tbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">&#9654; AUTO-FOLD</button>
+    </div>
   </div>
+  <div id="pauseBanner"></div>
   <div id="msg"></div>
   <div id="waitingMsg"></div>
   <div id="joinRequestNotif">
@@ -168,7 +183,42 @@ const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
 const COM_POS=[new BABYLON.Vector3(-2.20,0.305,0),new BABYLON.Vector3(-1.05,0.305,0),new BABYLON.Vector3(0.10,0.305,0),new BABYLON.Vector3(1.50,0.305,0),new BABYLON.Vector3(2.65,0.305,0)];
 const PIP_LAYOUTS={'2':[[.5,.17],[.5,.83]],'3':[[.5,.17],[.5,.5],[.5,.83]],'4':[[.28,.17],[.72,.17],[.28,.83],[.72,.83]],'5':[[.28,.17],[.72,.17],[.5,.5],[.28,.83],[.72,.83]],'6':[[.28,.17],[.72,.17],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],'7':[[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],'8':[[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.5,.66],[.28,.83],[.72,.83]],'9':[[.28,.12],[.72,.12],[.28,.36],[.72,.36],[.5,.5],[.28,.64],[.72,.64],[.28,.88],[.72,.88]],'10':[[.28,.12],[.72,.12],[.5,.25],[.28,.38],[.72,.38],[.28,.62],[.72,.62],[.5,.75],[.28,.88],[.72,.88]]};
 function mkBackTex(){const W=256,H=384,tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true),c=tex.getContext(),g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');c.fillStyle=g;c.fillRect(0,0,W,H);c.strokeStyle='#c8a020';c.lineWidth=10;c.strokeRect(5,5,W-10,H-10);c.strokeStyle='rgba(200,160,32,0.5)';c.lineWidth=2;c.strokeRect(18,18,W-36,H-36);c.strokeStyle='rgba(200,160,32,0.15)';c.lineWidth=1;for(let x=-H;x<W+H;x+=14){c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();}c.fillStyle='rgba(200,160,32,0.35)';c.font='72px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText('\u2660',W/2,H/2);tex.update();return tex;}
-function mkFrontTex(suit,rank){const W=320,H=450,tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true),c=tex.getContext(),isRed=suit==='\u2665'||suit==='\u2666',col=isRed?'#cc0000':'#111111',suitLetter={'\u2660':'S','\u2665':'H','\u2666':'D','\u2663':'C'}[suit];c.fillStyle='#fefefe';c.fillRect(0,0,W,H);c.strokeStyle='#bbbbbb';c.lineWidth=5;c.strokeRect(2.5,2.5,W-5,H-5);c.strokeStyle='#dddddd';c.lineWidth=1.5;c.strokeRect(9,9,W-18,H-18);c.fillStyle=col;c.textAlign='center';c.textBaseline='top';const rnkSize=rank==='10'?72:82;c.font=`bold ${rnkSize}px Arial`;const rnkX=rank==='10'?42:36;c.fillText(rank,rnkX,6);c.font='52px Arial';c.fillText(suit,36,rank==='10'?82:92);c.fillStyle=col;c.textAlign='center';c.textBaseline='top';c.font=`bold 48px Arial`;c.fillText(suitLetter,W-30,10);c.font='34px Arial';c.fillText(suit,W-30,62);c.save();c.translate(W,H);c.rotate(Math.PI);c.fillStyle=col;c.textAlign='center';c.textBaseline='top';c.font=`bold ${rnkSize}px Arial`;c.fillText(rank,rnkX,6);c.font='52px Arial';c.fillText(suit,36,rank==='10'?82:92);c.restore();c.save();c.translate(W,H);c.rotate(Math.PI);c.fillStyle=col;c.textAlign='center';c.textBaseline='top';c.font=`bold 48px Arial`;c.fillText(suitLetter,W-30,10);c.font='34px Arial';c.fillText(suit,W-30,62);c.restore();if(rank==='A'){c.fillStyle=col;c.font='220px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText(suit,W/2,H/2+8);}else if(['J','Q','K'].includes(rank)){c.fillStyle=isRed?'#fff4f4':'#f4f4ff';c.fillRect(16,115,W-32,H-230);c.strokeStyle=col+'33';c.lineWidth=2;c.strokeRect(18,117,W-36,H-234);c.fillStyle=col;c.font=`bold 130px Georgia,serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(rank,W/2,H/2-20);c.font='72px Arial';c.fillText(suit,W/2,H/2+90);c.font='28px Arial';c.fillStyle=col+'66';c.fillText(suit,22,H-100);c.fillText(suit,W-22,110);c.save();c.translate(W,H);c.rotate(Math.PI);c.fillText(suit,22,H-100);c.fillText(suit,W-22,110);c.restore();}else{const pips=PIP_LAYOUTS[rank]||[],ax=W*0.13,ay=H*0.19,aw=W*0.74,ah=H*0.62,pSize=pips.length<=4?72:pips.length<=6?60:pips.length<=8?52:44;c.fillStyle=col;c.font=`${pSize}px Arial`;c.textAlign='center';c.textBaseline='middle';for(const[fx,fy]of pips)c.fillText(suit,ax+fx*aw,ay+fy*ah);}tex.update();return tex;}
+function mkFrontTex(suit,rank){
+  const W=320,H=450,tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true),c=tex.getContext();
+  const isRed=suit==='\u2665'||suit==='\u2666',col=isRed?'#cc0000':'#111111';
+  // Background
+  c.fillStyle='#fefefe';c.fillRect(0,0,W,H);
+  c.strokeStyle='#aaaaaa';c.lineWidth=6;c.strokeRect(3,3,W-6,H-6);
+  c.strokeStyle='#dddddd';c.lineWidth=1.5;c.strokeRect(10,10,W-20,H-20);
+  // Center content first (corners drawn on top)
+  c.fillStyle=col;
+  if(rank==='A'){
+    c.font='230px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText(suit,W/2,H/2);
+  }else if(['J','Q','K'].includes(rank)){
+    c.fillStyle=isRed?'#fff4f4':'#f4f4ff';c.fillRect(18,130,W-36,H-260);
+    c.strokeStyle=col+'44';c.lineWidth=2;c.strokeRect(20,132,W-40,H-264);
+    c.fillStyle=col;c.font='bold 130px Georgia,serif';c.textAlign='center';c.textBaseline='middle';
+    c.fillText(rank,W/2,H/2-30);c.font='80px Arial';c.fillText(suit,W/2,H/2+88);
+  }else{
+    // Pip layout with bigger pips
+    const pips=PIP_LAYOUTS[rank]||[],ax=W*0.13,ay=H*0.19,aw=W*0.74,ah=H*0.62;
+    const pSz=pips.length<=4?82:pips.length<=6?70:pips.length<=8?60:50;
+    c.font=`${pSz}px Arial`;c.textAlign='center';c.textBaseline='middle';
+    for(const[fx,fy]of pips)c.fillText(suit,ax+fx*aw,ay+fy*ah);
+  }
+  // Corner indices - white backing so they're always readable over any pip/art
+  function drawCorner(){
+    const rnkSz=rank==='10'?84:96,suitSz=70;
+    const cW=rank==='10'?118:98,cH=rnkSz+suitSz+2;
+    c.fillStyle='rgba(255,255,255,0.94)';c.fillRect(3,3,cW,cH+6);
+    c.fillStyle=col;c.textAlign='left';c.textBaseline='top';
+    c.font=`bold ${rnkSz}px Arial`;c.fillText(rank,8,4);
+    c.font=`${suitSz}px Arial`;c.fillText(suit,10,4+rnkSz-6);
+  }
+  drawCorner();
+  c.save();c.translate(W,H);c.rotate(Math.PI);drawCorner();c.restore();
+  tex.update();return tex;
+}
 function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
 function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.0,height:1.40},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
 function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.28;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
@@ -316,6 +366,9 @@ case 'showdown':setPhase('Showdown');hideTurnIndicator();
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
 case 'playerLeft':addLog(`${msg.name} left the table`);addChat(`\u2b05 ${msg.name} left`);seatActions[msg.seat]='';if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}if(lastState)applyState(lastState);break;
 case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
+case 'gamePaused':handlePaused(true,msg.byName);break;
+case 'gameResumed':handlePaused(false,null);break;
+case 'voluntaryAutoFoldAck':break; // server confirms, already handled client-side
 case 'chat':addChat(`${msg.name}: ${msg.text}`);break;
 case 'error':addChat(`\u26a0 ${msg.msg}`);break;}}
 function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML=`<span>${s.name}${s.id===msg.hostId?'<span class="host-badge">HOST</span>':''}</span><span class="chips">\u00a3${(s.chips/100).toFixed(2)}</span>`;pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML=`<span>${p.name}</span><span><button class="btn-sm btn-approve" onclick="approvePlayer('${p.id}',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer('${p.id}',false)">\u2717 Reject</button></span>`;pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
@@ -332,6 +385,35 @@ function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textConte
 function addChat(txt){const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);}
 let handNumber=0;
 function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
+let activityCollapsed=false;
+function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{});}else{document.exitFullscreen();}}
+document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
+let gamePaused=false;
+function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
+function handlePaused(isPaused,byName){
+  gamePaused=isPaused;
+  const btn=document.getElementById('pauseBtn');
+  const banner=document.getElementById('pauseBanner');
+  if(isPaused){
+    btn.classList.add('active');btn.textContent='\u25b6 RESUME';
+    banner.style.display='block';
+    // Auto-expand activity log so players can review it
+    if(activityCollapsed)toggleActivityLog();
+    addLog(`\u23f8 Game PAUSED by ${byName||'a player'} \u2014 reviewing hand history`,'log-hand');
+  }else{
+    btn.classList.remove('active');btn.textContent='\u23ae\u23ae PAUSE';
+    banner.style.display='none';
+    addLog('\u25b6 Game RESUMED','log-hand');
+  }
+}
+let myAutoFold=false;
+function toggleAutoFold(){
+  myAutoFold=!myAutoFold;
+  wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});
+  const btn=document.getElementById('autoFoldBtn');
+  if(myAutoFold){btn.classList.add('active');btn.textContent='\u274c AUTO-FOLD ON';showMsg('\u274c Auto-fold ON \u2014 you will fold every hand until you turn it off',3200);}
+  else{btn.classList.remove('active');btn.textContent='\u25b6 AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
+}
 let activityCollapsed=false;
 function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 maximise':'\u25bc minimise';}
 let chatCollapsed=false;
