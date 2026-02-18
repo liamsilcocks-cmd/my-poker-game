@@ -176,40 +176,58 @@ let scene,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0
 const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
 function betPos(vSeat){const a=-Math.PI/2-(vSeat/NP)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const a=-Math.PI/2-(i/NP)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
-function cardPos(si,cn){const a=-Math.PI/2-(si/NP)*Math.PI*2,rx=TRX*0.70,rz=TRZ*0.70,pa=a-Math.PI/2,off=(cn-0.5)*1.10;return new BABYLON.Vector3(Math.cos(a)*rx+Math.cos(pa)*off,0.30+cn*0.003,Math.sin(a)*rz+Math.sin(pa)*off);}
+function cardPos(si,cn){
+  const a=-Math.PI/2-(si/NP)*Math.PI*2;
+  const rx=TRX*0.70,rz=TRZ*0.70;
+  // Tangent direction perpendicular to the radial line, consistent for all seats
+  // pa is 90deg clockwise from the seat angle, giving a stable side-by-side offset
+  const pa=a+Math.PI/2;
+  // Cards offset: card 0 goes left (-0.55), card 1 goes right (+0.55)
+  const off=(cn===0?-0.55:0.55);
+  return new BABYLON.Vector3(
+    Math.cos(a)*rx + Math.cos(pa)*off,
+    0.30+cn*0.003,
+    Math.sin(a)*rz + Math.sin(pa)*off
+  );
+}
 const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
 const COM_POS=[new BABYLON.Vector3(-2.20,0.305,0),new BABYLON.Vector3(-1.05,0.305,0),new BABYLON.Vector3(0.10,0.305,0),new BABYLON.Vector3(1.50,0.305,0),new BABYLON.Vector3(2.65,0.305,0)];
-const PIP_LAYOUTS={'2':[[.5,.17],[.5,.83]],'3':[[.5,.17],[.5,.5],[.5,.83]],'4':[[.28,.17],[.72,.17],[.28,.83],[.72,.83]],'5':[[.28,.17],[.72,.17],[.5,.5],[.28,.83],[.72,.83]],'6':[[.28,.17],[.72,.17],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],'7':[[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],'8':[[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.5,.66],[.28,.83],[.72,.83]],'9':[[.28,.12],[.72,.12],[.28,.36],[.72,.36],[.5,.5],[.28,.64],[.72,.64],[.28,.88],[.72,.88]],'10':[[.28,.12],[.72,.12],[.5,.25],[.28,.38],[.72,.38],[.28,.62],[.72,.62],[.5,.75],[.28,.88],[.72,.88]]};
+
 function mkBackTex(){const W=256,H=384,tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true),c=tex.getContext(),g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');c.fillStyle=g;c.fillRect(0,0,W,H);c.strokeStyle='#c8a020';c.lineWidth=10;c.strokeRect(5,5,W-10,H-10);c.strokeStyle='rgba(200,160,32,0.5)';c.lineWidth=2;c.strokeRect(18,18,W-36,H-36);c.strokeStyle='rgba(200,160,32,0.15)';c.lineWidth=1;for(let x=-H;x<W+H;x+=14){c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();}c.fillStyle='rgba(200,160,32,0.35)';c.font='72px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText('\u2660',W/2,H/2);tex.update();return tex;}
 function mkFrontTex(suit,rank){
-  const W=320,H=450,tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true),c=tex.getContext();
-  const isRed=suit==='\u2665'||suit==='\u2666',col=isRed?'#cc0000':'#111111';
-  c.fillStyle='#fefefe';c.fillRect(0,0,W,H);
-  c.strokeStyle='#aaaaaa';c.lineWidth=6;c.strokeRect(3,3,W-6,H-6);
-  c.strokeStyle='#dddddd';c.lineWidth=1.5;c.strokeRect(10,10,W-20,H-20);
+  // Power-of-2 dimensions fix Chrome WebGL texture clamping/clipping
+  const W=512,H=768;
+  const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
+  const c=tex.getContext();
+  const isRed=suit==='\u2665'||suit==='\u2666';
+  const col=isRed?'#cc0000':'#111111';
+  // White background + borders
+  c.fillStyle='#ffffff';c.fillRect(0,0,W,H);
+  c.strokeStyle='#999999';c.lineWidth=8;c.strokeRect(4,4,W-8,H-8);
+  c.strokeStyle='#dddddd';c.lineWidth=2;c.strokeRect(20,20,W-40,H-40);
+  // Large suit in centre
   c.fillStyle=col;
-  if(rank==='A'){
-    c.font='230px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText(suit,W/2,H/2);
-  }else if(['J','Q','K'].includes(rank)){
-    c.fillStyle=isRed?'#fff4f4':'#f4f4ff';c.fillRect(18,130,W-36,H-260);
-    c.strokeStyle=col+'44';c.lineWidth=2;c.strokeRect(20,132,W-40,H-264);
-    c.fillStyle=col;c.font='bold 130px Georgia,serif';c.textAlign='center';c.textBaseline='middle';
-    c.fillText(rank,W/2,H/2-30);c.font='80px Arial';c.fillText(suit,W/2,H/2+88);
-  }else{
-    const pips=PIP_LAYOUTS[rank]||[],ax=W*0.13,ay=H*0.19,aw=W*0.74,ah=H*0.62;
-    const pSz=pips.length<=4?82:pips.length<=6?70:pips.length<=8?60:50;
-    c.font=`${pSz}px Arial`;c.textAlign='center';c.textBaseline='middle';
-    for(const[fx,fy]of pips)c.fillText(suit,ax+fx*aw,ay+fy*ah);
-  }
+  c.font='340px Arial';
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillText(suit,W/2,H/2+10);
+  // Corner: rank + small suit pip
+  const rnkSz=rank==='10'?96:112;
+  const pipSz=68;
+  const padX=16,padY=12;
   function drawCorner(){
-    const rnkSz=rank==='10'?84:96,suitSz=70;
-    const cW=rank==='10'?118:98,cH=rnkSz+suitSz+2;
-    c.fillStyle='rgba(255,255,255,0.94)';c.fillRect(3,3,cW,cH+6);
-    c.fillStyle=col;c.textAlign='left';c.textBaseline='top';
-    c.font=`bold ${rnkSz}px Arial`;c.fillText(rank,8,4);
-    c.font=`${suitSz}px Arial`;c.fillText(suit,10,4+rnkSz-6);
+    c.fillStyle=col;
+    c.font=`bold ${rnkSz}px Arial`;c.textAlign='left';c.textBaseline='top';
+    c.fillText(rank,padX,padY);
+    c.font=`${pipSz}px Arial`;
+    c.fillText(suit,padX+2,padY+rnkSz-10);
   }
+  // Top-left
   drawCorner();
+  // Top-right (mirror X)
+  c.save();c.scale(-1,1);c.translate(-W,0);drawCorner();c.restore();
+  // Bottom-left (mirror Y)
+  c.save();c.scale(1,-1);c.translate(0,-H);drawCorner();c.restore();
+  // Bottom-right (rotate 180)
   c.save();c.translate(W,H);c.rotate(Math.PI);drawCorner();c.restore();
   tex.update();return tex;
 }
