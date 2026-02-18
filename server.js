@@ -1,433 +1,926 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SYFM Poker</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
-#c{width:100%;height:100%;display:block;touch-action:none}
-.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,5,2,0.88);z-index:200}
-.panel{background:linear-gradient(160deg,#1c0e06 0%,#2a1408 100%);border:2px solid #c8a020;border-radius:16px;padding:36px 44px;min-width:340px;max-width:480px;width:90%;text-align:center;box-shadow:0 0 60px rgba(200,160,32,0.20)}
-.panel h1{color:#ffd700;font-size:2.2rem;margin-bottom:8px;letter-spacing:2px}
-.panel h2{color:#ffd700;font-size:1.5rem;margin-bottom:18px}
-.panel h3{color:#c8a020;font-size:1rem;margin:14px 0 8px}
-.panel p{color:#c8a060;margin-bottom:14px;line-height:1.5}
-.panel input[type=text],.panel input[type=number]{width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;background:#0d0704;border:1px solid #6a5010;color:#ffd700;font-size:1.1rem;outline:none;text-align:center}
-.panel input:focus{border-color:#c8a020}
-.btn-gold{width:100%;padding:14px;margin-top:14px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:1.1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
-.btn-gold:hover{opacity:.85}
-.btn-gold:disabled{opacity:.4;cursor:not-allowed}
-.btn-sm{padding:8px 18px;border-radius:6px;border:none;font-size:.9rem;font-weight:bold;cursor:pointer;color:#fff;margin:4px}
-.btn-approve{background:#1a6a1a}
-.btn-reject{background:#6a1a1a}
-.player-row{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 14px;margin:6px 0;color:#e0c060;font-size:.95rem}
-.player-row .chips{color:#ffd700;font-weight:bold}
-.host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
-.pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
-#gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
-#gameUI > *{pointer-events:auto}
-#topBar{position:absolute;top:10px;left:10px;right:10px;background:rgba(0,0,0,0.72);padding:10px 18px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center}
-#phase{font-size:16px;font-weight:bold}
-#pot{font-size:20px;font-weight:bold}
-#roomBadge{font-size:13px;color:#c8a060;padding:4px 12px;background:rgba(200,160,32,0.15);border-radius:6px}
-#bottomBar{position:absolute;bottom:10px;left:10px;right:10px;background:rgba(0,0,0,0.72);padding:12px 18px;border-radius:8px;color:#c8a820;text-align:center}
-#myInfo{font-size:15px;font-weight:bold;margin-bottom:8px;color:#ffd700}
-#actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.abtn{padding:12px 24px;border-radius:6px;border:none;font-size:14px;font-weight:bold;cursor:pointer;color:#fff}
-.abtn-call{background:#1a7a1a}
-.abtn-raise{background:#7a5800}
-.abtn-fold{background:#7a1a1a}
-#raiseAmt{width:90px;padding:9px;border-radius:4px;border:1px solid #c8a020;background:rgba(0,0,0,0.8);color:#fff;font-size:14px;text-align:center}
-#msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:16px 36px;border-radius:12px;color:#fff;font-size:20px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:70%;white-space:pre-line;pointer-events:none}
-#chatBox{position:absolute;bottom:110px;right:10px;width:240px;background:rgba(0,0,0,0.70);border-radius:8px;border:1px solid #3a2a10}
-#chatHeader{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer;color:#c8a060;font-size:12px;font-weight:bold;user-select:none}
-#chatHeader span{color:#a09060;font-size:11px}
-#chatInner{padding:0 10px 10px;border-top:1px solid #3a2a10}
-#chatLog{height:100px;overflow-y:auto;font-size:12px;color:#c8c8a0;margin-bottom:6px;display:flex;flex-direction:column;gap:3px}
-#chatInput{width:100%;padding:6px 10px;border-radius:4px;border:1px solid #4a3a15;background:rgba(0,0,0,0.7);color:#ffd700;font-size:12px}
-#activityBox{position:absolute;bottom:110px;left:10px;width:270px;background:rgba(0,0,0,0.70);border-radius:8px;border:1px solid #2a3a1a}
-#activityHeader{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer;color:#60c840;font-size:12px;font-weight:bold;user-select:none}
-#activityHeader span{color:#a0d070;font-size:11px}
-#activityLog{height:280px;overflow-y:auto;font-size:11px;color:#b0d890;padding:6px 10px 8px;display:flex;flex-direction:column;gap:2px;border-top:1px solid #1a2a10}
-#activityLog .log-hand{color:#ffd700;font-weight:bold;margin-top:4px}
-#activityLog .log-action{color:#90c870}
-#activityLog .log-win{color:#40e870;font-weight:bold}
-#activityLog .log-community{color:#a0b8ff}
-#brightness{position:absolute;top:70px;left:14px;background:rgba(0,0,0,0.65);padding:10px 14px;border-radius:8px;color:#c8a820}
-#brightness label{display:block;font-size:11px;margin-bottom:4px}
-#brightSlider{width:110px}
-#waitingMsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:24px 40px;border-radius:14px;color:#c8a020;font-size:18px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none}
-#joinRequestNotif{position:absolute;top:70px;right:260px;background:rgba(10,40,10,0.95);padding:14px 18px;border-radius:10px;color:#e0e0e0;font-size:14px;display:none;border:1px solid #20a040;min-width:220px;z-index:10}
-#joinRequestNotif h4{color:#40e060;margin-bottom:8px;font-size:15px}
-#joinReqList{display:flex;flex-direction:column;gap:6px}
-.jr-row{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.07);padding:6px 10px;border-radius:6px}
-.jr-name{color:#ffd700;font-weight:bold}
-.jr-btns{display:flex;gap:5px}
-.jr-admit{background:#1a6a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
-.jr-reject{background:#6a1a1a;border:none;color:#fff;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold}
-#turnIndicator{position:absolute;bottom:115px;left:290px;color:#ffd700;font-size:15px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.75);padding:7px 16px;border-radius:8px;border:1px solid #6a5010;max-width:260px;word-wrap:break-word}
-#toolsStrip{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
-.tbtn{padding:8px 16px;border-radius:6px;border:none;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;transition:background .15s,box-shadow .15s}
-.tbtn-pause{background:#1a4a7a}
-.tbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
-.tbtn-autofold{background:#3a1a5a}
-.tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
-.tbtn-fs{background:#1a3a1a}
-#pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
-#pauseBanner::after{content:'PAUSED - reviewing\2026';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,0,0.25);font-size:clamp(28px,5vw,60px);font-weight:bold;letter-spacing:4px;white-space:nowrap;pointer-events:none}
-</style>
-</head>
-<body>
-<canvas id="c"></canvas>
-<div id="loginOverlay" class="overlay">
-  <div class="panel">
-    <h1>&#127921; SYFM POKER</h1>
-    <p>Enter your name and a room number to play</p>
-    <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
-    <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
-    <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
-    <p id="loginErr" style="color:#e05050;margin-top:10px;font-size:.9rem"></p>
-  </div>
-</div>
-<div id="waitingOverlay" class="overlay" style="display:none">
-  <div class="panel">
-    <h2>&#9203; Waiting for host&hellip;</h2>
-    <p id="waitingTxt">The host will approve your entry shortly.</p>
-    <button class="btn-gold" onclick="location.reload()" style="margin-top:10px">Cancel</button>
-  </div>
-</div>
-<div id="lobbyOverlay" class="overlay" style="display:none">
-  <div class="panel">
-    <h2>&#127920; Room <span id="lobbyRoomId"></span></h2>
-    <div id="playerList"></div>
-    <div id="pendingSection" style="display:none">
-      <h3>&#9203; Requesting to join:</h3>
-      <div id="pendingItems"></div>
-    </div>
-    <p id="lobbyStatus" style="color:#c8a060;margin-top:14px;font-size:.9rem"></p>
-    <button class="btn-gold" id="startBtn" style="display:none;margin-top:18px">&#9654; START GAME</button>
-  </div>
-</div>
-<div id="gameUI">
-  <div id="topBar">
-    <div id="phase">PRE-FLOP</div>
-    <div id="pot">POT: &pound;0.00</div>
-    <div id="roomBadge">ROOM &mdash;</div>
-    <button class="tbtn tbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
-  </div>
-  <div id="bottomBar">
-    <div id="myInfo">YOUR CHIPS: &pound;10.00</div>
-    <div id="actions" style="display:none">
-      <button class="abtn abtn-call" id="callBtn">CALL</button>
-      <input type="number" id="raiseAmt" value="0.40" step="0.20" min="0.40">
-      <button class="abtn abtn-raise" id="raiseBtn">RAISE</button>
-      <button class="abtn abtn-fold" id="foldBtn">FOLD</button>
-    </div>
-    <div id="toolsStrip">
-      <button class="tbtn tbtn-pause" id="pauseBtn" onclick="togglePause()">&#9646;&#9646; PAUSE</button>
-      <button class="tbtn tbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">&#9654; AUTO-FOLD</button>
-    </div>
-  </div>
-  <div id="pauseBanner"></div>
-  <div id="msg"></div>
-  <div id="waitingMsg"></div>
-  <div id="joinRequestNotif">
-    <h4>&#9203; Players want to join</h4>
-    <div id="joinReqList"></div>
-  </div>
-  <div id="turnIndicator"></div>
-  <div id="activityBox">
-    <div id="activityHeader" onclick="toggleActivityLog()">&#128203; ACTIVITY LOG <span id="activityToggle">&#9660; minimise</span></div>
-    <div id="activityLog"></div>
-  </div>
-  <div id="chatBox">
-    <div id="chatHeader" onclick="toggleChat()">&#128172; CHAT <span id="chatToggle">&#9660; minimise</span></div>
-    <div id="chatInner">
-      <div id="chatLog"></div>
-      <input type="text" id="chatInput" placeholder="Type and press Enter&hellip;" maxlength="100">
-    </div>
-  </div>
-  <div id="brightness">
-    <label>&#9728; Brightness</label>
-    <input type="range" id="brightSlider" min="0.5" max="3.5" step="0.1" value="1.8">
-  </div>
-</div>
-<script src="https://cdn.babylonjs.com/babylon.js"></script>
-<script>
 'use strict';
-let audioCtx;
-function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
-function snd_deal(){ensureAudio();const t=audioCtx.currentTime,len=Math.floor(audioCtx.sampleRate*0.12),buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/len),0.6);const src=audioCtx.createBufferSource(),bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.Q.value=0.6;bp.frequency.setValueAtTime(4200,t);bp.frequency.exponentialRampToValueAtTime(1600,t+0.12);const g=audioCtx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.28,t+0.015);g.gain.exponentialRampToValueAtTime(0.001,t+0.12);src.buffer=buf;src.connect(bp);bp.connect(g);g.connect(audioCtx.destination);src.start(t);}
-function snd_flip(){ensureAudio();const t=audioCtx.currentTime,b=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.055),audioCtx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2200;g.gain.setValueAtTime(0.32,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.055);src.buffer=b;src.connect(hp);hp.connect(g);g.connect(audioCtx.destination);src.start(t);}
-function snd_chip(){ensureAudio();const t=audioCtx.currentTime,base=1600+Math.random()*500;[[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{const osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.type='sine';osc.frequency.value=base*r*(0.97+Math.random()*0.06);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);osc.connect(g);g.connect(audioCtx.destination);osc.start(t);osc.stop(t+0.14);});}
-function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,1319].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*0.10);g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);o.connect(g);g.connect(audioCtx.destination);o.start(t+i*0.10);o.stop(t+i*0.10+0.6);});}
-function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([delay,freq])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq*0.8,t+delay);o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);g.gain.setValueAtTime(0,t+delay);g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+delay);o.stop(t+delay+0.3);});}
-const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
-let myId=localStorage.getItem('pokerPlayerId')||null,mySeat=0,isHost=false,myRoomId=null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
-function vs(s){return(s-mySeat+NP)%NP;}
-const canvas=document.getElementById('c');
-const engine=new BABYLON.Engine(canvas,true);
-window.addEventListener('resize',()=>engine.resize());
-canvas.addEventListener('click',()=>ensureAudio(),{once:true});
-let scene,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
-// POT_BASE: above community cards, between them and the far rail (negative Z = away from viewer)
-const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
-// Bet zone for a visual seat: halfway between seat edge and centre
-function betPos(vSeat){const a=-Math.PI/2-(vSeat/NP)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
-function seatPos(i){const a=-Math.PI/2-(i/NP)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
-function cardPos(si,cn){const a=-Math.PI/2-(si/NP)*Math.PI*2,rx=TRX*0.70,rz=TRZ*0.70,pa=a-Math.PI/2,off=(cn-0.5)*1.10;return new BABYLON.Vector3(Math.cos(a)*rx+Math.cos(pa)*off,0.30+cn*0.003,Math.sin(a)*rz+Math.sin(pa)*off);}
-const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
-const COM_POS=[new BABYLON.Vector3(-2.20,0.305,0),new BABYLON.Vector3(-1.05,0.305,0),new BABYLON.Vector3(0.10,0.305,0),new BABYLON.Vector3(1.50,0.305,0),new BABYLON.Vector3(2.65,0.305,0)];
-const PIP_LAYOUTS={'2':[[.5,.17],[.5,.83]],'3':[[.5,.17],[.5,.5],[.5,.83]],'4':[[.28,.17],[.72,.17],[.28,.83],[.72,.83]],'5':[[.28,.17],[.72,.17],[.5,.5],[.28,.83],[.72,.83]],'6':[[.28,.17],[.72,.17],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],'7':[[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.28,.83],[.72,.83]],'8':[[.28,.17],[.72,.17],[.5,.34],[.28,.5],[.72,.5],[.5,.66],[.28,.83],[.72,.83]],'9':[[.28,.12],[.72,.12],[.28,.36],[.72,.36],[.5,.5],[.28,.64],[.72,.64],[.28,.88],[.72,.88]],'10':[[.28,.12],[.72,.12],[.5,.25],[.28,.38],[.72,.38],[.28,.62],[.72,.62],[.5,.75],[.28,.88],[.72,.88]]};
-function mkBackTex(){const W=256,H=384,tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true),c=tex.getContext(),g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');c.fillStyle=g;c.fillRect(0,0,W,H);c.strokeStyle='#c8a020';c.lineWidth=10;c.strokeRect(5,5,W-10,H-10);c.strokeStyle='rgba(200,160,32,0.5)';c.lineWidth=2;c.strokeRect(18,18,W-36,H-36);c.strokeStyle='rgba(200,160,32,0.15)';c.lineWidth=1;for(let x=-H;x<W+H;x+=14){c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();}c.fillStyle='rgba(200,160,32,0.35)';c.font='72px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText('\u2660',W/2,H/2);tex.update();return tex;}
-function mkFrontTex(suit,rank){
-  const W=320,H=450,tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true),c=tex.getContext();
-  const isRed=suit==='\u2665'||suit==='\u2666',col=isRed?'#cc0000':'#111111';
-  // Background
-  c.fillStyle='#fefefe';c.fillRect(0,0,W,H);
-  c.strokeStyle='#aaaaaa';c.lineWidth=6;c.strokeRect(3,3,W-6,H-6);
-  c.strokeStyle='#dddddd';c.lineWidth=1.5;c.strokeRect(10,10,W-20,H-20);
-  // Center content first (corners drawn on top)
-  c.fillStyle=col;
-  if(rank==='A'){
-    c.font='230px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText(suit,W/2,H/2);
-  }else if(['J','Q','K'].includes(rank)){
-    c.fillStyle=isRed?'#fff4f4':'#f4f4ff';c.fillRect(18,130,W-36,H-260);
-    c.strokeStyle=col+'44';c.lineWidth=2;c.strokeRect(20,132,W-40,H-264);
-    c.fillStyle=col;c.font='bold 130px Georgia,serif';c.textAlign='center';c.textBaseline='middle';
-    c.fillText(rank,W/2,H/2-30);c.font='80px Arial';c.fillText(suit,W/2,H/2+88);
-  }else{
-    // Pip layout with bigger pips
-    const pips=PIP_LAYOUTS[rank]||[],ax=W*0.13,ay=H*0.19,aw=W*0.74,ah=H*0.62;
-    const pSz=pips.length<=4?82:pips.length<=6?70:pips.length<=8?60:50;
-    c.font=`${pSz}px Arial`;c.textAlign='center';c.textBaseline='middle';
-    for(const[fx,fy]of pips)c.fillText(suit,ax+fx*aw,ay+fy*ah);
-  }
-  // Corner indices - white backing so they're always readable over any pip/art
-  function drawCorner(){
-    const rnkSz=rank==='10'?84:96,suitSz=70;
-    const cW=rank==='10'?118:98,cH=rnkSz+suitSz+2;
-    c.fillStyle='rgba(255,255,255,0.94)';c.fillRect(3,3,cW,cH+6);
-    c.fillStyle=col;c.textAlign='left';c.textBaseline='top';
-    c.font=`bold ${rnkSz}px Arial`;c.fillText(rank,8,4);
-    c.font=`${suitSz}px Arial`;c.fillText(suit,10,4+rnkSz-6);
-  }
-  drawCorner();
-  c.save();c.translate(W,H);c.rotate(Math.PI);drawCorner();c.restore();
-  tex.update();return tex;
+const http = require('http');
+const { WebSocketServer } = require('ws');
+const fs   = require('fs');
+const path = require('path');
+const ftp  = require('basic-ftp');
+
+const PORT  = process.env.PORT || 10000;
+const SUITS = ['\u2660','\u2665','\u2666','\u2663'];
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const RVAL  = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
+const NP    = 9;
+const SB    = 10, BB = 20;
+const START_CHIPS = 1000;
+const ACTION_TIMEOUT = 15000;
+
+// ─── Logging ─────────────────────────────────────────────────────────────────
+const LOGS_DIR = path.join(__dirname, 'logs');
+if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
+
+function handLogPath(roomId, handNum) {
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return path.join(LOGS_DIR, `room${roomId}_hand${String(handNum).padStart(4,'0')}_${ts}.txt`);
 }
-function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
-function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.0,height:1.40},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
-function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.28;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
-const CHIP_DENOM=[{val:500,col:[0.52,0.06,0.62]},{val:100,col:[0.14,0.20,0.88]},{val:25,col:[0.10,0.60,0.16]},{val:5,col:[0.85,0.10,0.10]},{val:1,col:[0.90,0.88,0.86]}];
-function buildChipPool(){for(const d of CHIP_DENOM){for(let i=0;i<60;i++){const chip=BABYLON.MeshBuilder.CreateCylinder('chip_'+d.val+'_'+i,{height:0.072,diameter:0.34,tessellation:32},scene),m=new BABYLON.StandardMaterial('cmat_'+d.val+'_'+i,scene);m.diffuseColor=new BABYLON.Color3(...d.col);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(...d.col.map(v=>v*0.22));chip.material=m;chip.isVisible=false;chip.renderingGroupId=1;chip._dval=d.val;chipPool.push(chip);}}}
-function acquireChip(forVal){const d=CHIP_DENOM.find(d=>d.val<=forVal)||CHIP_DENOM[CHIP_DENOM.length-1];const ch=chipPool.find(c=>!c.isVisible&&c._dval===d.val)||chipPool.find(c=>!c.isVisible)||null;if(ch)ch.isVisible=true;return ch;}
-function freeChip(c){if(c){c.isVisible=false;c.position=new BABYLON.Vector3(0,-5,0);}}
-function freeAllChips(){[...potChips].forEach(freeChip);potChips=[];seatBetChips.forEach(arr=>{arr.forEach(freeChip);});seatBetChips=Array.from({length:NP},()=>[]);}
-// Build a realistic chip stack representing an amount (max 12 chips)
-function buildChipStack(amount){const chips=[];let rem=amount;for(const d of CHIP_DENOM){if(rem<=0||chips.length>=12)break;const n=Math.min(Math.floor(rem/d.val),5);for(let i=0;i<n&&chips.length<12;i++){const ch=acquireChip(d.val);if(ch){chips.push(ch);rem-=d.val;}}}return chips;}
-// Arc chips from srcPos to dstBase with stagger
-function animChipArc(chips,srcPos,dstBase,staggerMs,baseY,cb){
-  if(!chips.length){if(cb)setTimeout(cb,50);return;}
-  let done=0;
-  chips.forEach((chip,i)=>{
-    chip.position=new BABYLON.Vector3(srcPos.x,srcPos.y+0.45+i*0.07,srcPos.z);
-    const tgt=new BABYLON.Vector3(dstBase.x+(Math.random()-0.5)*0.20,baseY+i*0.060,dstBase.z+(Math.random()-0.5)*0.20);
-    const mid=new BABYLON.Vector3((chip.position.x+tgt.x)*0.5,chip.position.y+2.0,(chip.position.z+tgt.z)*0.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:chip.position.clone()},{frame:10,value:mid},{frame:22,value:tgt}],'out');
-    chip.animations=[a];
-    setTimeout(()=>{scene.beginAnimation(chip,0,22,false,1.4,()=>{snd_chip();done++;if(done===chips.length&&cb)cb();});},i*staggerMs);
-  });}
-// Place a player's bet chips at their bet zone (seat to bet area in front of them)
-function showBet(serverSeat,amount){
-  if(amount<=0)return;
-  const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);
-  const existH=seatBetChips[serverSeat].length*0.060;
-  const chips=buildChipStack(amount);
-  seatBetChips[serverSeat].push(...chips);
-  animChipArc(chips,src,dst,38,0.32+existH,null);}
-// Sweep all per-seat bet chips into the pot zone above community cards
-function sweepBetsToPot(cb){
-  const all=[];seatBetChips.forEach(arr=>all.push(...arr));
-  seatBetChips=Array.from({length:NP},()=>[]);
-  if(!all.length){if(cb)setTimeout(cb,60);return;}
-  const baseY=0.32+potChips.length*0.055;
-  let done=0;
-  all.forEach((chip,i)=>{
-    const tgt=new BABYLON.Vector3(POT_BASE.x+(Math.random()-0.5)*0.38,baseY+i*0.055,POT_BASE.z+(Math.random()-0.5)*0.28);
-    const mid=new BABYLON.Vector3((chip.position.x+tgt.x)*0.5,chip.position.y+1.5,(chip.position.z+tgt.z)*0.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:chip.position.clone()},{frame:8,value:mid},{frame:18,value:tgt}],'out');
-    chip.animations=[a];
-    setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.6,()=>{snd_chip();potChips.push(chip);done++;if(done===all.length&&cb)cb();});},i*28);});}
-// Fly pot chips (and any straggling seat chips) to winner
-function chipsFlyToWinner(winSeat,cb){
-  const wp=seatPos(vs(winSeat));wp.y+=0.8;
-  const all=[...potChips];seatBetChips.forEach(arr=>all.push(...arr));
-  potChips=[];seatBetChips=Array.from({length:NP},()=>[]);
-  if(!all.length){if(cb)cb();return;}
-  let done=0;
-  all.forEach((chip,i)=>{
-    const start=chip.position.clone(),mid=new BABYLON.Vector3((start.x+wp.x)*0.5,start.y+2.4,(start.z+wp.z)*0.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:8,value:mid},{frame:18,value:wp}],'in');
-    chip.animations=[a];
-    setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.5,()=>{snd_chip();freeChip(chip);done++;if(done===all.length&&cb)cb();});},i*18);});}
-function buildTokens(){function makeToken(name,r,g,b,label){const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene),m=new BABYLON.StandardMaterial(name+'m',scene);m.diffuseColor=new BABYLON.Color3(r,g,b);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);tok.material=m;tok.isVisible=false;tok.renderingGroupId=1;const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false),dc=discTex.getContext();dc.fillStyle=`rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;dc.beginPath();dc.arc(64,64,62,0,Math.PI*2);dc.fill();dc.strokeStyle='rgba(0,0,0,0.5)';dc.lineWidth=3;dc.stroke();dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';dc.font='bold 42px Arial';dc.textAlign='center';dc.textBaseline='middle';dc.fillText(label,64,64);discTex.update();const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene),dm=new BABYLON.StandardMaterial(name+'dm',scene);dm.diffuseTexture=discTex;dm.emissiveColor=new BABYLON.Color3(1,1,1);dm.disableLighting=true;dm.backFaceCulling=false;disc.material=dm;disc.rotation.x=-Math.PI/2;disc.position.y=0.07;disc.parent=tok;disc.renderingGroupId=2;return tok;}dealerToken=makeToken('dealer',0.95,0.95,0.95,'D');sbToken=makeToken('sb',0.15,0.40,0.90,'SB');bbToken=makeToken('bb',0.90,0.80,0.10,'BB');}
-function positionTokens(dSeat,sbSeat,bbSeat){
-// All tokens sit at radius 52% between centre and rail - nicely visible without overlapping labels
-const RX=TRX*0.50,RZ=TRZ*0.50;
-function seatA(seat){return -Math.PI/2-(seat/NP)*Math.PI*2;}
-function place(tok,seat,angOffset){
-  const a=seatA(seat)+angOffset;
-  tok.position=new BABYLON.Vector3(Math.cos(a)*RX,0.38,Math.sin(a)*RZ);
-  tok.isVisible=true;}
-if(dSeat===sbSeat){
-  // Heads-up: dealer=SB. Place D and SB chips side by side, tight together
-  place(dealerToken,dSeat, 0.18);   // D slightly clockwise
-  place(sbToken,    sbSeat,-0.18);  // SB slightly counter-clockwise
-}else{
-  // Normal: D at dealer, no offset needed (alone at that seat)
-  place(dealerToken,dSeat,0);
-  // SB: offset slightly so it's clearly next to D if adjacent seats
-  place(sbToken,sbSeat,0.06);
+
+function writeLog(room, line) {
+  if (!room.G || !room.G.logPath) return;
+  const ts = new Date().toTimeString().slice(0, 8);
+  try { fs.appendFileSync(room.G.logPath, `[${ts}] ${line}\n`); } catch {}
 }
-place(bbToken,bbSeat,0.06);}
-const LW=320,LH=128;
-function buildPlayerLabels(){for(let i=0;i<NP;i++){const tex=new BABYLON.DynamicTexture('plbtex'+i,{width:LW,height:LH},scene,false);tex.hasAlpha=true;const mat=new BABYLON.StandardMaterial('plbm'+i,scene);mat.diffuseTexture=tex;mat.hasAlpha=true;mat.emissiveColor=new BABYLON.Color3(1,1,1);mat.disableLighting=true;mat.backFaceCulling=false;const plane=BABYLON.MeshBuilder.CreatePlane('plbp'+i,{width:2.2,height:0.88},scene);plane.material=mat;const sp=seatPos(i);plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);plane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;plane.isVisible=false;plane.renderingGroupId=2;playerLabels.push({plane,tex});}}
-function updateLabel(seat,name,chips,bet,action,isMe,isDead){const vSeat=vs(seat),lb=playerLabels[vSeat];if(!lb)return;const sp=seatPos(vSeat);lb.plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);const ctx=lb.tex.getContext();ctx.clearRect(0,0,LW,LH);if(!name){lb.plane.isVisible=false;lb.tex.update();return;}const bgCol=isDead?'rgba(80,20,20,0.82)':isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';ctx.fillStyle=bgCol;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.fill();const borderCol=isMe?'#20c040':isDead?'#802020':'#c8a020';ctx.strokeStyle=borderCol;ctx.lineWidth=2;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.stroke();ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='top';const dispName=(name.length>14?name.slice(0,13)+'\u2026':name).toUpperCase();ctx.fillText(dispName,LW/2,8);ctx.fillStyle='#ffd700';ctx.font='19px Arial';ctx.fillText('\u00a3'+(chips/100).toFixed(2),LW/2,38);if(bet>0){ctx.fillStyle='#80cfff';ctx.font='15px Arial';ctx.fillText('STAKE: \u00a3'+(bet/100).toFixed(2),LW/2,64);}if(action){const ac=action.toUpperCase(),acCol=ac.startsWith('FOLD')?'#c04040':ac.startsWith('RAISE')?'#e09020':'#20c040';ctx.fillStyle=acCol;ctx.font='bold 16px Arial';ctx.fillText(ac,LW/2,bet>0?90:68);}lb.tex.update();lb.plane.isVisible=true;}
-function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);a.setKeys(keys);const ef=ease==='in'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();ef.setEasingMode(ease==='in'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);a.setEasingFunction(ef);return a;}
-function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
-function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
-// (chip functions defined above)}
-function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.055,0.025,0.010,1);const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.8,17,new BABYLON.Vector3(0,0.5,0),scene);cam.lowerRadiusLimit=7;cam.upperRadiusLimit=26;cam.lowerBetaLimit=0.20;cam.upperBetaLimit=1.35;cam.wheelPrecision=22;cam.attachControl(canvas,true);const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);h.intensity=0.20;h.diffuse=new BABYLON.Color3(0.55,0.48,0.60);h.groundColor=new BABYLON.Color3(0.06,0.04,0.08);spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.1,1.4,scene);spotLight.intensity=1.8;spotLight.diffuse=new BABYLON.Color3(1,0.97,0.88);shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=12;const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);f.position.y=-0.22;f.receiveShadows=true;const fm=new BABYLON.StandardMaterial('fm',scene);fm.diffuseColor=new BABYLON.Color3(0.10,0.048,0.020);fm.specularColor=new BABYLON.Color3(0.20,0.10,0.04);fm.specularPower=80;f.material=fm;const T=96,base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.44,diameter:12,tessellation:T},scene);base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;const bm=new BABYLON.StandardMaterial('bm',scene);bm.diffuseColor=new BABYLON.Color3(0.22,0.10,0.04);bm.specularColor=new BABYLON.Color3(0.55,0.32,0.08);bm.specularPower=160;base.material=bm;const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.42,tessellation:T,radialSegments:20},scene);rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.18;const rm=new BABYLON.StandardMaterial('rm',scene);rm.diffuseColor=new BABYLON.Color3(0.30,0.14,0.05);rm.specularColor=new BABYLON.Color3(0.80,0.50,0.15);rm.specularPower=220;rm.emissiveColor=new BABYLON.Color3(0.04,0.02,0.005);rail.material=rm;const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.22;const ftm=new BABYLON.StandardMaterial('ftm',scene);ftm.diffuseColor=new BABYLON.Color3(0.05,0.22,0.48);ftm.specularColor=new BABYLON.Color3(0.01,0.04,0.08);ftm.specularPower=6;felt.material=ftm;felt.receiveShadows=true;
-// Brand text "SYFM UC" faded onto the felt
-const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
-let seatActions={};
-function applyState(st){if(!st)return;lastState=st;for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').textContent=`YOUR CHIPS: \u00a3${(p0.chips/100).toFixed(2)}  |  BET: \u00a3${(p0.bet/100).toFixed(2)}`;document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
-function getOrCreateCommunityMesh(idx){if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];const m=nextCardMesh();communityCardMeshes[idx]=m;return m;}
-function startDealAnimation(activeSeats,afterDone){dealing=true;for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}for(const m of communityCardMeshes){if(m)m.isVisible=false;}communityCardMeshes=[];freeAllChips();const seq=[];for(let rd=0;rd<2;rd++)for(const si of activeSeats)seq.push(si);const dealt={};for(const si of activeSeats)dealt[si]=0;let idx=0;function next(){if(idx>=seq.length){dealing=false;if(afterDone)afterDone();return;}const si=seq[idx++],cn=dealt[si]||0;dealt[si]=cn+1;const m=nextCardMesh();seatCardMeshes[si][cn]=m;const target=cardPos(vs(si),cn);animDeal(m,target,()=>{snd_deal();if(lastState&&lastState.players[si]){const cd=lastState.players[si].cards[cn];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());}setTimeout(next,80);});}next();}
-function connectWS(name,roomId,playerId){const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${proto}//${location.host}`);ws.onopen=()=>{ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));};ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};ws.onclose=()=>{showMsg('\u26a0 Disconnected from server',0);setTimeout(()=>location.reload(),4000);};ws.onerror=()=>{document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';};}
-function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
-function handleServerMsg(msg){switch(msg.type){
-case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
-case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
-case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
-case 'lobby':renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
-case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
-case 'winner':snd_win();hideTurnIndicator();addLog(`\ud83c\udfc6 ${msg.name} wins \u00a3${(msg.amount/100).toFixed(2)} \u2014 ${msg.label||''}`,'log-win');showMsg(`\ud83c\udfc6 ${msg.name} wins \u00a3${(msg.amount/100).toFixed(2)}\n${msg.label||''}!`,0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
-case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;break;
-case 'newHand':{
-  seatActions={};showMsg('');setActions(false);hideTurnIndicator();
-  document.getElementById('waitingMsg').style.display='none';
-  handNumber++;
-  addLog(`\u2501\u2501 Hand #${handNumber} | Dealer: Seat ${(msg.dealerSeat+1)} \u2501\u2501`,'log-hand');
-  addLog(`SB: Seat ${msg.sbSeat+1} \u00b7 BB: Seat ${msg.bbSeat+1}`);
-  positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));
-  // Show blind chips AFTER deal animation completes
-  const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat;
-  startDealAnimation(msg.activeSeats||[],()=>{
-    // Animate SB and BB chips sliding to their bet zones
-    setTimeout(()=>{showBet(sbSeat,10);},120);
-    setTimeout(()=>{showBet(bbSeat,20);},280);
-    if(lastState)applyState(lastState);
-  });break;}
-case 'state':lastState=msg;if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;}if(!dealing)applyState(msg);break;
-case 'playerAction':{
-  const pname=msg.name||'Player';
-  const ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?`CALL \u00a3${((msg.amount||0)/100).toFixed(2)}`:`RAISE \u00a3${((msg.amount||0)/100).toFixed(2)}`;
-  seatActions[msg.seat]=ac;addLog(`${pname}: ${ac}`);
-  // Show bet chips for any chips put into the pot (call or raise)
-  if(msg.amount>0)showBet(msg.seat,msg.amount);
-  hideTurnIndicator();if(lastState)applyState(lastState);break;}
-case 'yourTurn':{
-  const ca=msg.callAmt||0;
-  if(msg.seat===mySeat){
-    document.getElementById('callBtn').textContent=ca>0?`CALL \u00a3${(ca/100).toFixed(2)}`:'CHECK';
-    document.getElementById('raiseAmt').value=((msg.minRaise||40)/100).toFixed(2);
-    setActions(true);showMsg('\u2b50 Your turn!',0);
-    document.getElementById('waitingMsg').style.display='none';
-  }else{
-    setActions(false);showMsg('');
-    const actingPlayer=lastState&&lastState.players[msg.seat];
-    const actingName=actingPlayer?actingPlayer.name:`Seat ${msg.seat+1}`;
-    showTurnIndicator(`\u23f3 ${actingName} is thinking\u2026`);
-  }break;}
-case 'communityDealt':
-  // Sweep all seat bet chips into the pot, THEN show the new card(s)
-  addLog(`\u25b6 ${(msg.phase||'').toUpperCase()}: ${(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' ')}`,'log-community');
-  sweepBetsToPot(()=>{if(lastState)applyState(lastState);});
-  break;
-case 'showdown':setPhase('Showdown');hideTurnIndicator();
-  // Sweep any final street bets to pot before showdown reveal
-  sweepBetsToPot(null);
-  addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
-case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
-case 'playerLeft':addLog(`${msg.name} left the table`);addChat(`\u2b05 ${msg.name} left`);seatActions[msg.seat]='';if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}if(lastState)applyState(lastState);break;
-case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
-case 'gamePaused':handlePaused(true,msg.byName);break;
-case 'gameResumed':handlePaused(false,null);break;
-case 'voluntaryAutoFoldAck':break; // server confirms, already handled client-side
-case 'chat':addChat(`${msg.name}: ${msg.text}`);break;
-case 'error':addChat(`\u26a0 ${msg.msg}`);break;}}
-function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML=`<span>${s.name}${s.id===msg.hostId?'<span class="host-badge">HOST</span>':''}</span><span class="chips">\u00a3${(s.chips/100).toFixed(2)}</span>`;pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML=`<span>${p.name}</span><span><button class="btn-sm btn-approve" onclick="approvePlayer('${p.id}',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer('${p.id}',false)">\u2717 Reject</button></span>`;pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
-function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
-let pendingInGame={};
-function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
-function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML=`<span class="jr-name">${p.name}</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove('${p.id}',true)">Admit</button><button class="jr-reject" onclick="inGameApprove('${p.id}',false)">Reject</button></span>`;list.appendChild(row);}}
-function inGameApprove(id,accept){wsSend({type:'approve',id,accept});delete pendingInGame[id];refreshInGameJoinNotif();}
-function showTurnIndicator(txt){document.getElementById('turnIndicator').textContent=txt;document.getElementById('turnIndicator').style.display='block';}
-function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';}
-function setActions(v){document.getElementById('actions').style.display=v?'flex':'none';}
-function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
-function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);}
-function addChat(txt){const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);}
-let handNumber=0;
-function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
-let activityCollapsed=false;
-function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{});}else{document.exitFullscreen();}}
-document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
-let gamePaused=false;
-function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
-function handlePaused(isPaused,byName){
-  gamePaused=isPaused;
-  const btn=document.getElementById('pauseBtn');
-  const banner=document.getElementById('pauseBanner');
-  if(isPaused){
-    btn.classList.add('active');btn.textContent='\u25b6 RESUME';
-    banner.style.display='block';
-    // Auto-expand activity log so players can review it
-    if(activityCollapsed)toggleActivityLog();
-    addLog(`\u23f8 Game PAUSED by ${byName||'a player'} \u2014 reviewing hand history`,'log-hand');
-  }else{
-    btn.classList.remove('active');btn.textContent='\u23ae\u23ae PAUSE';
-    banner.style.display='none';
-    addLog('\u25b6 Game RESUMED','log-hand');
+
+// FTP upload after hand finishes
+async function ftpUpload(localPath) {
+  const host = process.env.FTP_HOST;
+  const user = process.env.FTP_USER;
+  const pass = process.env.FTP_PASS;
+  const dir  = process.env.FTP_DIR || '/poker-logs';
+  if (!host || !user || !pass) { console.log('FTP: env vars not set, skipping'); return; }
+  const client = new ftp.Client();
+  client.ftp.verbose = false;
+  try {
+    await client.access({ host, user, password: pass, secure: false });
+    try { await client.ensureDir(dir); } catch {}
+    await client.uploadFrom(localPath, `${dir}/${path.basename(localPath)}`);
+    console.log('FTP: uploaded', path.basename(localPath));
+  } catch (err) {
+    console.error('FTP upload failed:', err.message);
+  } finally {
+    client.close();
   }
 }
-let myAutoFold=false;
-function toggleAutoFold(){
-  myAutoFold=!myAutoFold;
-  wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});
-  const btn=document.getElementById('autoFoldBtn');
-  if(myAutoFold){btn.classList.add('active');btn.textContent='\u274c AUTO-FOLD ON';showMsg('\u274c Auto-fold ON \u2014 you will fold every hand until you turn it off',3200);}
-  else{btn.classList.remove('active');btn.textContent='\u25b6 AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
+
+// ─── HTTP server ──────────────────────────────────────────────────────────────
+const server = http.createServer((req, res) => {
+  if (req.url === '/' || req.url === '/index.html') {
+    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
+      if (err) { res.writeHead(500); res.end('Error loading game'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(data);
+    });
+    return;
+  }
+  if (req.url === '/logs') {
+    let files = [];
+    try { files = fs.readdirSync(LOGS_DIR).filter(f => f.endsWith('.txt')).sort().reverse(); } catch {}
+    const links = files.map(f =>
+      `<li><a href="/logs/download/${encodeURIComponent(f)}">${f}</a></li>`
+    ).join('');
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(`<!DOCTYPE html><html><head><title>Logs</title>
+      <style>body{font-family:monospace;background:#111;color:#aef;padding:20px}a{color:#ffd700}li{margin:4px 0}</style></head>
+      <body><h2>SYFM Poker - Hand Logs (${files.length} files)</h2><ul>${links}</ul>
+      <p><a href="/">Back to game</a></p></body></html>`);
+    return;
+  }
+  const dl = req.url.match(/^\/logs\/download\/(.+)$/);
+  if (dl) {
+    const name = decodeURIComponent(dl[1]).replace(/[/\\]/g, '');
+    const fp = path.join(LOGS_DIR, name);
+    if (!fp.startsWith(LOGS_DIR) || !name.endsWith('.txt')) { res.writeHead(403); res.end(); return; }
+    fs.readFile(fp, (err, data) => {
+      if (err) { res.writeHead(404); res.end('Not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Disposition': `attachment; filename="${name}"` });
+      res.end(data);
+    });
+    return;
+  }
+  res.writeHead(404); res.end('Not found');
+});
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+const wss = new WebSocketServer({ server });
+const rooms = new Map();
+
+function getOrCreateRoom(roomId) {
+  if (!rooms.has(roomId)) {
+    rooms.set(roomId, {
+      id: roomId, seats: Array(NP).fill(null), hostId: null,
+      gameActive: false, pendingJoins: [], G: null, dealerSeat: -1,
+      actionTimer: null, handNum: 0,
+      paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT, actionTimerStarted: 0
+    });
+  }
+  return rooms.get(roomId);
 }
-let activityCollapsed=false;
-function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 maximise':'\u25bc minimise';}
-let chatCollapsed=false;
-function toggleChat(){chatCollapsed=!chatCollapsed;const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');inner.style.display=chatCollapsed?'none':'block';toggle.textContent=chatCollapsed?'\u25b6 maximise':'\u25bc minimise';}
-document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
-document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');const val=Math.round(parseFloat(document.getElementById('raiseAmt').value)*100)||40;wsSend({type:'action',action:'raise',amount:val});};
-document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
-document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
-document.getElementById('brightSlider').oninput=(e)=>{if(spotLight)spotLight.intensity=parseFloat(e.target.value);};
-document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
-['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
-const scn=createScene();
-engine.runRenderLoop(()=>scn.render());
-</script>
-</body>
-</html>
+
+function send(ws, msg) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+}
+
+function broadcastAll(room, msg) {
+  const str = JSON.stringify(msg);
+  room.seats.forEach(s => { if (s?.ws?.readyState === 1) s.ws.send(str); });
+}
+
+function lobbySnapshot(room) {
+  return {
+    type: 'lobby', roomId: room.id, hostId: room.hostId, gameActive: room.gameActive,
+    seats: room.seats.map(s => s ? { id: s.id, name: s.name, chips: s.chips, seat: s.seat } : null),
+    pending: room.pendingJoins.map(p => ({ id: p.id, name: p.name }))
+  };
+}
+
+function tableSnapshot(room, forId) {
+  const G = room.G;
+  if (!G) return { type: 'state', phase: 'idle', players: room.seats.map(() => null) };
+  return {
+    type: 'state', phase: G.phase, pot: G.pot, currentBet: G.currentBet,
+    community: G.community, dealerSeat: room.dealerSeat,
+    sbSeat: G.sbSeat, bbSeat: G.bbSeat, toActSeat: G.toAct[0] ?? null,
+    players: room.seats.map(s => {
+      if (!s) return null;
+      const showCards = s.id === forId || (G.phase === 'showdown' && !s.folded);
+      return {
+        seat: s.seat, name: s.name, chips: s.chips, bet: s.bet,
+        folded: s.folded, disconnected: s.disconnected || false,
+        cards: showCards ? s.cards : s.cards.map(() => 'back'),
+        active: !s.sittingOut
+      };
+    })
+  };
+}
+
+function startActionTimer(room, seat, remainingMs) {
+  clearActionTimer(room);
+  if (room.paused) {
+    // Game is paused — record what we would have done, but don't start the clock
+    room.actionTimerSeat = seat;
+    room.actionTimerRemaining = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
+    return;
+  }
+  const duration = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
+  room.actionTimerSeat = seat;
+  room.actionTimerRemaining = duration;
+  room.actionTimerStarted = Date.now();
+  room.actionTimer = setTimeout(() => {
+    const p = room.seats[seat];
+    if (!p || p.folded || !room.G || room.G.toAct[0] !== seat) return;
+    doFold(room, seat, 'timeout');
+  }, duration);
+}
+
+function clearActionTimer(room) {
+  if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
+  // Snapshot remaining time so resume can use it
+  if (room.actionTimerStarted) {
+    const elapsed = Date.now() - room.actionTimerStarted;
+    room.actionTimerRemaining = Math.max(2000, (room.actionTimerRemaining || ACTION_TIMEOUT) - elapsed);
+    room.actionTimerStarted = 0;
+  }
+}
+
+function pauseGame(room, byName) {
+  if (room.paused) return;
+  room.paused = true;
+  // Capture remaining time before clearing
+  clearActionTimer(room);
+  broadcastAll(room, { type: 'gamePaused', byName });
+  console.log(`Room ${room.id} PAUSED by ${byName}`);
+}
+
+function resumeGame(room) {
+  if (!room.paused) return;
+  room.paused = false;
+  broadcastAll(room, { type: 'gameResumed' });
+  // Restart the action timer with remaining time if a hand is in progress
+  if (room.G && room.actionTimerSeat >= 0 && room.G.toAct[0] === room.actionTimerSeat) {
+    startActionTimer(room, room.actionTimerSeat, room.actionTimerRemaining || ACTION_TIMEOUT);
+  }
+  console.log(`Room ${room.id} RESUMED`);
+}
+
+// ─── Connections ──────────────────────────────────────────────────────────────
+// Reconnect grace period: how long we wait after a socket closes before
+// treating it as a real disconnect. Handles brief network blips, page reloads,
+// mobile radio switches, Render load-balancer health checks, etc.
+const RECONNECT_GRACE_MS = 8000;
+
+wss.on('connection', ws => {
+  let myId = null, myRoomId = null;
+
+  ws.on('message', raw => {
+    let msg;
+    try { msg = JSON.parse(raw); } catch { return; }
+
+    switch (msg.type) {
+
+      case 'join': {
+        const rawRoom = String(msg.room || '1').replace(/\D/g, '') || '1';
+        myRoomId = rawRoom.slice(0, 6);
+        myId = msg.id || ('p_' + Math.random().toString(36).slice(2, 8));
+        const name = (msg.name || 'Player').slice(0, 18).trim() || 'Player';
+        const room = getOrCreateRoom(myRoomId);
+
+        // ── Reconnect: player already has a seat ──────────────────────────────
+        const existing = room.seats.find(s => s?.id === myId);
+        if (existing) {
+          // Cancel any pending disconnect timer — they're back
+          if (existing._disconnectTimer) {
+            clearTimeout(existing._disconnectTimer);
+            existing._disconnectTimer = null;
+          }
+
+          if (existing.autoFold) {
+            // Was permanently disconnected — needs host re-admission
+            // But first make sure they're not already in pending from a previous attempt
+            if (!room.pendingJoins.find(p => p.id === myId)) {
+              room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
+            } else {
+              // Update the ws in the existing pending entry to this newer socket
+              const pj = room.pendingJoins.find(p => p.id === myId);
+              if (pj) pj.ws = ws;
+            }
+            send(ws, { type: 'waiting', id: myId, reason: 'Waiting for host to re-admit you.' });
+            const host = room.seats.find(s => s?.id === room.hostId);
+            if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
+            broadcastAll(room, lobbySnapshot(room));
+          } else {
+            // Normal reconnect — swap in the new socket, resume play
+            existing.ws = ws;
+            existing.disconnected = false;
+            send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
+            send(ws, lobbySnapshot(room));
+            if (room.G) send(ws, tableSnapshot(room, myId));
+            broadcastAll(room, { type: 'chat', name: 'System', text: `${existing.name} reconnected` });
+          }
+          return;
+        }
+
+        // ── Brand-new player ──────────────────────────────────────────────────
+        const hasSeatedPlayers = room.seats.some(s => s !== null);
+        if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
+          // First player in the room becomes host
+          room.seats[0] = mkPlayer(ws, myId, name, 0);
+          room.hostId = myId;
+          send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
+          broadcastAll(room, lobbySnapshot(room));
+          return;
+        }
+
+        // Avoid duplicate pending entries (e.g. double-click join)
+        if (room.pendingJoins.find(p => p.id === myId)) {
+          const pj = room.pendingJoins.find(p => p.id === myId);
+          pj.ws = ws; // update to latest socket
+          send(ws, { type: 'waiting', id: myId });
+          return;
+        }
+
+        room.pendingJoins.push({ ws, id: myId, name });
+        send(ws, { type: 'waiting', id: myId });
+        const host = room.seats.find(s => s?.id === room.hostId);
+        if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name });
+        break;
+      }
+
+      case 'approve': {
+        const room = rooms.get(myRoomId);
+        if (!room || myId !== room.hostId) return;
+        const idx = room.pendingJoins.findIndex(p => p.id === msg.id);
+        if (idx === -1) return;
+        const p = room.pendingJoins.splice(idx, 1)[0];
+
+        if (msg.accept) {
+          const existSeat = room.seats.find(s => s?.id === p.id);
+          if (existSeat) {
+            // Re-admitting a previously disconnected player back to their seat
+            if (existSeat._disconnectTimer) {
+              clearTimeout(existSeat._disconnectTimer);
+              existSeat._disconnectTimer = null;
+            }
+            existSeat.ws = p.ws;
+            existSeat.disconnected = false;
+            existSeat.autoFold = false;
+            send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
+            send(p.ws, lobbySnapshot(room));
+            if (room.G) send(p.ws, tableSnapshot(room, p.id));
+            broadcastAll(room, { type: 'chat', name: 'System', text: `${existSeat.name} re-admitted to the table` });
+          } else {
+            // New player joining for the first time
+            const seat = room.seats.findIndex(s => s === null);
+            if (seat === -1) {
+              send(p.ws, { type: 'rejected', reason: 'Table is full' });
+              broadcastAll(room, lobbySnapshot(room));
+              return;
+            }
+            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat);
+            send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
+            if (room.gameActive) {
+              room.seats[seat].sittingOut = true;
+              send(p.ws, { type: 'sittingOut', reason: 'Hand in progress - you will join next hand.' });
+              send(p.ws, tableSnapshot(room, p.id));
+            }
+          }
+        } else {
+          send(p.ws, { type: 'rejected', reason: 'Host declined your request' });
+        }
+        broadcastAll(room, lobbySnapshot(room));
+        break;
+      }
+
+      case 'startGame': {
+        const room = rooms.get(myRoomId);
+        if (!room || myId !== room.hostId) return;
+        const playable = room.seats.filter(s => s && !s.autoFold);
+        if (playable.length < 2) { send(ws, { type: 'error', msg: 'Need at least 2 players' }); return; }
+        room.gameActive = true;
+        broadcastAll(room, { type: 'gameStarting' });
+        broadcastAll(room, lobbySnapshot(room));
+        startNewHand(room);
+        break;
+      }
+
+      case 'pause': {
+        const room = rooms.get(myRoomId);
+        if (!room || !room.gameActive) return;
+        const p = room.seats.find(s => s?.id === myId);
+        if (!p) return;
+        pauseGame(room, p.name);
+        break;
+      }
+
+      case 'resume': {
+        const room = rooms.get(myRoomId);
+        if (!room || !room.gameActive) return;
+        const p = room.seats.find(s => s?.id === myId);
+        if (!p) return;
+        resumeGame(room);
+        break;
+      }
+
+      case 'voluntaryAutoFold': {
+        const room = rooms.get(myRoomId);
+        if (!room) return;
+        const p = room.seats.find(s => s?.id === myId);
+        if (!p) return;
+        p.voluntaryAutoFold = msg.enabled === true;
+        writeLog(room, `${p.name} voluntary auto-fold: ${p.voluntaryAutoFold}`);
+        // If it's currently their turn and they just enabled it, fold them now
+        if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
+          clearActionTimer(room);
+          doFold(room, p.seat, 'auto-fold');
+        }
+        break;
+      }
+
+      case 'action': {
+        const room = rooms.get(myRoomId);
+        if (!room?.G || !room.gameActive) return;
+        const actSeat = room.seats.findIndex(s => s?.id === myId);
+        if (actSeat === -1 || room.G.toAct[0] !== actSeat) return;
+        clearActionTimer(room);
+        handleAction(room, actSeat, msg.action, msg.amount);
+        break;
+      }
+
+      case 'chat': {
+        const room = rooms.get(myRoomId);
+        if (!room) return;
+        const s = room.seats.find(s => s?.id === myId);
+        if (!s) return;
+        broadcastAll(room, { type: 'chat', name: s.name, text: (msg.text || '').slice(0, 120) });
+        break;
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    if (!myId || !myRoomId) return;
+    const room = rooms.get(myRoomId);
+    if (!room) return;
+
+    // ── If this socket was waiting in pending, just remove it cleanly ─────────
+    const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
+    if (pi !== -1) {
+      room.pendingJoins.splice(pi, 1);
+      broadcastAll(room, lobbySnapshot(room));
+      return; // not seated, nothing more to do
+    }
+
+    // ── Find the seated player this socket belonged to ────────────────────────
+    const s = room.seats.find(s => s?.id === myId);
+    if (!s) return;
+
+    // ── CRITICAL: Stale socket guard ──────────────────────────────────────────
+    // If the seat's current socket is NOT the one that just closed, this player
+    // has already reconnected on a newer socket. Ignore this stale close event
+    // entirely — do not disconnect them.
+    if (s.ws !== ws) return;
+
+    // ── Real disconnect: start grace period before penalising ─────────────────
+    // Mark as temporarily disconnected but do NOT set autoFold yet.
+    // Give them RECONNECT_GRACE_MS to come back (handles page reloads,
+    // mobile radio switches, brief network blips, Render health checks).
+    s.disconnected = true;
+    s.ws = null;
+    broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} disconnected — reconnecting...` });
+    writeLog(room, `DISCONNECT: ${s.name} seat ${s.seat + 1} — grace period started`);
+    broadcastState(room); // UI can show the disconnected state visually
+
+    // If it's their turn RIGHT NOW, fold immediately (game can't wait 8 seconds)
+    if (room.G && room.G.toAct[0] === s.seat) {
+      clearActionTimer(room);
+      doFold(room, s.seat, 'disconnected');
+    }
+
+    // Start the grace timer
+    s._disconnectTimer = setTimeout(() => {
+      // Check they haven't reconnected during the grace period
+      if (!s.disconnected || s.ws !== null) return;
+
+      s.autoFold = true;
+      s._disconnectTimer = null;
+      broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out — auto-folding until host re-admits` });
+      writeLog(room, `TIMEOUT: ${s.name} seat ${s.seat + 1} — autoFold enabled`);
+
+      // Fold them out of the current hand if still in it
+      if (room.G && !s.folded) {
+        s.folded = true;
+        const idx = room.G.toAct.indexOf(s.seat);
+        if (idx !== -1) room.G.toAct.splice(idx, 1);
+        broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (timed out)' });
+        broadcastState(room);
+        const alive = room.seats.filter(p => p && !p.folded);
+        if (alive.length <= 1) endRound(room);
+      }
+
+      // Notify host they need to re-admit this player
+      if (room.hostId) {
+        const host = room.seats.find(h => h?.id === room.hostId);
+        if (host?.ws?.readyState === 1) {
+          send(host.ws, { type: 'joinRequest', id: s.id, name: s.name });
+        }
+      }
+    }, RECONNECT_GRACE_MS);
+  });
+
+  ws.on('error', err => console.error('WS error:', err.message));
+});
+
+function mkPlayer(ws, id, name, seat) {
+  return { ws, id, name, chips: START_CHIPS, seat, cards: [], bet: 0, folded: false, disconnected: false, autoFold: false, _disconnectTimer: null };
+}
+
+// ─── Game helpers ─────────────────────────────────────────────────────────────
+function shuffle(d) {
+  for (let i = d.length - 1; i > 0; i--) { const j = 0 | Math.random() * (i + 1); [d[i], d[j]] = [d[j], d[i]]; }
+  return d;
+}
+function buildDeck() {
+  const d = [];
+  for (const s of SUITS) for (const r of RANKS) d.push({ s, r });
+  return shuffle(d);
+}
+
+// Active seats = seated, not sitting out, not permanently disconnected (autoFold)
+// Note: temporarily disconnected players (grace period) still count as active —
+// their turn will be handled by promptToAct which folds them immediately
+function activePlaying(room) {
+  return room.seats
+    .map((s, i) => (s && !s.sittingOut && !s.autoFold) ? i : null)
+    .filter(i => i !== null);
+}
+
+function nextSeat(from, active) {
+  const sorted = [...active].sort((a, b) => a - b);
+  const nxt = sorted.find(i => i > from);
+  return nxt !== undefined ? nxt : sorted[0];
+}
+
+// Build act order starting from startSeat, cycling through active seats
+// Excludes folded, autoFold, and zero-chip players
+function buildActOrder(room, startSeat, active) {
+  const sorted = [...active].sort((a, b) => a - b);
+  let startIdx = sorted.indexOf(startSeat);
+  // If startSeat not in active (shouldn't happen but safety), start from 0
+  if (startIdx === -1) startIdx = 0;
+  const ordered = [...sorted.slice(startIdx), ...sorted.slice(0, startIdx)];
+  return ordered.filter(i => {
+    const p = room.seats[i];
+    return p && !p.folded && !p.autoFold && p.chips > 0;
+  });
+}
+
+// ─── Hand flow ────────────────────────────────────────────────────────────────
+function startNewHand(room) {
+  clearActionTimer(room);
+
+  // Resume if paused — new hand always starts live
+  if (room.paused) {
+    room.paused = false;
+    broadcastAll(room, { type: 'gameResumed' });
+  }
+  room.actionTimerSeat = -1;
+  room.actionTimerRemaining = ACTION_TIMEOUT;
+  room.actionTimerStarted = 0;
+
+  // Clear sittingOut for all (new hand = everyone plays)
+  // Also clear any stale disconnect timers — start fresh each hand
+  room.seats.forEach(s => {
+    if (s) {
+      s.sittingOut = false;
+      if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
+    }
+  });
+
+  // Only include genuinely connected, non-auto-fold players
+  const active = activePlaying(room);
+
+  if (active.length < 2) {
+    broadcastAll(room, { type: 'waitingForPlayers' });
+    room.gameActive = false;
+    broadcastAll(room, lobbySnapshot(room));
+    return;
+  }
+
+  // Advance dealer button (skip autoFold/disconnected)
+  room.dealerSeat = room.dealerSeat < 0
+    ? active[0]
+    : nextSeat(room.dealerSeat, active);
+
+  room.handNum = (room.handNum || 0) + 1;
+
+  // ── Heads-up rule (TDA Rule 34): dealer = SB, acts first preflop ──────────
+  // In 3-handed: dealer = UTG (acts first, no blinds posted by dealer)
+  //              SB = next left of dealer
+  //              BB = next left of SB
+  // In 4+ handed: UTG = next left of BB acts first
+  //               Dealer acts second-to-last (before SB, BB get option)
+  const isHeadsUp = active.length === 2;
+  const sbSeat = isHeadsUp ? room.dealerSeat : nextSeat(room.dealerSeat, active);
+  const bbSeat = nextSeat(sbSeat, active);
+
+  // Preflop starting seat:
+  // Heads-up: SB/dealer acts first
+  // 3-handed: dealer = UTG, acts first (nextSeat(bbSeat) wraps back to dealer)
+  // 4+ handed: UTG (left of BB) acts first - dealer acts near the end
+  const preflopStart = nextSeat(bbSeat, active);
+
+  const logPath = handLogPath(room.id, room.handNum);
+
+  room.G = {
+    deck: buildDeck(), phase: 'preflop', pot: 0,
+    currentBet: BB,
+    lastRaiseIncrement: BB, // tracks the size of the most recent raise, for min-raise calculation
+    community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath
+  };
+
+  // Reset per-player hand state
+  room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; } });
+
+  // Write log header
+  const playerSummary = active.map(i => {
+    const s = room.seats[i];
+    return `${s.name}(seat${i+1}) \u00a3${(s.chips/100).toFixed(2)}`;
+  }).join(', ');
+  fs.writeFileSync(logPath,
+    `SYFM Poker | Room ${room.id} | Hand #${room.handNum}\n` +
+    `${new Date().toISOString()}\n` +
+    `${'='.repeat(60)}\n` +
+    `Players: ${playerSummary}\n` +
+    `Dealer: Seat ${room.dealerSeat+1}  SB: Seat ${sbSeat+1} (${SB}p)  BB: Seat ${bbSeat+1} (${BB}p)\n` +
+    `Heads-up: ${isHeadsUp}  Active seats: ${active.join(',')}\n` +
+    `${'-'.repeat(60)}\n`
+  );
+
+  // Post blinds
+  room.seats[sbSeat].chips -= SB; room.seats[sbSeat].bet = SB;
+  room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB;
+  room.G.pot = SB + BB;
+
+  // Deal 2 hole cards each
+  for (let rd = 0; rd < 2; rd++)
+    for (const si of active)
+      room.seats[si].cards.push(room.G.deck.shift());
+
+  // Log hole cards
+  active.forEach(i => {
+    const s = room.seats[i];
+    writeLog(room, `DEAL: ${s.name} \u2192 ${s.cards.map(c => c.r + c.s).join(' ')}`);
+  });
+
+  // Build preflop act order
+  room.G.toAct = buildActOrder(room, preflopStart, active);
+
+  broadcastAll(room, {
+    type: 'newHand', dealerSeat: room.dealerSeat, sbSeat, bbSeat,
+    pot: room.G.pot, activeSeats: active
+  });
+
+  room.seats.forEach(s => {
+    if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id));
+  });
+
+  writeLog(room, `PREFLOP | Pot: ${room.G.pot}p | Act order: ${room.G.toAct.map(i => room.seats[i].name).join(' \u2192 ')}`);
+  promptToAct(room);
+}
+
+function promptToAct(room) {
+  const G = room.G;
+  if (!G) return;
+
+  // Skip any players who are now ineligible
+  while (G.toAct.length) {
+    const si = G.toAct[0];
+    const p = room.seats[si];
+    if (!p || p.folded || p.autoFold || p.chips === 0) G.toAct.shift();
+    else break;
+  }
+
+  const alive = room.seats.filter(s => s && !s.folded);
+  if (alive.length <= 1) { endRound(room); return; }
+  if (!G.toAct.length) { advPhase(room); return; }
+
+  const seat = G.toAct[0];
+  const p = room.seats[seat];
+
+  // Auto-fold disconnected/autoFold/voluntaryAutoFold player immediately
+  if (p.disconnected || p.autoFold || p.voluntaryAutoFold) {
+    clearActionTimer(room);
+    const reason = p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
+    doFold(room, seat, reason);
+    return;
+  }
+
+  // ── Min-raise calculation (No-Limit Hold'em rules) ──────────────────────
+  // callAmt: what the player needs to put in just to call
+  // minRaise: TOTAL chips player must put in from their stack to make the minimum legal raise
+  //   = callAmt + lastRaiseIncrement
+  //   where lastRaiseIncrement = size of the last raise (or BB if no raise yet)
+  // Capped at player's remaining chips (for all-in scenarios)
+  const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
+  const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
+
+  broadcastAll(room, { type: 'yourTurn', seat, callAmt, minRaise, pot: G.pot, currentBet: G.currentBet });
+  startActionTimer(room, seat);
+}
+
+function doFold(room, seat, reason) {
+  const p = room.seats[seat];
+  if (!p) return;
+  p.folded = true;
+  const label = reason ? ` (${reason})` : '';
+  broadcastAll(room, { type: 'playerAction', seat, action: 'fold', amount: 0, name: p.name + label });
+  writeLog(room, `ACTION: ${p.name} FOLDS${label}`);
+  broadcastState(room);
+  acted(room, seat, false);
+}
+
+function handleAction(room, seat, action, amount) {
+  const p = room.seats[seat];
+  const G = room.G;
+  if (!p || !G) return;
+
+  if (action === 'fold') {
+    doFold(room, seat, null);
+
+  } else if (action === 'check' || action === 'call') {
+    const ca = Math.min(G.currentBet - p.bet, p.chips);
+    p.chips -= ca; p.bet += ca; G.pot += ca;
+    const act = ca === 0 ? 'check' : 'call';
+    broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
+    writeLog(room, `ACTION: ${p.name} ${act.toUpperCase()}${ca > 0 ? ` \u00a3${(ca/100).toFixed(2)}` : ''} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    broadcastState(room);
+    acted(room, seat, false);
+
+  } else if (action === 'raise') {
+    // ── Correct No-Limit min-raise ───────────────────────────────────────────
+    // minFromStack = callAmount + lastRaiseIncrement
+    // Player must put in at LEAST this much from their stack
+    const callAmount     = G.currentBet - p.bet;
+    const minFromStack   = Math.min(callAmount + G.lastRaiseIncrement, p.chips);
+    const raiseFromStack = Math.min(Math.max(amount || minFromStack, minFromStack), p.chips);
+
+    const prevCurrentBet = G.currentBet;
+    p.chips -= raiseFromStack;
+    p.bet   += raiseFromStack;
+    G.pot   += raiseFromStack;
+    G.currentBet = Math.max(G.currentBet, p.bet);
+
+    // Update lastRaiseIncrement ONLY if this was a full (non-under) raise
+    // Under-raise (all-in less than min) does NOT reset the increment
+    if (G.currentBet > prevCurrentBet) {
+      G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
+    }
+
+    broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
+    writeLog(room,
+      `ACTION: ${p.name} RAISES \u00a3${(raiseFromStack/100).toFixed(2)} from stack ` +
+      `(total bet: \u00a3${(p.bet/100).toFixed(2)}, new current bet: \u00a3${(G.currentBet/100).toFixed(2)}) ` +
+      `| Pot: \u00a3${(G.pot/100).toFixed(2)} | Next min raise increment: \u00a3${(G.lastRaiseIncrement/100).toFixed(2)}`
+    );
+    broadcastState(room);
+    acted(room, seat, true);
+  }
+}
+
+function broadcastState(room) {
+  room.seats.forEach(s => { if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id)); });
+}
+
+function acted(room, seat, isRaise) {
+  const G = room.G;
+  G.toAct.shift();
+
+  if (isRaise) {
+    // After a raise: rebuild act order - everyone who hasn't matched currentBet gets another turn
+    const active = activePlaying(room).sort((a, b) => a - b);
+    const si = active.indexOf(seat);
+    const ordered = [...active.slice((si+1)%active.length), ...active.slice(0, (si+1)%active.length)];
+    // Proper rotation: start from player after raiser
+    const raiserIdx = active.indexOf(seat);
+    const rotated = [...active.slice(raiserIdx + 1), ...active.slice(0, raiserIdx + 1)];
+    G.toAct = rotated.filter(i => {
+      const p = room.seats[i];
+      return p && !p.folded && !p.autoFold && p.chips > 0 && p.bet < G.currentBet;
+    });
+  }
+
+  setTimeout(() => promptToAct(room), 200);
+}
+
+function advPhase(room) {
+  const G = room.G;
+  clearActionTimer(room);
+  room.seats.forEach(s => { if (s) s.bet = 0; });
+  // Reset betting for new street
+  G.currentBet = 0;
+  G.lastRaiseIncrement = BB; // min bet on a new street = BB
+
+  const next = { preflop: 'flop', flop: 'turn', turn: 'river' };
+
+  if (G.phase in next) {
+    G.phase = next[G.phase];
+    const count = G.phase === 'flop' ? 3 : 1;
+    const newCards = [];
+    for (let i = 0; i < count; i++) { const c = G.deck.shift(); G.community.push(c); newCards.push(c); }
+
+    broadcastAll(room, { type: 'communityDealt', phase: G.phase, cards: G.community, newCards });
+    writeLog(room, `${G.phase.toUpperCase()}: ${newCards.map(c => c.r+c.s).join(' ')} | Board: ${G.community.map(c => c.r+c.s).join(' ')}`);
+    broadcastState(room);
+
+    const active = activePlaying(room);
+    // Postflop: SB (or first active left of dealer) acts first; dealer acts last
+    // Heads-up: BB (non-dealer) acts first postflop
+    const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
+    G.toAct = buildActOrder(room, postStart, active);
+    writeLog(room, `${G.phase.toUpperCase()} betting | Act order: ${G.toAct.map(i => room.seats[i].name).join(' \u2192 ')}`);
+    setTimeout(() => promptToAct(room), 600);
+
+  } else {
+    G.phase = 'showdown';
+    showdown(room);
+  }
+}
+
+function endRound(room) {
+  clearActionTimer(room);
+  const remaining = room.seats.filter(s => s && !s.folded);
+  if (remaining.length === 1) {
+    writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
+    finish(room, remaining[0], 'Last player standing');
+  }
+}
+
+function showdown(room) {
+  clearActionTimer(room);
+  const active = room.seats.filter(s => s && !s.folded);
+  if (active.length === 1) {
+    writeLog(room, `RESULT: ${active[0].name} wins at showdown uncontested`);
+    finish(room, active[0], 'Last player standing');
+    return;
+  }
+
+  broadcastAll(room, { type: 'showdown', reveals: active.map(s => ({ seat: s.seat, name: s.name, cards: s.cards })) });
+  broadcastState(room);
+
+  writeLog(room, 'SHOWDOWN:');
+  let best = null, bestScore = -1;
+  for (const p of active) {
+    const allCards = [...p.cards, ...room.G.community];
+    const sc = evalBest(allCards);
+    const hn = handName(sc);
+    const bf = bestFiveCards(allCards);
+    writeLog(room, `  ${p.name}: hole=${p.cards.map(c=>c.r+c.s).join(' ')} best=[${bf.map(c=>c.r+c.s).join(' ')}] => ${hn} (${sc.toFixed(0)})`);
+    if (sc > bestScore) { bestScore = sc; best = p; }
+  }
+  writeLog(room, `WINNER: ${best.name} with ${handName(bestScore)}`);
+  setTimeout(() => finish(room, best, handName(bestScore)), 1200);
+}
+
+function finish(room, winner, label) {
+  if (!winner) return;
+  clearActionTimer(room);
+  const won = room.G.pot;
+  winner.chips += won;
+  room.G.pot = 0;
+  broadcastAll(room, { type: 'winner', seat: winner.seat, name: winner.name, amount: won, label });
+  broadcastState(room);
+
+  const chipSummary = room.seats.filter(Boolean).map(s => `${s.name}:\u00a3${(s.chips/100).toFixed(2)}`).join(', ');
+  writeLog(room, `POT: \u00a3${(won/100).toFixed(2)} \u2192 ${winner.name}`);
+  writeLog(room, `CHIPS: ${chipSummary}`);
+  writeLog(room, '='.repeat(60));
+
+  // FTP upload the completed log asynchronously
+  const logPath = room.G.logPath;
+  if (logPath) setTimeout(() => ftpUpload(logPath), 500);
+
+  setTimeout(() => {
+    room.seats.forEach((s, i) => {
+      if (s && s.chips <= 0) {
+        writeLog(room, `BUST: ${s.name} eliminated`);
+        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: i, reason: 'busted' });
+        room.seats[i] = null;
+      }
+    });
+    startNewHand(room);
+  }, 5000);
+}
+
+// ─── Hand evaluator ───────────────────────────────────────────────────────────
+function rv(r) { return RVAL[r] || parseInt(r) || 0; }
+
+function evalBest(cards) {
+  const cs = combs(cards, Math.min(cards.length, 5));
+  let best = -1;
+  for (const c of cs) { const s = score5(c); if (s > best) best = s; }
+  return best;
+}
+
+function bestFiveCards(cards) {
+  const cs = combs(cards, Math.min(cards.length, 5));
+  let best = -1, bestCombo = cards.slice(0, 5);
+  for (const c of cs) { const s = score5(c); if (s > best) { best = s; bestCombo = c; } }
+  return bestCombo;
+}
+
+function combs(arr, k) {
+  if (arr.length <= k) return [arr];
+  if (k === 1) return arr.map(x => [x]);
+  const out = [];
+  for (let i = 0; i <= arr.length - k; i++)
+    for (const c of combs(arr.slice(i + 1), k - 1)) out.push([arr[i], ...c]);
+  return out;
+}
+
+function score5(cards) {
+  const sorted = [...cards].sort((a, b) => rv(b.r) - rv(a.r));
+  const ranks  = sorted.map(c => rv(c.r));
+  const suits  = sorted.map(c => c.s);
+
+  const cnt = {};
+  for (const r of ranks) cnt[r] = (cnt[r] || 0) + 1;
+  const groups = Object.entries(cnt)
+    .map(([r, n]) => ({ r: Number(r), n }))
+    .sort((a, b) => b.n - a.n || b.r - a.r);
+  const tbRanks = groups.flatMap(g => Array(g.n).fill(g.r));
+
+  const flush = suits.every(s => s === suits[0]);
+  const uniq  = [...new Set(ranks)].sort((a, b) => b - a);
+
+  let isStraight = false, sHigh = 0;
+  if (uniq.length === 5) {
+    if (uniq[0] - uniq[4] === 4) {
+      isStraight = true; sHigh = uniq[0]; // normal straight
+    } else if (uniq[0] === 14 && uniq[1] === 5 && uniq[2] === 4 && uniq[3] === 3 && uniq[4] === 2) {
+      isStraight = true; sHigh = 5; // wheel A-2-3-4-5, Ace plays low → high card = 5
+    }
+  }
+
+  const pack = rArr => rArr.reduce((acc, r, i) => acc + r * Math.pow(15, 4 - i), 0);
+  const freq = groups[0].n, freq2 = groups[1]?.n || 0;
+
+  // Royal flush: broadway (A-high) straight flush only — NOT wheel flush
+  if (flush && isStraight && sHigh === 14) return 9e8 + pack(ranks);
+  if (flush && isStraight)                  return 8e8 + sHigh * 1e6;  // straight flush inc. steel wheel
+  if (freq === 4)                           return 7e8 + pack(tbRanks);
+  if (freq === 3 && freq2 === 2)            return 6e8 + pack(tbRanks);
+  if (flush)                                return 5e8 + pack(ranks);
+  if (isStraight)                           return 4e8 + sHigh * 1e6;
+  if (freq === 3)                           return 3e8 + pack(tbRanks);
+  if (freq === 2 && freq2 === 2)            return 2e8 + pack(tbRanks);
+  if (freq === 2)                           return 1e8 + pack(tbRanks);
+  return pack(ranks);
+}
+
+function handName(s) {
+  if (s >= 9e8) return 'Royal Flush';
+  if (s >= 8e8) return 'Straight Flush';
+  if (s >= 7e8) return 'Four of a Kind';
+  if (s >= 6e8) return 'Full House';
+  if (s >= 5e8) return 'Flush';
+  if (s >= 4e8) return 'Straight';
+  if (s >= 3e8) return 'Three of a Kind';
+  if (s >= 2e8) return 'Two Pair';
+  if (s >= 1e8) return 'One Pair';
+  return 'High Card';
+}
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+server.listen(PORT, () => {
+  console.log(`\n\u2663 SYFM Poker running on port ${PORT}`);
+  console.log(`   Game: http://localhost:${PORT}`);
+  console.log(`   Logs: http://localhost:${PORT}/logs`);
+  console.log(`   FTP:  ${process.env.FTP_HOST || '(not configured)'}\n`);
+});
