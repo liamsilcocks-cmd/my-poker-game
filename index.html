@@ -173,9 +173,7 @@ const engine=new BABYLON.Engine(canvas,true);
 window.addEventListener('resize',()=>engine.resize());
 canvas.addEventListener('click',()=>ensureAudio(),{once:true});
 let scene,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
-// POT_BASE: above community cards, between them and the far rail (negative Z = away from viewer)
 const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
-// Bet zone for a visual seat: halfway between seat edge and centre
 function betPos(vSeat){const a=-Math.PI/2-(vSeat/NP)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const a=-Math.PI/2-(i/NP)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
 function cardPos(si,cn){const a=-Math.PI/2-(si/NP)*Math.PI*2,rx=TRX*0.70,rz=TRZ*0.70,pa=a-Math.PI/2,off=(cn-0.5)*1.10;return new BABYLON.Vector3(Math.cos(a)*rx+Math.cos(pa)*off,0.30+cn*0.003,Math.sin(a)*rz+Math.sin(pa)*off);}
@@ -186,11 +184,9 @@ function mkBackTex(){const W=256,H=384,tex=new BABYLON.DynamicTexture('bt',{widt
 function mkFrontTex(suit,rank){
   const W=320,H=450,tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true),c=tex.getContext();
   const isRed=suit==='\u2665'||suit==='\u2666',col=isRed?'#cc0000':'#111111';
-  // Background
   c.fillStyle='#fefefe';c.fillRect(0,0,W,H);
   c.strokeStyle='#aaaaaa';c.lineWidth=6;c.strokeRect(3,3,W-6,H-6);
   c.strokeStyle='#dddddd';c.lineWidth=1.5;c.strokeRect(10,10,W-20,H-20);
-  // Center content first (corners drawn on top)
   c.fillStyle=col;
   if(rank==='A'){
     c.font='230px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText(suit,W/2,H/2);
@@ -200,13 +196,11 @@ function mkFrontTex(suit,rank){
     c.fillStyle=col;c.font='bold 130px Georgia,serif';c.textAlign='center';c.textBaseline='middle';
     c.fillText(rank,W/2,H/2-30);c.font='80px Arial';c.fillText(suit,W/2,H/2+88);
   }else{
-    // Pip layout with bigger pips
     const pips=PIP_LAYOUTS[rank]||[],ax=W*0.13,ay=H*0.19,aw=W*0.74,ah=H*0.62;
     const pSz=pips.length<=4?82:pips.length<=6?70:pips.length<=8?60:50;
     c.font=`${pSz}px Arial`;c.textAlign='center';c.textBaseline='middle';
     for(const[fx,fy]of pips)c.fillText(suit,ax+fx*aw,ay+fy*ah);
   }
-  // Corner indices - white backing so they're always readable over any pip/art
   function drawCorner(){
     const rnkSz=rank==='10'?84:96,suitSz=70;
     const cW=rank==='10'?118:98,cH=rnkSz+suitSz+2;
@@ -227,9 +221,7 @@ function buildChipPool(){for(const d of CHIP_DENOM){for(let i=0;i<60;i++){const 
 function acquireChip(forVal){const d=CHIP_DENOM.find(d=>d.val<=forVal)||CHIP_DENOM[CHIP_DENOM.length-1];const ch=chipPool.find(c=>!c.isVisible&&c._dval===d.val)||chipPool.find(c=>!c.isVisible)||null;if(ch)ch.isVisible=true;return ch;}
 function freeChip(c){if(c){c.isVisible=false;c.position=new BABYLON.Vector3(0,-5,0);}}
 function freeAllChips(){[...potChips].forEach(freeChip);potChips=[];seatBetChips.forEach(arr=>{arr.forEach(freeChip);});seatBetChips=Array.from({length:NP},()=>[]);}
-// Build a realistic chip stack representing an amount (max 12 chips)
 function buildChipStack(amount){const chips=[];let rem=amount;for(const d of CHIP_DENOM){if(rem<=0||chips.length>=12)break;const n=Math.min(Math.floor(rem/d.val),5);for(let i=0;i<n&&chips.length<12;i++){const ch=acquireChip(d.val);if(ch){chips.push(ch);rem-=d.val;}}}return chips;}
-// Arc chips from srcPos to dstBase with stagger
 function animChipArc(chips,srcPos,dstBase,staggerMs,baseY,cb){
   if(!chips.length){if(cb)setTimeout(cb,50);return;}
   let done=0;
@@ -241,7 +233,6 @@ function animChipArc(chips,srcPos,dstBase,staggerMs,baseY,cb){
     chip.animations=[a];
     setTimeout(()=>{scene.beginAnimation(chip,0,22,false,1.4,()=>{snd_chip();done++;if(done===chips.length&&cb)cb();});},i*staggerMs);
   });}
-// Place a player's bet chips at their bet zone (seat to bet area in front of them)
 function showBet(serverSeat,amount){
   if(amount<=0)return;
   const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);
@@ -249,7 +240,6 @@ function showBet(serverSeat,amount){
   const chips=buildChipStack(amount);
   seatBetChips[serverSeat].push(...chips);
   animChipArc(chips,src,dst,38,0.32+existH,null);}
-// Sweep all per-seat bet chips into the pot zone above community cards
 function sweepBetsToPot(cb){
   const all=[];seatBetChips.forEach(arr=>all.push(...arr));
   seatBetChips=Array.from({length:NP},()=>[]);
@@ -262,7 +252,6 @@ function sweepBetsToPot(cb){
     const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:chip.position.clone()},{frame:8,value:mid},{frame:18,value:tgt}],'out');
     chip.animations=[a];
     setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.6,()=>{snd_chip();potChips.push(chip);done++;if(done===all.length&&cb)cb();});},i*28);});}
-// Fly pot chips (and any straggling seat chips) to winner
 function chipsFlyToWinner(winSeat,cb){
   const wp=seatPos(vs(winSeat));wp.y+=0.8;
   const all=[...potChips];seatBetChips.forEach(arr=>all.push(...arr));
@@ -276,7 +265,6 @@ function chipsFlyToWinner(winSeat,cb){
     setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.5,()=>{snd_chip();freeChip(chip);done++;if(done===all.length&&cb)cb();});},i*18);});}
 function buildTokens(){function makeToken(name,r,g,b,label){const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene),m=new BABYLON.StandardMaterial(name+'m',scene);m.diffuseColor=new BABYLON.Color3(r,g,b);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);tok.material=m;tok.isVisible=false;tok.renderingGroupId=1;const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false),dc=discTex.getContext();dc.fillStyle=`rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;dc.beginPath();dc.arc(64,64,62,0,Math.PI*2);dc.fill();dc.strokeStyle='rgba(0,0,0,0.5)';dc.lineWidth=3;dc.stroke();dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';dc.font='bold 42px Arial';dc.textAlign='center';dc.textBaseline='middle';dc.fillText(label,64,64);discTex.update();const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene),dm=new BABYLON.StandardMaterial(name+'dm',scene);dm.diffuseTexture=discTex;dm.emissiveColor=new BABYLON.Color3(1,1,1);dm.disableLighting=true;dm.backFaceCulling=false;disc.material=dm;disc.rotation.x=-Math.PI/2;disc.position.y=0.07;disc.parent=tok;disc.renderingGroupId=2;return tok;}dealerToken=makeToken('dealer',0.95,0.95,0.95,'D');sbToken=makeToken('sb',0.15,0.40,0.90,'SB');bbToken=makeToken('bb',0.90,0.80,0.10,'BB');}
 function positionTokens(dSeat,sbSeat,bbSeat){
-// All tokens sit at radius 52% between centre and rail - nicely visible without overlapping labels
 const RX=TRX*0.50,RZ=TRZ*0.50;
 function seatA(seat){return -Math.PI/2-(seat/NP)*Math.PI*2;}
 function place(tok,seat,angOffset){
@@ -284,13 +272,10 @@ function place(tok,seat,angOffset){
   tok.position=new BABYLON.Vector3(Math.cos(a)*RX,0.38,Math.sin(a)*RZ);
   tok.isVisible=true;}
 if(dSeat===sbSeat){
-  // Heads-up: dealer=SB. Place D and SB chips side by side, tight together
-  place(dealerToken,dSeat, 0.18);   // D slightly clockwise
-  place(sbToken,    sbSeat,-0.18);  // SB slightly counter-clockwise
+  place(dealerToken,dSeat, 0.18);
+  place(sbToken,    sbSeat,-0.18);
 }else{
-  // Normal: D at dealer, no offset needed (alone at that seat)
   place(dealerToken,dSeat,0);
-  // SB: offset slightly so it's clearly next to D if adjacent seats
   place(sbToken,sbSeat,0.06);
 }
 place(bbToken,bbSeat,0.06);}
@@ -300,9 +285,7 @@ function updateLabel(seat,name,chips,bet,action,isMe,isDead){const vSeat=vs(seat
 function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);a.setKeys(keys);const ef=ease==='in'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();ef.setEasingMode(ease==='in'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);a.setEasingFunction(ef);return a;}
 function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
 function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
-// (chip functions defined above)}
 function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.055,0.025,0.010,1);const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.8,17,new BABYLON.Vector3(0,0.5,0),scene);cam.lowerRadiusLimit=7;cam.upperRadiusLimit=26;cam.lowerBetaLimit=0.20;cam.upperBetaLimit=1.35;cam.wheelPrecision=22;cam.attachControl(canvas,true);const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);h.intensity=0.20;h.diffuse=new BABYLON.Color3(0.55,0.48,0.60);h.groundColor=new BABYLON.Color3(0.06,0.04,0.08);spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.1,1.4,scene);spotLight.intensity=1.8;spotLight.diffuse=new BABYLON.Color3(1,0.97,0.88);shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=12;const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);f.position.y=-0.22;f.receiveShadows=true;const fm=new BABYLON.StandardMaterial('fm',scene);fm.diffuseColor=new BABYLON.Color3(0.10,0.048,0.020);fm.specularColor=new BABYLON.Color3(0.20,0.10,0.04);fm.specularPower=80;f.material=fm;const T=96,base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.44,diameter:12,tessellation:T},scene);base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;const bm=new BABYLON.StandardMaterial('bm',scene);bm.diffuseColor=new BABYLON.Color3(0.22,0.10,0.04);bm.specularColor=new BABYLON.Color3(0.55,0.32,0.08);bm.specularPower=160;base.material=bm;const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.42,tessellation:T,radialSegments:20},scene);rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.18;const rm=new BABYLON.StandardMaterial('rm',scene);rm.diffuseColor=new BABYLON.Color3(0.30,0.14,0.05);rm.specularColor=new BABYLON.Color3(0.80,0.50,0.15);rm.specularPower=220;rm.emissiveColor=new BABYLON.Color3(0.04,0.02,0.005);rail.material=rm;const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.22;const ftm=new BABYLON.StandardMaterial('ftm',scene);ftm.diffuseColor=new BABYLON.Color3(0.05,0.22,0.48);ftm.specularColor=new BABYLON.Color3(0.01,0.04,0.08);ftm.specularPower=6;felt.material=ftm;felt.receiveShadows=true;
-// Brand text "SYFM UC" faded onto the felt
 const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
 let seatActions={};
 function applyState(st){if(!st)return;lastState=st;for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').textContent=`YOUR CHIPS: \u00a3${(p0.chips/100).toFixed(2)}  |  BET: \u00a3${(p0.bet/100).toFixed(2)}`;document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
@@ -325,10 +308,8 @@ case 'newHand':{
   addLog(`\u2501\u2501 Hand #${handNumber} | Dealer: Seat ${(msg.dealerSeat+1)} \u2501\u2501`,'log-hand');
   addLog(`SB: Seat ${msg.sbSeat+1} \u00b7 BB: Seat ${msg.bbSeat+1}`);
   positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));
-  // Show blind chips AFTER deal animation completes
   const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat;
   startDealAnimation(msg.activeSeats||[],()=>{
-    // Animate SB and BB chips sliding to their bet zones
     setTimeout(()=>{showBet(sbSeat,10);},120);
     setTimeout(()=>{showBet(bbSeat,20);},280);
     if(lastState)applyState(lastState);
@@ -338,7 +319,6 @@ case 'playerAction':{
   const pname=msg.name||'Player';
   const ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?`CALL \u00a3${((msg.amount||0)/100).toFixed(2)}`:`RAISE \u00a3${((msg.amount||0)/100).toFixed(2)}`;
   seatActions[msg.seat]=ac;addLog(`${pname}: ${ac}`);
-  // Show bet chips for any chips put into the pot (call or raise)
   if(msg.amount>0)showBet(msg.seat,msg.amount);
   hideTurnIndicator();if(lastState)applyState(lastState);break;}
 case 'yourTurn':{
@@ -355,12 +335,10 @@ case 'yourTurn':{
     showTurnIndicator(`\u23f3 ${actingName} is thinking\u2026`);
   }break;}
 case 'communityDealt':
-  // Sweep all seat bet chips into the pot, THEN show the new card(s)
   addLog(`\u25b6 ${(msg.phase||'').toUpperCase()}: ${(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' ')}`,'log-community');
   sweepBetsToPot(()=>{if(lastState)applyState(lastState);});
   break;
 case 'showdown':setPhase('Showdown');hideTurnIndicator();
-  // Sweep any final street bets to pot before showdown reveal
   sweepBetsToPot(null);
   addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
@@ -368,7 +346,7 @@ case 'playerLeft':addLog(`${msg.name} left the table`);addChat(`\u2b05 ${msg.nam
 case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
 case 'gamePaused':handlePaused(true,msg.byName);break;
 case 'gameResumed':handlePaused(false,null);break;
-case 'voluntaryAutoFoldAck':break; // server confirms, already handled client-side
+case 'voluntaryAutoFoldAck':break;
 case 'chat':addChat(`${msg.name}: ${msg.text}`);break;
 case 'error':addChat(`\u26a0 ${msg.msg}`);break;}}
 function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML=`<span>${s.name}${s.id===msg.hostId?'<span class="host-badge">HOST</span>':''}</span><span class="chips">\u00a3${(s.chips/100).toFixed(2)}</span>`;pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML=`<span>${p.name}</span><span><button class="btn-sm btn-approve" onclick="approvePlayer('${p.id}',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer('${p.id}',false)">\u2717 Reject</button></span>`;pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
@@ -385,9 +363,6 @@ function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textConte
 function addChat(txt){const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);}
 let handNumber=0;
 function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
-let activityCollapsed=false;
-function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{});}else{document.exitFullscreen();}}
-document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
 let gamePaused=false;
 function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
 function handlePaused(isPaused,byName){
@@ -397,7 +372,6 @@ function handlePaused(isPaused,byName){
   if(isPaused){
     btn.classList.add('active');btn.textContent='\u25b6 RESUME';
     banner.style.display='block';
-    // Auto-expand activity log so players can review it
     if(activityCollapsed)toggleActivityLog();
     addLog(`\u23f8 Game PAUSED by ${byName||'a player'} \u2014 reviewing hand history`,'log-hand');
   }else{
@@ -418,6 +392,8 @@ let activityCollapsed=false;
 function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 maximise':'\u25bc minimise';}
 let chatCollapsed=false;
 function toggleChat(){chatCollapsed=!chatCollapsed;const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');inner.style.display=chatCollapsed?'none':'block';toggle.textContent=chatCollapsed?'\u25b6 maximise':'\u25bc minimise';}
+function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{});}else{document.exitFullscreen();}}
+document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
 document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');const val=Math.round(parseFloat(document.getElementById('raiseAmt').value)*100)||40;wsSend({type:'action',action:'raise',amount:val});};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
