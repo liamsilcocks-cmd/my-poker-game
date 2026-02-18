@@ -5,7 +5,7 @@ const fs   = require('fs');
 const path = require('path');
 
 const PORT  = process.env.PORT || 10000;
-const SUITS = ['♠','♥','♦','♣'];
+const SUITS = ['\u2660','\u2665','\u2666','\u2663'];
 const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const RVAL  = {2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13,A:14};
 const NP    = 9;
@@ -14,26 +14,18 @@ const START_CHIPS = 1000;
 const ACTION_TIMEOUT = 15000;
 
 const server = http.createServer((req, res) => {
-  console.log('HTTP request:', req.url);
   if (req.url === '/' || req.url === '/index.html') {
     fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      if (err) { 
-        console.error('Error reading index.html:', err);
-        res.writeHead(500); 
-        res.end('Error: index.html not found'); 
-        return; 
-      }
+      if (err) { res.writeHead(500); res.end('Error: index.html not found'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(data);
     });
   } else {
-    res.writeHead(404); 
-    res.end('Not found');
+    res.writeHead(404); res.end('Not found');
   }
 });
 
 const wss = new WebSocketServer({ server });
-console.log('✓ WebSocket server initialized');
 
 const rooms = new Map();
 
@@ -43,7 +35,6 @@ function getOrCreateRoom(roomId) {
       id:roomId, seats:Array(NP).fill(null), hostId:null, gameActive:false,
       pendingJoins:[], G:null, dealerSeat:-1, actionTimer:null
     });
-    console.log('Created room:', roomId);
   }
   return rooms.get(roomId);
 }
@@ -54,9 +45,7 @@ function send(ws, msg) {
 
 function broadcastAll(room, msg) {
   const str = JSON.stringify(msg);
-  room.seats.forEach(s => {
-    if (s && s.ws && s.ws.readyState === 1) s.ws.send(str);
-  });
+  room.seats.forEach(s => { if (s && s.ws && s.ws.readyState === 1) s.ws.send(str); });
 }
 
 function lobbySnapshot(room) {
@@ -90,7 +79,6 @@ function startActionTimer(room, seat) {
   room.actionTimer = setTimeout(() => {
     const p = room.seats[seat];
     if (!p || p.folded || !room.G || room.G.toAct[0] !== seat) return;
-    console.log(`Player ${p.name} timed out`);
     p.folded = true;
     broadcastAll(room, {type:'playerAction',seat,action:'fold',name:p.name+' (timeout)'});
     broadcastState(room);
@@ -103,13 +91,11 @@ function clearActionTimer(room) {
 }
 
 wss.on('connection', (ws) => {
-  console.log('✓ New WebSocket connection');
-  let myId=null, myRoomId=null, mySeat=null;
+  let myId=null, myRoomId=null;
 
   ws.on('message', raw => {
     let msg;
     try { msg=JSON.parse(raw); } catch { return; }
-    console.log('Received:', msg.type, msg);
 
     switch (msg.type) {
       case 'join': {
@@ -118,23 +104,19 @@ wss.on('connection', (ws) => {
         myId = msg.id || ('p_'+Math.random().toString(36).slice(2,8));
         const name = (msg.name||'Player').slice(0,18).trim()||'Player';
         const room = getOrCreateRoom(myRoomId);
-        console.log(`Player ${name} joining room ${myRoomId}`);
 
         const existing = room.seats.find(s=>s&&s.id===myId);
         if (existing) {
-          console.log(`Reconnecting ${name}`);
-          existing.ws=ws; existing.disconnected=false; mySeat=existing.seat;
-          send(ws, {type:'joined',id:myId,seat:mySeat,isHost:myId===room.hostId});
+          existing.ws=ws; existing.disconnected=false;
+          send(ws, {type:'joined',id:myId,seat:existing.seat,isHost:myId===room.hostId});
           send(ws, lobbySnapshot(room));
           if (room.G) send(ws, tableSnapshot(room,myId));
           broadcastAll(room, {type:'chat',name:'System',text:`${existing.name} reconnected`});
           return;
         }
 
-        const isEmpty = room.seats.every(s=>s===null)&&room.pendingJoins.length===0;
+        const isEmpty = room.seats.every(s=>s===null) && room.pendingJoins.length===0;
         if (isEmpty) {
-          console.log(`${name} is first player - becomes host`);
-          mySeat=0;
           room.seats[0]={ws,id:myId,name,chips:START_CHIPS,seat:0,cards:[],bet:0,folded:false,disconnected:false};
           room.hostId=myId;
           send(ws, {type:'joined',id:myId,seat:0,isHost:true});
@@ -142,7 +124,6 @@ wss.on('connection', (ws) => {
           return;
         }
 
-        console.log(`${name} queued for approval`);
         room.pendingJoins.push({ws,id:myId,name});
         send(ws, {type:'waiting',id:myId});
         const hostSeat = room.seats.find(s=>s&&s.id===room.hostId);
@@ -156,21 +137,17 @@ wss.on('connection', (ws) => {
         const idx = room.pendingJoins.findIndex(p=>p.id===msg.id);
         if (idx===-1) return;
         const p = room.pendingJoins.splice(idx,1)[0];
-
         if (msg.accept) {
-          console.log(`Host approved ${p.name}`);
           const seat = room.seats.findIndex(s=>s===null);
-          if (seat===-1) { send(p.ws,{type:'rejected',reason:'Table is full'}); return; }
+          if (seat===-1) { send(p.ws,{type:'rejected',reason:'Table is full'}); broadcastAll(room,lobbySnapshot(room)); return; }
           room.seats[seat]={ws:p.ws,id:p.id,name:p.name,chips:START_CHIPS,seat,cards:[],bet:0,folded:false,disconnected:false};
           send(p.ws, {type:'joined',id:p.id,seat,isHost:false});
           if (room.gameActive) {
             room.seats[seat].sittingOut=true;
-            send(p.ws, {type:'sittingOut',reason:'Hand in progress – you will join next hand.'});
+            send(p.ws, {type:'sittingOut',reason:'Hand in progress - you will join next hand.'});
             send(p.ws, tableSnapshot(room,p.id));
           }
-          broadcastAll(room, lobbySnapshot(room));
         } else {
-          console.log(`Host rejected ${p.name}`);
           send(p.ws, {type:'rejected',reason:'Host declined your request'});
         }
         broadcastAll(room, lobbySnapshot(room));
@@ -181,8 +158,7 @@ wss.on('connection', (ws) => {
         const room = rooms.get(myRoomId);
         if (!room||myId!==room.hostId) return;
         const active = room.seats.filter(s=>s!==null);
-        if (active.length<2) { send(ws,{type:'error',msg:'Need at least 2 players to start'}); return; }
-        console.log(`Starting game in room ${myRoomId}`);
+        if (active.length<2) { send(ws,{type:'error',msg:'Need at least 2 players'}); return; }
         room.gameActive=true;
         broadcastAll(room, {type:'gameStarting'});
         broadcastAll(room, lobbySnapshot(room));
@@ -194,8 +170,7 @@ wss.on('connection', (ws) => {
         const room = rooms.get(myRoomId);
         if (!room||!room.G||!room.gameActive) return;
         const actingSeat = room.seats.findIndex(s=>s&&s.id===myId);
-        if (actingSeat===-1) return;
-        if (room.G.toAct[0]!==actingSeat) return;
+        if (actingSeat===-1||room.G.toAct[0]!==actingSeat) return;
         clearActionTimer(room);
         handleAction(room, actingSeat, msg.action, msg.amount);
         break;
@@ -216,15 +191,12 @@ wss.on('connection', (ws) => {
     if (!myId||!myRoomId) return;
     const room = rooms.get(myRoomId);
     if (!room) return;
-    console.log(`Connection closed for ${myId}`);
-
     const pi = room.pendingJoins.findIndex(p=>p.id===myId);
     if (pi!==-1) room.pendingJoins.splice(pi,1);
-
     const s = room.seats.find(s=>s&&s.id===myId);
     if (s) {
       s.ws=null; s.disconnected=true;
-      broadcastAll(room, {type:'chat',name:'System',text:`${s.name} disconnected (can reconnect)`});
+      broadcastAll(room, {type:'chat',name:'System',text:`${s.name} disconnected`});
       if (room.G&&room.G.toAct[0]===s.seat) {
         setTimeout(() => {
           if (s.disconnected&&room.G&&room.G.toAct[0]===s.seat) {
@@ -238,16 +210,11 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('error', (err) => {
-    console.error('WebSocket error:', err);
-  });
+  ws.on('error', err => console.error('WS error:', err));
 });
 
 function shuffle(d) {
-  for (let i=d.length-1;i>0;i--) {
-    const j=0|Math.random()*(i+1);
-    [d[i],d[j]]=[d[j],d[i]];
-  }
+  for (let i=d.length-1;i>0;i--) { const j=0|Math.random()*(i+1); [d[i],d[j]]=[d[j],d[i]]; }
   return d;
 }
 
@@ -257,7 +224,8 @@ function buildDeck() {
   return shuffle(d);
 }
 
-function activeIndices(room) {
+function activeSeatsFull(room) {
+  // All seated players not sitting out (regardless of folded status - used for new hands)
   return room.seats.map((s,i)=>(s&&!s.sittingOut)?i:null).filter(i=>i!==null);
 }
 
@@ -269,15 +237,15 @@ function nextSeat(from, active) {
 
 function buildActOrder(room, startSeat, active) {
   const sorted=[...active].sort((a,b)=>a-b);
-  const startIdx=sorted.indexOf(startSeat);
+  const startIdx=Math.max(0,sorted.indexOf(startSeat));
   const reordered=[...sorted.slice(startIdx),...sorted.slice(0,startIdx)];
-  return reordered.filter(i=>!room.seats[i].folded&&room.seats[i].chips>0);
+  return reordered.filter(i=>i!==undefined&&room.seats[i]&&!room.seats[i].folded&&room.seats[i].chips>0);
 }
 
 function startNewHand(room) {
   clearActionTimer(room);
   room.seats.forEach(s=>{if(s) s.sittingOut=false;});
-  const active=activeIndices(room);
+  const active=activeSeatsFull(room);
 
   if (active.length<2) {
     broadcastAll(room, {type:'waitingForPlayers'});
@@ -286,27 +254,36 @@ function startNewHand(room) {
     return;
   }
 
-  room.dealerSeat=room.dealerSeat<0?active[0]:nextSeat(room.dealerSeat,active);
+  room.dealerSeat = room.dealerSeat<0 ? active[0] : nextSeat(room.dealerSeat, active);
 
-  const sbSeat=nextSeat(room.dealerSeat,active);
-  const bbSeat=nextSeat(sbSeat,active);
+  // HEADS-UP RULE (TDA Rule 34):
+  // Dealer = Small Blind. Acts first preflop, last postflop.
+  // Big Blind acts first postflop.
+  const isHeadsUp = active.length === 2;
+  const sbSeat = isHeadsUp ? room.dealerSeat : nextSeat(room.dealerSeat, active);
+  const bbSeat = nextSeat(sbSeat, active);
 
-  room.G={
+  room.G = {
     deck:buildDeck(), phase:'preflop', pot:0, currentBet:BB,
-    community:[], toAct:[], sbSeat, bbSeat
+    community:[], toAct:[], sbSeat, bbSeat, isHeadsUp
   };
 
   room.seats.forEach(s=>{if(s){s.cards=[];s.bet=0;s.folded=false;}});
 
-  room.seats[sbSeat].chips-=SB; room.seats[sbSeat].bet=SB;
-  room.seats[bbSeat].chips-=BB; room.seats[bbSeat].bet=BB;
-  room.G.pot=SB+BB;
+  // Post blinds
+  room.seats[sbSeat].chips -= SB; room.seats[sbSeat].bet = SB;
+  room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB;
+  room.G.pot = SB + BB;
 
+  // Deal 2 cards each
   for(let rd=0;rd<2;rd++)
     for(const si of active) room.seats[si].cards.push(room.G.deck.shift());
 
-  const startSeat=nextSeat(bbSeat,active);
-  room.G.toAct=buildActOrder(room,startSeat,active);
+  // Preflop action order:
+  // Heads-up: dealer/SB acts first
+  // Normal: player left of BB acts first
+  const preflopStart = isHeadsUp ? sbSeat : nextSeat(bbSeat, active);
+  room.G.toAct = buildActOrder(room, preflopStart, active);
 
   broadcastAll(room, {
     type:'newHand', dealerSeat:room.dealerSeat, sbSeat, bbSeat,
@@ -314,8 +291,7 @@ function startNewHand(room) {
   });
 
   room.seats.forEach(s=>{
-    if(s&&s.ws&&s.ws.readyState===1)
-      send(s.ws, tableSnapshot(room,s.id));
+    if(s&&s.ws&&s.ws.readyState===1) send(s.ws, tableSnapshot(room,s.id));
   });
 
   promptToAct(room);
@@ -325,6 +301,7 @@ function promptToAct(room) {
   const G=room.G;
   if (!G) return;
 
+  // Skip folded/out-of-chips players
   while(G.toAct.length) {
     const si=G.toAct[0];
     if(!room.seats[si]||room.seats[si].folded||room.seats[si].chips===0)
@@ -332,22 +309,15 @@ function promptToAct(room) {
     else break;
   }
 
-  const active=room.seats.filter(s=>s&&!s.folded);
-  if(active.length<=1){endRound(room);return;}
+  const alive=room.seats.filter(s=>s&&!s.folded);
+  if(alive.length<=1){endRound(room);return;}
   if(!G.toAct.length){advPhase(room);return;}
 
   const seat=G.toAct[0];
   const p=room.seats[seat];
-  const callAmt=Math.min(G.currentBet-p.bet,p.chips);
+  const callAmt=Math.min(G.currentBet-p.bet, p.chips);
 
-  broadcastAll(room, {
-    type:'yourTurn', seat, callAmt, minRaise:BB*2,
-    pot:G.pot, currentBet:G.currentBet
-  });
-
-  if(p.ws&&p.ws.readyState===1)
-    send(p.ws, {type:'act',callAmt,minRaise:BB*2});
-
+  broadcastAll(room, {type:'yourTurn', seat, callAmt, minRaise:BB*2, pot:G.pot, currentBet:G.currentBet});
   startActionTimer(room, seat);
 }
 
@@ -356,40 +326,33 @@ function handleAction(room, seat, action, amount) {
   const G=room.G;
   if(!p||!G) return;
 
-  switch(action) {
-    case 'fold': {
-      p.folded=true;
-      broadcastAll(room, {type:'playerAction',seat,action:'fold',name:p.name});
-      broadcastState(room);
-      acted(room,seat,false);
-      break;
-    }
-    case 'check':
-    case 'call': {
-      const ca=Math.min(G.currentBet-p.bet,p.chips);
-      p.chips-=ca; p.bet+=ca; G.pot+=ca;
-      broadcastAll(room, {type:'playerAction',seat,action:ca===0?'check':'call',amount:ca,name:p.name,pot:G.pot});
-      broadcastState(room);
-      acted(room,seat,false);
-      break;
-    }
-    case 'raise': {
-      const minR=Math.max(BB*2,G.currentBet-p.bet+BB);
-      const raise=Math.min(Math.max(amount||minR,minR),p.chips);
-      p.chips-=raise; p.bet+=raise; G.pot+=raise;
-      G.currentBet=Math.max(G.currentBet,p.bet);
-      broadcastAll(room, {type:'playerAction',seat,action:'raise',amount:raise,name:p.name,pot:G.pot});
-      broadcastState(room);
-      acted(room,seat,true);
-      break;
-    }
+  if(action==='fold') {
+    p.folded=true;
+    broadcastAll(room, {type:'playerAction',seat,action:'fold',name:p.name,amount:0});
+    broadcastState(room);
+    acted(room,seat,false);
+
+  } else if(action==='check'||action==='call') {
+    const ca=Math.min(G.currentBet-p.bet, p.chips);
+    p.chips-=ca; p.bet+=ca; G.pot+=ca;
+    broadcastAll(room, {type:'playerAction',seat,action:ca===0?'check':'call',amount:ca,name:p.name,pot:G.pot});
+    broadcastState(room);
+    acted(room,seat,false);
+
+  } else if(action==='raise') {
+    const minR=Math.max(BB*2, G.currentBet-p.bet+BB);
+    const raise=Math.min(Math.max(amount||minR, minR), p.chips);
+    p.chips-=raise; p.bet+=raise; G.pot+=raise;
+    G.currentBet=Math.max(G.currentBet, p.bet);
+    broadcastAll(room, {type:'playerAction',seat,action:'raise',amount:raise,name:p.name,pot:G.pot});
+    broadcastState(room);
+    acted(room,seat,true);
   }
 }
 
 function broadcastState(room) {
   room.seats.forEach(s=>{
-    if(s&&s.ws&&s.ws.readyState===1)
-      send(s.ws, tableSnapshot(room,s.id));
+    if(s&&s.ws&&s.ws.readyState===1) send(s.ws, tableSnapshot(room,s.id));
   });
 }
 
@@ -398,14 +361,15 @@ function acted(room, seat, isRaise) {
   G.toAct.shift();
 
   if(isRaise) {
-    const sorted=activeIndices(room).sort((a,b)=>a-b);
-    const startIdx=(sorted.indexOf(seat)+1)%sorted.length;
-    const ordered=[...sorted.slice(startIdx),...sorted.slice(0,startIdx)];
+    // After a raise, everyone else who hasn't matched gets to act again
+    const active=activeSeatsFull(room).sort((a,b)=>a-b);
+    const startIdx=(active.indexOf(seat)+1)%active.length;
+    const ordered=[...active.slice(startIdx),...active.slice(0,startIdx)];
     G.toAct=ordered.filter(i=>
-      !room.seats[i].folded&&room.seats[i].chips>0&&room.seats[i].bet<G.currentBet);
+      room.seats[i]&&!room.seats[i].folded&&room.seats[i].chips>0&&room.seats[i].bet<G.currentBet);
   }
 
-  setTimeout(()=>promptToAct(room),200);
+  setTimeout(()=>promptToAct(room), 200);
 }
 
 function advPhase(room) {
@@ -414,21 +378,24 @@ function advPhase(room) {
   room.seats.forEach(s=>{if(s) s.bet=0;});
   G.currentBet=0;
 
-  const map={preflop:'flop',flop:'turn',turn:'river'};
+  const nextPhase={preflop:'flop',flop:'turn',turn:'river'};
 
-  if(G.phase in map) {
-    G.phase=map[G.phase];
+  if(G.phase in nextPhase) {
+    G.phase=nextPhase[G.phase];
     const count=G.phase==='flop'?3:1;
     const newCards=[];
     for(let i=0;i<count;i++){ const c=G.deck.shift(); G.community.push(c); newCards.push(c); }
-
     broadcastAll(room, {type:'communityDealt',phase:G.phase,cards:G.community,newCards});
     broadcastState(room);
 
-    const active=activeIndices(room);
-    const startSeat=nextSeat(room.dealerSeat,active);
-    G.toAct=buildActOrder(room,startSeat,active);
-    setTimeout(()=>promptToAct(room),600);
+    const active=activeSeatsFull(room);
+    // Post-flop action:
+    // Heads-up: BB (non-dealer) acts first
+    // Normal: first active player left of dealer
+    const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
+    G.toAct=buildActOrder(room, postStart, active);
+    setTimeout(()=>promptToAct(room), 600);
+
   } else {
     G.phase='showdown';
     showdown(room);
@@ -446,8 +413,7 @@ function showdown(room) {
   const active=room.seats.filter(s=>s&&!s.folded);
   if(active.length===1){finish(room,active[0],'Last player standing');return;}
 
-  const reveals=active.map(s=>({seat:s.seat,name:s.name,cards:s.cards}));
-  broadcastAll(room, {type:'showdown',reveals});
+  broadcastAll(room, {type:'showdown',reveals:active.map(s=>({seat:s.seat,name:s.name,cards:s.cards}))});
   broadcastState(room);
 
   let best=null, bestScore=-1;
@@ -455,10 +421,11 @@ function showdown(room) {
     const sc=evalBest([...p.cards,...room.G.community]);
     if(sc>bestScore){bestScore=sc;best=p;}
   }
-  setTimeout(()=>finish(room,best,handName(bestScore)),1200);
+  setTimeout(()=>finish(room, best, handName(bestScore)), 1200);
 }
 
 function finish(room, winner, label) {
+  if(!winner) return;
   clearActionTimer(room);
   const won=room.G.pot;
   winner.chips+=won;
@@ -468,7 +435,7 @@ function finish(room, winner, label) {
 
   setTimeout(()=>{
     room.seats.forEach((s,i)=>{
-      if(s&&s.chips<=0) {
+      if(s&&s.chips<=0){
         broadcastAll(room, {type:'playerLeft',id:s.id,name:s.name,seat:i,reason:'busted'});
         room.seats[i]=null;
       }
@@ -504,7 +471,7 @@ function score5(cards) {
   const flush=suits.every(s=>s===suits[0]);
   const uniq=[...new Set(ranks)].sort((a,b)=>b-a);
   let straight=uniq.length>=5&&(uniq[0]-uniq[4]===4);
-  if(!straight&&uniq[0]===14) {
+  if(!straight&&uniq[0]===14){
     const low=uniq.slice(1);
     if(low.length>=4&&low[0]-low[3]===3&&low[3]===2) straight=true;
   }
@@ -523,7 +490,7 @@ function score5(cards) {
 }
 
 function handName(s) {
-  if(s>=9) return 'Royal Flush 👑';
+  if(s>=9) return 'Royal Flush';
   if(s>=8) return 'Straight Flush';
   if(s>=7) return 'Four of a Kind';
   if(s>=6) return 'Full House';
@@ -536,7 +503,5 @@ function handName(s) {
 }
 
 server.listen(PORT, ()=>{
-  console.log(`\n🃏 SYFM Poker Server Running`);
-  console.log(`   Port: ${PORT}`);
-  console.log(`   Visit: http://localhost:${PORT}\n`);
+  console.log('\n\u2663 SYFM Poker Server Running on port '+PORT+'\n');
 });
