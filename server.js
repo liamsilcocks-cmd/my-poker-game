@@ -385,7 +385,7 @@ wss.on('connection', ws => {
     s.disconnected = true;
     s.ws = null;
     broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} disconnected — reconnecting...` });
-    writeLog(room, `DISCONNECT: ${s.name} seat ${s.seat + 1} — grace period started`);
+    writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) left — ${RECONNECT_GRACE_MS/1000}s grace period started | Stack: £${(s.chips/100).toFixed(2)}`);
     broadcastState(room);
 
     // Fold immediately if it's their turn — game can't wait
@@ -399,7 +399,7 @@ wss.on('connection', ws => {
       s.autoFold = true;
       s._disconnectTimer = null;
       broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out — auto-folding until host re-admits` });
-      writeLog(room, `TIMEOUT: ${s.name} seat ${s.seat + 1} — autoFold enabled`);
+      writeLog(room, `TIMEOUT: ${s.name} (Seat ${s.seat+1}) failed to reconnect within ${RECONNECT_GRACE_MS/1000}s — auto-fold enabled until re-admitted by host`);
 
       if (room.G && !s.folded) {
         s.folded = true;
@@ -517,14 +517,33 @@ function startNewHand(room) {
     const s = room.seats[i];
     return `${s.name}(seat${i+1}) £${(s.chips/100).toFixed(2)}`;
   }).join(', ');
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const timeStr = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const totalChips = active.reduce((s,i) => s + room.seats[i].chips, 0);
+  const playerLines = active.map(i => {
+    const s = room.seats[i];
+    const tags = [];
+    if (i === room.dealerSeat) tags.push('DEALER');
+    if (i === sbSeat) tags.push('SB');
+    if (i === bbSeat) tags.push('BB');
+    return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | Stack: £${(s.chips/100).toFixed(2).padStart(7)} ${tags.length?'['+tags.join('+')+']':''}`;
+  }).join('\n');
   fs.writeFileSync(logPath,
-    `SYFM Poker | Room ${room.id} | Hand #${room.handNum}\n` +
-    `${new Date().toISOString()}\n` +
-    `${'='.repeat(60)}\n` +
-    `Players: ${playerSummary}\n` +
-    `Dealer: Seat ${room.dealerSeat+1}  SB: Seat ${sbSeat+1} (${SB}p)  BB: Seat ${bbSeat+1} (${BB}p)\n` +
-    `Heads-up: ${isHeadsUp}  Active seats: ${active.join(',')}\n` +
-    `${'-'.repeat(60)}\n`
+    '╔' + '═'.repeat(62) + '╗\n' +
+    '║  SYFM POKER — HAND LOG' + ' '.repeat(39) + '║\n' +
+    '╠' + '═'.repeat(62) + '╣\n' +
+    `║  Room: ${room.id.padEnd(10)} Hand: #${String(room.handNum).padEnd(6)} Date: ${dateStr.slice(0,20).padEnd(20)}║\n` +
+    `║  Time: ${timeStr.padEnd(54)}║\n` +
+    '╠' + '═'.repeat(62) + '╣\n' +
+    '║  PLAYERS AT THE TABLE' + ' '.repeat(40) + '║\n' +
+    '╠' + '═'.repeat(62) + '╣\n' +
+    playerLines.split('\n').map(l => '║' + l.padEnd(63) + '║').join('\n') + '\n' +
+    '╠' + '═'.repeat(62) + '╣\n' +
+    `║  Format: ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | Blinds: SB £${(SB/100).toFixed(2)} / BB £${(BB/100).toFixed(2)} | Total chips in play: £${(totalChips/100).toFixed(2)}`.padEnd(63) + '║\n' +
+    `║  Deal order: ${dealOrder.map(i=>room.seats[i].name).join(' → ')}`.padEnd(63) + '║\n' +
+    '╚' + '═'.repeat(62) + '╝\n' +
+    '\n'
   );
 
   // Post blinds
@@ -546,11 +565,18 @@ function startNewHand(room) {
     for (const si of dealOrder)
       room.seats[si].cards.push(room.G.deck.shift());
 
-  // Log hole cards
-  active.forEach(i => {
+  // Log hole cards with full detail
+  writeLog(room, '┌─ HOLE CARDS DEALT ─────────────────────────────┐');
+  dealOrder.forEach(i => {
     const s = room.seats[i];
-    writeLog(room, `DEAL: ${s.name} → ${s.cards.map(c => c.r + c.s).join(' ')}`);
+    const tags = [];
+    if (i === room.dealerSeat) tags.push('D');
+    if (i === sbSeat) tags.push('SB');
+    if (i === bbSeat) tags.push('BB');
+    const tagStr = tags.length ? ' ['+tags.join('+')+']' : '';
+    writeLog(room, `│ ${('Seat '+(i+1)+' '+s.name).padEnd(22)}${tagStr.padEnd(8)}: ${s.cards.map(c=>c.r+c.s).join('  ')} │`);
   });
+  writeLog(room, '└────────────────────────────────────────────────┘');
 
   // Build preflop act order
   room.G.toAct = buildActOrder(room, preflopStart, active);
@@ -564,7 +590,13 @@ function startNewHand(room) {
     if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id));
   });
 
-  writeLog(room, `PREFLOP | Pot: ${room.G.pot}p | Act order: ${room.G.toAct.map(i => room.seats[i].name).join(' → ')}`);
+  writeLog(room, '');
+  writeLog(room, '┌─ PREFLOP ────────────────────────────────────────────┐');
+  writeLog(room, `│  Pot (blinds): £${((room.G.pot)/100).toFixed(2).padEnd(44)}│`);
+  writeLog(room, `│  SB: ${room.seats[sbSeat].name.padEnd(18)} posts £${(SB/100).toFixed(2).padEnd(30)}│`);
+  writeLog(room, `│  BB: ${room.seats[bbSeat].name.padEnd(18)} posts £${(BB/100).toFixed(2).padEnd(30)}│`);
+  writeLog(room, `│  Act order: ${room.G.toAct.map(i=>room.seats[i].name).join(' → ').padEnd(49)}│`);
+  writeLog(room, '└──────────────────────────────────────────────────────┘');
   promptToAct(room);
 }
 
@@ -606,7 +638,7 @@ function doFold(room, seat, reason) {
   p.folded = true;
   const label = reason ? ` (${reason})` : '';
   broadcastAll(room, { type: 'playerAction', seat, action: 'fold', amount: 0, name: p.name + label });
-  writeLog(room, `ACTION: ${p.name} FOLDS${label}`);
+  writeLog(room, `FOLD   | ${p.name.padEnd(18)} | Pot: £${((room.G?.pot||0)/100).toFixed(2)} | Players still in: ${room.seats.filter(s=>s&&!s.folded).length}${label?'  ('+label.trim()+')':''}`);
   broadcastState(room);
   acted(room, seat, false);
 }
@@ -624,7 +656,9 @@ function handleAction(room, seat, action, amount) {
     p.chips -= ca; p.bet += ca; G.pot += ca;
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    writeLog(room, `ACTION: ${p.name} ${act.toUpperCase()}${ca > 0 ? ` £${(ca/100).toFixed(2)}` : ''} | Pot: £${(G.pot/100).toFixed(2)}`);
+    const callStackLeft = p.chips;
+    writeLog(room, `${act==='check'?'CHECK ':'CALL  '} | ${p.name.padEnd(18)} | Amount: ${ca>0?'£'+(ca/100).toFixed(2).padStart(7):'  ---   '} | Stack after: £${(callStackLeft/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`);
+
     broadcastState(room);
     acted(room, seat, false);
 
@@ -645,9 +679,8 @@ function handleAction(room, seat, action, amount) {
 
     broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
     writeLog(room,
-      `ACTION: ${p.name} RAISES £${(raiseFromStack/100).toFixed(2)} from stack ` +
-      `(total bet: £${(p.bet/100).toFixed(2)}, new current bet: £${(G.currentBet/100).toFixed(2)}) ` +
-      `| Pot: £${(G.pot/100).toFixed(2)} | Next min raise increment: £${(G.lastRaiseIncrement/100).toFixed(2)}`
+      `RAISE  | ${p.name.padEnd(18)} | Amount: £${(raiseFromStack/100).toFixed(2).padStart(7)} | Total bet: £${(p.bet/100).toFixed(2)} | ` +
+      `New street bet: £${(G.currentBet/100).toFixed(2)} | Stack after: £${(p.chips/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`
     );
     broadcastState(room);
     acted(room, seat, true);
@@ -691,13 +724,18 @@ function advPhase(room) {
     for (let i = 0; i < count; i++) { const c = G.deck.shift(); G.community.push(c); newCards.push(c); }
 
     broadcastAll(room, { type: 'communityDealt', phase: G.phase, cards: G.community, newCards });
-    writeLog(room, `${G.phase.toUpperCase()}: ${newCards.map(c => c.r+c.s).join(' ')} | Board: ${G.community.map(c => c.r+c.s).join(' ')}`);
+    writeLog(room, '');
+    writeLog(room, '┌─ ' + G.phase.toUpperCase().padEnd(10) + '──────────────────────────────────────────┐');
+    writeLog(room, '│  New cards : ' + newCards.map(c=>c.r+c.s).join('  ').padEnd(47) + '│');
+    writeLog(room, '│  Board     : ' + G.community.map(c=>c.r+c.s).join('  ').padEnd(47) + '│');
+    writeLog(room, '│  Pot       : £' + (G.pot/100).toFixed(2).padEnd(46) + '│');
+    writeLog(room, '└────────────────────────────────────────────────────┘');
     broadcastState(room);
 
     const active = activePlaying(room);
     const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
     G.toAct = buildActOrder(room, postStart, active);
-    writeLog(room, `${G.phase.toUpperCase()} betting | Act order: ${G.toAct.map(i => room.seats[i].name).join(' → ')}`);
+    writeLog(room, `Act order: ${G.toAct.map(i => room.seats[i].name).join(' → ')}`);
     setTimeout(() => promptToAct(room), 600);
 
   } else {
@@ -727,17 +765,26 @@ function showdown(room) {
   broadcastAll(room, { type: 'showdown', reveals: active.map(s => ({ seat: s.seat, name: s.name, cards: s.cards })) });
   broadcastState(room);
 
-  writeLog(room, 'SHOWDOWN:');
+  writeLog(room, '');
+  writeLog(room, '╔' + '═'.repeat(62) + '╗');
+  writeLog(room, '║  SHOWDOWN' + ' '.repeat(52) + '║');
+  writeLog(room, '╠' + '═'.repeat(62) + '╣');
+  writeLog(room, `║  Board: ${room.G.community.map(c=>c.r+c.s).join('  ').padEnd(53)}║`);
+  writeLog(room, '╠' + '═'.repeat(62) + '╣');
   let best = null, bestScore = -1;
   for (const p of active) {
     const allCards = [...p.cards, ...room.G.community];
     const sc = evalBest(allCards);
     const hn = handName(sc);
     const bf = bestFiveCards(allCards);
-    writeLog(room, `  ${p.name}: hole=${p.cards.map(c=>c.r+c.s).join(' ')} best=[${bf.map(c=>c.r+c.s).join(' ')}] => ${hn} (${sc.toFixed(0)})`);
+    const holeStr = p.cards.map(c=>c.r+c.s).join(' ');
+    const bestStr = bf.map(c=>c.r+c.s).join(' ');
+    writeLog(room, `║  ${('Seat '+(p.seat+1)+' '+p.name).padEnd(22)} | Hole: ${holeStr.padEnd(10)} | Best: ${bestStr.padEnd(14)} | ${hn.padEnd(16)}║`);
     if (sc > bestScore) { bestScore = sc; best = p; }
   }
-  writeLog(room, `WINNER: ${best.name} with ${handName(bestScore)}`);
+  writeLog(room, '╠' + '═'.repeat(62) + '╣');
+  writeLog(room, `║  🏆 WINNER: ${best.name} with ${handName(bestScore)}`.padEnd(63) + '║');
+  writeLog(room, '╚' + '═'.repeat(62) + '╝');
   setTimeout(() => finish(room, best, handName(bestScore)), 1200);
 }
 
@@ -750,10 +797,17 @@ function finish(room, winner, label) {
   broadcastAll(room, { type: 'winner', seat: winner.seat, name: winner.name, amount: won, label });
   broadcastState(room);
 
-  const chipSummary = room.seats.filter(Boolean).map(s => `${s.name}:£${(s.chips/100).toFixed(2)}`).join(', ');
-  writeLog(room, `POT: £${(won/100).toFixed(2)} → ${winner.name}`);
-  writeLog(room, `CHIPS: ${chipSummary}`);
-  writeLog(room, '='.repeat(60));
+  const remaining = room.seats.filter(Boolean).sort((a,b) => b.chips - a.chips);
+  writeLog(room, '');
+  writeLog(room, '┌─ HAND RESULT ─────────────────────────────────────────┐');
+  writeLog(room, `│  ${winner.name} wins £${(won/100).toFixed(2)} (${label})`.padEnd(63) + '│');
+  writeLog(room, '├─ CHIP COUNTS AFTER HAND ──────────────────────────────┤');
+  remaining.forEach(s => {
+    const bar = '█'.repeat(Math.round(s.chips/START_CHIPS*20));
+    writeLog(room, `│  ${('Seat '+(s.seat+1)+' '+s.name).padEnd(22)} £${(s.chips/100).toFixed(2).padStart(7)}  ${bar}`.padEnd(63) + '│');
+  });
+  writeLog(room, '└───────────────────────────────────────────────────────┘');
+  writeLog(room, '');
 
   const logPath = room.G.logPath;
   if (logPath) setTimeout(() => ftpUpload(logPath), 500);
