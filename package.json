@@ -1,13 +1,10 @@
 {
-  "name": "vegas-poker-server",
+  "name": "syfm-poker",
   "version": "1.0.0",
-  "description": "WebSocket game server for Vegas Poker",
+  "description": "Multiplayer Texas Hold'em Poker",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
   },
   "dependencies": {
     "ws": "^8.16.0"
