@@ -11,15 +11,16 @@ const RVAL  = {2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13,A:14};
 const NP    = 9;
 const SB    = 10, BB = 20;
 const START_CHIPS = 1000;
-const ACTION_TIMEOUT = 15000; // 15 seconds
+const ACTION_TIMEOUT = 15000;
 
 const server = http.createServer((req, res) => {
+  console.log('HTTP request:', req.url);
   if (req.url === '/' || req.url === '/index.html') {
     fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
       if (err) { 
         console.error('Error reading index.html:', err);
         res.writeHead(500); 
-        res.end('Error loading game'); 
+        res.end('Error: index.html not found'); 
         return; 
       }
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -32,6 +33,7 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
+console.log('✓ WebSocket server initialized');
 
 const rooms = new Map();
 
@@ -41,6 +43,7 @@ function getOrCreateRoom(roomId) {
       id:roomId, seats:Array(NP).fill(null), hostId:null, gameActive:false,
       pendingJoins:[], G:null, dealerSeat:-1, actionTimer:null
     });
+    console.log('Created room:', roomId);
   }
   return rooms.get(roomId);
 }
@@ -87,6 +90,7 @@ function startActionTimer(room, seat) {
   room.actionTimer = setTimeout(() => {
     const p = room.seats[seat];
     if (!p || p.folded || !room.G || room.G.toAct[0] !== seat) return;
+    console.log(`Player ${p.name} timed out`);
     p.folded = true;
     broadcastAll(room, {type:'playerAction',seat,action:'fold',name:p.name+' (timeout)'});
     broadcastState(room);
@@ -98,12 +102,14 @@ function clearActionTimer(room) {
   if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer=null; }
 }
 
-wss.on('connection', ws => {
+wss.on('connection', (ws) => {
+  console.log('✓ New WebSocket connection');
   let myId=null, myRoomId=null, mySeat=null;
 
   ws.on('message', raw => {
     let msg;
     try { msg=JSON.parse(raw); } catch { return; }
+    console.log('Received:', msg.type, msg);
 
     switch (msg.type) {
       case 'join': {
@@ -112,9 +118,11 @@ wss.on('connection', ws => {
         myId = msg.id || ('p_'+Math.random().toString(36).slice(2,8));
         const name = (msg.name||'Player').slice(0,18).trim()||'Player';
         const room = getOrCreateRoom(myRoomId);
+        console.log(`Player ${name} joining room ${myRoomId}`);
 
         const existing = room.seats.find(s=>s&&s.id===myId);
         if (existing) {
+          console.log(`Reconnecting ${name}`);
           existing.ws=ws; existing.disconnected=false; mySeat=existing.seat;
           send(ws, {type:'joined',id:myId,seat:mySeat,isHost:myId===room.hostId});
           send(ws, lobbySnapshot(room));
@@ -125,6 +133,7 @@ wss.on('connection', ws => {
 
         const isEmpty = room.seats.every(s=>s===null)&&room.pendingJoins.length===0;
         if (isEmpty) {
+          console.log(`${name} is first player - becomes host`);
           mySeat=0;
           room.seats[0]={ws,id:myId,name,chips:START_CHIPS,seat:0,cards:[],bet:0,folded:false,disconnected:false};
           room.hostId=myId;
@@ -133,6 +142,7 @@ wss.on('connection', ws => {
           return;
         }
 
+        console.log(`${name} queued for approval`);
         room.pendingJoins.push({ws,id:myId,name});
         send(ws, {type:'waiting',id:myId});
         const hostSeat = room.seats.find(s=>s&&s.id===room.hostId);
@@ -148,6 +158,7 @@ wss.on('connection', ws => {
         const p = room.pendingJoins.splice(idx,1)[0];
 
         if (msg.accept) {
+          console.log(`Host approved ${p.name}`);
           const seat = room.seats.findIndex(s=>s===null);
           if (seat===-1) { send(p.ws,{type:'rejected',reason:'Table is full'}); return; }
           room.seats[seat]={ws:p.ws,id:p.id,name:p.name,chips:START_CHIPS,seat,cards:[],bet:0,folded:false,disconnected:false};
@@ -159,6 +170,7 @@ wss.on('connection', ws => {
           }
           broadcastAll(room, lobbySnapshot(room));
         } else {
+          console.log(`Host rejected ${p.name}`);
           send(p.ws, {type:'rejected',reason:'Host declined your request'});
         }
         broadcastAll(room, lobbySnapshot(room));
@@ -170,6 +182,7 @@ wss.on('connection', ws => {
         if (!room||myId!==room.hostId) return;
         const active = room.seats.filter(s=>s!==null);
         if (active.length<2) { send(ws,{type:'error',msg:'Need at least 2 players to start'}); return; }
+        console.log(`Starting game in room ${myRoomId}`);
         room.gameActive=true;
         broadcastAll(room, {type:'gameStarting'});
         broadcastAll(room, lobbySnapshot(room));
@@ -203,6 +216,7 @@ wss.on('connection', ws => {
     if (!myId||!myRoomId) return;
     const room = rooms.get(myRoomId);
     if (!room) return;
+    console.log(`Connection closed for ${myId}`);
 
     const pi = room.pendingJoins.findIndex(p=>p.id===myId);
     if (pi!==-1) room.pendingJoins.splice(pi,1);
@@ -222,6 +236,10 @@ wss.on('connection', ws => {
         }, 3000);
       }
     }
+  });
+
+  ws.on('error', (err) => {
+    console.error('WebSocket error:', err);
   });
 });
 
@@ -517,4 +535,8 @@ function handName(s) {
   return 'High Card';
 }
 
-server.listen(PORT, ()=>console.log(`🃏 SYFM Poker server running on port ${PORT}`));
+server.listen(PORT, ()=>{
+  console.log(`\n🃏 SYFM Poker Server Running`);
+  console.log(`   Port: ${PORT}`);
+  console.log(`   Visit: http://localhost:${PORT}\n`);
+});
