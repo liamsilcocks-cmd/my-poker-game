@@ -177,25 +177,23 @@ const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
 function betPos(vSeat){const a=-Math.PI/2-(vSeat/NP)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const a=-Math.PI/2-(i/NP)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
 function cardPos(si,cn){
+  // si = visual seat index, cn = card number (0=first/left, 1=second/right)
   const a=-Math.PI/2-(si/NP)*Math.PI*2;
   const rx=TRX*0.70,rz=TRZ*0.70;
-  // Tangent direction perpendicular to the radial line, consistent for all seats
-  // pa is 90deg clockwise from the seat angle, giving a stable side-by-side offset
+  // Perpendicular tangent direction: rotate seat angle +90deg
   const pa=a+Math.PI/2;
-  // Cards offset: card 0 goes left (-0.55), card 1 goes right (+0.55)
   const off=(cn===0?-0.55:0.55);
   return new BABYLON.Vector3(
-    Math.cos(a)*rx + Math.cos(pa)*off,
+    Math.cos(a)*rx+Math.cos(pa)*off,
     0.30+cn*0.003,
-    Math.sin(a)*rz + Math.sin(pa)*off
+    Math.sin(a)*rz+Math.sin(pa)*off
   );
 }
 const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
 const COM_POS=[new BABYLON.Vector3(-2.20,0.305,0),new BABYLON.Vector3(-1.05,0.305,0),new BABYLON.Vector3(0.10,0.305,0),new BABYLON.Vector3(1.50,0.305,0),new BABYLON.Vector3(2.65,0.305,0)];
-
 function mkBackTex(){const W=256,H=384,tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true),c=tex.getContext(),g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');c.fillStyle=g;c.fillRect(0,0,W,H);c.strokeStyle='#c8a020';c.lineWidth=10;c.strokeRect(5,5,W-10,H-10);c.strokeStyle='rgba(200,160,32,0.5)';c.lineWidth=2;c.strokeRect(18,18,W-36,H-36);c.strokeStyle='rgba(200,160,32,0.15)';c.lineWidth=1;for(let x=-H;x<W+H;x+=14){c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();}c.fillStyle='rgba(200,160,32,0.35)';c.font='72px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText('\u2660',W/2,H/2);tex.update();return tex;}
 function mkFrontTex(suit,rank){
-  // Power-of-2 dimensions fix Chrome WebGL texture clamping/clipping
+  // 512x768 (power-of-2) prevents Chrome WebGL texture clamping/clipping
   const W=512,H=768;
   const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
   const c=tex.getContext();
@@ -203,33 +201,41 @@ function mkFrontTex(suit,rank){
   const col=isRed?'#cc0000':'#111111';
   // White background + borders
   c.fillStyle='#ffffff';c.fillRect(0,0,W,H);
-  c.strokeStyle='#999999';c.lineWidth=8;c.strokeRect(4,4,W-8,H-8);
-  c.strokeStyle='#dddddd';c.lineWidth=2;c.strokeRect(20,20,W-40,H-40);
-  // Large suit in centre
+  c.strokeStyle='#aaaaaa';c.lineWidth=8;c.strokeRect(4,4,W-8,H-8);
+  c.strokeStyle='#e0e0e0';c.lineWidth=2;c.strokeRect(22,22,W-44,H-44);
+  // Large suit symbol centred on card
   c.fillStyle=col;
   c.font='340px Arial';
-  c.textAlign='center';c.textBaseline='middle';
-  c.fillText(suit,W/2,H/2+10);
-  // Corner: rank + small suit pip
-  const rnkSz=rank==='10'?96:112;
-  const pipSz=68;
-  const padX=16,padY=12;
-  function drawCorner(){
-    c.fillStyle=col;
-    c.font=`bold ${rnkSz}px Arial`;c.textAlign='left';c.textBaseline='top';
-    c.fillText(rank,padX,padY);
-    c.font=`${pipSz}px Arial`;
-    c.fillText(suit,padX+2,padY+rnkSz-10);
-  }
-  // Top-left
-  drawCorner();
-  // Top-right (mirror X)
-  c.save();c.scale(-1,1);c.translate(-W,0);drawCorner();c.restore();
-  // Bottom-left (mirror Y)
-  c.save();c.scale(1,-1);c.translate(0,-H);drawCorner();c.restore();
-  // Bottom-right (rotate 180)
-  c.save();c.translate(W,H);c.rotate(Math.PI);drawCorner();c.restore();
-  tex.update();return tex;
+  c.textAlign='center';
+  c.textBaseline='middle';
+  c.fillText(suit,W/2,H/2+12);
+  // Corner indices: big rank + small suit pip
+  // All four corners drawn explicitly upright with direct coordinate placement — no transforms
+  const rnkSz=rank==='10'?118:136;
+  const pipSz=84;
+  const px=20,py=16;
+  const rowH=rnkSz+pipSz-4;
+  const byPy=H-py-rowH; // top of bottom-corner block
+  c.textBaseline='top';
+  c.fillStyle=col;
+  // TOP-LEFT
+  c.textAlign='left';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,px,py);
+  c.font=pipSz+'px Arial';c.fillText(suit,px+2,py+rnkSz-4);
+  // TOP-RIGHT
+  c.textAlign='right';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-px,py);
+  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,py+rnkSz-4);
+  // BOTTOM-LEFT
+  c.textAlign='left';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,px,byPy);
+  c.font=pipSz+'px Arial';c.fillText(suit,px+2,byPy+rnkSz-4);
+  // BOTTOM-RIGHT
+  c.textAlign='right';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-px,byPy);
+  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,byPy+rnkSz-4);
+  tex.update();
+  return tex;
 }
 function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
 function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.0,height:1.40},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
@@ -281,22 +287,14 @@ function chipsFlyToWinner(winSeat,cb){
     const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:8,value:mid},{frame:18,value:wp}],'in');
     chip.animations=[a];
     setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.5,()=>{snd_chip();freeChip(chip);done++;if(done===all.length&&cb)cb();});},i*18);});}
-function buildTokens(){function makeToken(name,r,g,b,label){const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene),m=new BABYLON.StandardMaterial(name+'m',scene);m.diffuseColor=new BABYLON.Color3(r,g,b);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);tok.material=m;tok.isVisible=false;tok.renderingGroupId=1;const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false),dc=discTex.getContext();dc.fillStyle=`rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;dc.beginPath();dc.arc(64,64,62,0,Math.PI*2);dc.fill();dc.strokeStyle='rgba(0,0,0,0.5)';dc.lineWidth=3;dc.stroke();dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';dc.font='bold 42px Arial';dc.textAlign='center';dc.textBaseline='middle';dc.fillText(label,64,64);discTex.update();const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene),dm=new BABYLON.StandardMaterial(name+'dm',scene);dm.diffuseTexture=discTex;dm.emissiveColor=new BABYLON.Color3(1,1,1);dm.disableLighting=true;dm.backFaceCulling=false;disc.material=dm;disc.rotation.x=-Math.PI/2;disc.position.y=0.07;disc.parent=tok;disc.renderingGroupId=2;return tok;}dealerToken=makeToken('dealer',0.95,0.95,0.95,'D');sbToken=makeToken('sb',0.15,0.40,0.90,'SB');bbToken=makeToken('bb',0.90,0.80,0.10,'BB');}
+function buildTokens(){function makeToken(name,r,g,b,label){const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene),m=new BABYLON.StandardMaterial(name+'m',scene);m.diffuseColor=new BABYLON.Color3(r,g,b);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);tok.material=m;tok.isVisible=false;tok.renderingGroupId=1;const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false),dc=discTex.getContext();dc.fillStyle='rgb('+Math.round(r*255)+','+Math.round(g*255)+','+Math.round(b*255)+')';dc.beginPath();dc.arc(64,64,62,0,Math.PI*2);dc.fill();dc.strokeStyle='rgba(0,0,0,0.5)';dc.lineWidth=3;dc.stroke();dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';dc.font='bold 42px Arial';dc.textAlign='center';dc.textBaseline='middle';dc.fillText(label,64,64);discTex.update();const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene),dm=new BABYLON.StandardMaterial(name+'dm',scene);dm.diffuseTexture=discTex;dm.emissiveColor=new BABYLON.Color3(1,1,1);dm.disableLighting=true;dm.backFaceCulling=false;disc.material=dm;disc.rotation.x=-Math.PI/2;disc.position.y=0.07;disc.parent=tok;disc.renderingGroupId=2;return tok;}dealerToken=makeToken('dealer',0.95,0.95,0.95,'D');sbToken=makeToken('sb',0.15,0.40,0.90,'SB');bbToken=makeToken('bb',0.90,0.80,0.10,'BB');}
 function positionTokens(dSeat,sbSeat,bbSeat){
-const RX=TRX*0.50,RZ=TRZ*0.50;
-function seatA(seat){return -Math.PI/2-(seat/NP)*Math.PI*2;}
-function place(tok,seat,angOffset){
-  const a=seatA(seat)+angOffset;
-  tok.position=new BABYLON.Vector3(Math.cos(a)*RX,0.38,Math.sin(a)*RZ);
-  tok.isVisible=true;}
-if(dSeat===sbSeat){
-  place(dealerToken,dSeat, 0.18);
-  place(sbToken,    sbSeat,-0.18);
-}else{
-  place(dealerToken,dSeat,0);
-  place(sbToken,sbSeat,0.06);
-}
-place(bbToken,bbSeat,0.06);}
+  const RX=TRX*0.50,RZ=TRZ*0.50;
+  function seatA(seat){return -Math.PI/2-(seat/NP)*Math.PI*2;}
+  function place(tok,seat,angOffset){const a=seatA(seat)+angOffset;tok.position=new BABYLON.Vector3(Math.cos(a)*RX,0.38,Math.sin(a)*RZ);tok.isVisible=true;}
+  if(dSeat===sbSeat){place(dealerToken,dSeat,0.18);place(sbToken,sbSeat,-0.18);}
+  else{place(dealerToken,dSeat,0);place(sbToken,sbSeat,0.06);}
+  place(bbToken,bbSeat,0.06);}
 const LW=320,LH=128;
 function buildPlayerLabels(){for(let i=0;i<NP;i++){const tex=new BABYLON.DynamicTexture('plbtex'+i,{width:LW,height:LH},scene,false);tex.hasAlpha=true;const mat=new BABYLON.StandardMaterial('plbm'+i,scene);mat.diffuseTexture=tex;mat.hasAlpha=true;mat.emissiveColor=new BABYLON.Color3(1,1,1);mat.disableLighting=true;mat.backFaceCulling=false;const plane=BABYLON.MeshBuilder.CreatePlane('plbp'+i,{width:2.2,height:0.88},scene);plane.material=mat;const sp=seatPos(i);plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);plane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;plane.isVisible=false;plane.renderingGroupId=2;playerLabels.push({plane,tex});}}
 function updateLabel(seat,name,chips,bet,action,isMe,isDead){const vSeat=vs(seat),lb=playerLabels[vSeat];if(!lb)return;const sp=seatPos(vSeat);lb.plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);const ctx=lb.tex.getContext();ctx.clearRect(0,0,LW,LH);if(!name){lb.plane.isVisible=false;lb.tex.update();return;}const bgCol=isDead?'rgba(80,20,20,0.82)':isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';ctx.fillStyle=bgCol;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.fill();const borderCol=isMe?'#20c040':isDead?'#802020':'#c8a020';ctx.strokeStyle=borderCol;ctx.lineWidth=2;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.stroke();ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='top';const dispName=(name.length>14?name.slice(0,13)+'\u2026':name).toUpperCase();ctx.fillText(dispName,LW/2,8);ctx.fillStyle='#ffd700';ctx.font='19px Arial';ctx.fillText('\u00a3'+(chips/100).toFixed(2),LW/2,38);if(bet>0){ctx.fillStyle='#80cfff';ctx.font='15px Arial';ctx.fillText('STAKE: \u00a3'+(bet/100).toFixed(2),LW/2,64);}if(action){const ac=action.toUpperCase(),acCol=ac.startsWith('FOLD')?'#c04040':ac.startsWith('RAISE')?'#e09020':'#20c040';ctx.fillStyle=acCol;ctx.font='bold 16px Arial';ctx.fillText(ac,LW/2,bet>0?90:68);}lb.tex.update();lb.plane.isVisible=true;}
@@ -306,10 +304,28 @@ function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animat
 function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.055,0.025,0.010,1);const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.8,17,new BABYLON.Vector3(0,0.5,0),scene);cam.lowerRadiusLimit=7;cam.upperRadiusLimit=26;cam.lowerBetaLimit=0.20;cam.upperBetaLimit=1.35;cam.wheelPrecision=22;cam.attachControl(canvas,true);const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);h.intensity=0.20;h.diffuse=new BABYLON.Color3(0.55,0.48,0.60);h.groundColor=new BABYLON.Color3(0.06,0.04,0.08);spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.1,1.4,scene);spotLight.intensity=1.8;spotLight.diffuse=new BABYLON.Color3(1,0.97,0.88);shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=12;const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);f.position.y=-0.22;f.receiveShadows=true;const fm=new BABYLON.StandardMaterial('fm',scene);fm.diffuseColor=new BABYLON.Color3(0.10,0.048,0.020);fm.specularColor=new BABYLON.Color3(0.20,0.10,0.04);fm.specularPower=80;f.material=fm;const T=96,base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.44,diameter:12,tessellation:T},scene);base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;const bm=new BABYLON.StandardMaterial('bm',scene);bm.diffuseColor=new BABYLON.Color3(0.22,0.10,0.04);bm.specularColor=new BABYLON.Color3(0.55,0.32,0.08);bm.specularPower=160;base.material=bm;const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.42,tessellation:T,radialSegments:20},scene);rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.18;const rm=new BABYLON.StandardMaterial('rm',scene);rm.diffuseColor=new BABYLON.Color3(0.30,0.14,0.05);rm.specularColor=new BABYLON.Color3(0.80,0.50,0.15);rm.specularPower=220;rm.emissiveColor=new BABYLON.Color3(0.04,0.02,0.005);rail.material=rm;const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.22;const ftm=new BABYLON.StandardMaterial('ftm',scene);ftm.diffuseColor=new BABYLON.Color3(0.05,0.22,0.48);ftm.specularColor=new BABYLON.Color3(0.01,0.04,0.08);ftm.specularPower=6;felt.material=ftm;felt.receiveShadows=true;
 const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
 let seatActions={};
-function applyState(st){if(!st)return;lastState=st;for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').textContent=`YOUR CHIPS: \u00a3${(p0.chips/100).toFixed(2)}  |  BET: \u00a3${(p0.bet/100).toFixed(2)}`;document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
+function applyState(st){if(!st)return;lastState=st;for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').textContent='YOUR CHIPS: \u00a3'+(p0.chips/100).toFixed(2)+'  |  BET: \u00a3'+(p0.bet/100).toFixed(2);document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
 function getOrCreateCommunityMesh(idx){if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];const m=nextCardMesh();communityCardMeshes[idx]=m;return m;}
-function startDealAnimation(activeSeats,afterDone){dealing=true;for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}for(const m of communityCardMeshes){if(m)m.isVisible=false;}communityCardMeshes=[];freeAllChips();const seq=[];for(let rd=0;rd<2;rd++)for(const si of activeSeats)seq.push(si);const dealt={};for(const si of activeSeats)dealt[si]=0;let idx=0;function next(){if(idx>=seq.length){dealing=false;if(afterDone)afterDone();return;}const si=seq[idx++],cn=dealt[si]||0;dealt[si]=cn+1;const m=nextCardMesh();seatCardMeshes[si][cn]=m;const target=cardPos(vs(si),cn);animDeal(m,target,()=>{snd_deal();if(lastState&&lastState.players[si]){const cd=lastState.players[si].cards[cn];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());}setTimeout(next,80);});}next();}
-function connectWS(name,roomId,playerId){const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${proto}//${location.host}`);ws.onopen=()=>{ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));};ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};ws.onclose=()=>{showMsg('\u26a0 Disconnected from server',0);setTimeout(()=>location.reload(),4000);};ws.onerror=()=>{document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';};}
+function startDealAnimation(activeSeats,afterDone){
+  // activeSeats is already rotated by the caller so SB is first, dealer is last
+  dealing=true;
+  for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}
+  for(const m of communityCardMeshes){if(m)m.isVisible=false;}
+  communityCardMeshes=[];freeAllChips();
+  // Build deal sequence: one card to each player (round 1), then second card (round 2)
+  const seq=[];
+  for(let rd=0;rd<2;rd++)for(const si of activeSeats)seq.push(si);
+  const dealt={};for(const si of activeSeats)dealt[si]=0;
+  let idx=0;
+  function next(){
+    if(idx>=seq.length){dealing=false;if(afterDone)afterDone();return;}
+    const si=seq[idx++],cn=dealt[si]||0;dealt[si]=cn+1;
+    const m=nextCardMesh();seatCardMeshes[si][cn]=m;
+    const target=cardPos(vs(si),cn);
+    animDeal(m,target,()=>{snd_deal();if(lastState&&lastState.players[si]){const cd=lastState.players[si].cards[cn];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());}setTimeout(next,80);});
+  }
+  next();}
+function connectWS(name,roomId,playerId){const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);ws.onopen=()=>{ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));};ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};ws.onclose=()=>{showMsg('\u26a0 Disconnected from server',0);setTimeout(()=>location.reload(),4000);};ws.onerror=()=>{document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';};}
 function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
 function handleServerMsg(msg){switch(msg.type){
 case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
@@ -317,17 +333,24 @@ case 'waiting':document.getElementById('loginOverlay').style.display='none';docu
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
 case 'lobby':renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
-case 'winner':snd_win();hideTurnIndicator();addLog(`\ud83c\udfc6 ${msg.name} wins \u00a3${(msg.amount/100).toFixed(2)} \u2014 ${msg.label||''}`,'log-win');showMsg(`\ud83c\udfc6 ${msg.name} wins \u00a3${(msg.amount/100).toFixed(2)}\n${msg.label||''}!`,0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
+case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
 case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;break;
 case 'newHand':{
   seatActions={};showMsg('');setActions(false);hideTurnIndicator();
   document.getElementById('waitingMsg').style.display='none';
   handNumber++;
-  addLog(`\u2501\u2501 Hand #${handNumber} | Dealer: Seat ${(msg.dealerSeat+1)} \u2501\u2501`,'log-hand');
-  addLog(`SB: Seat ${msg.sbSeat+1} \u00b7 BB: Seat ${msg.bbSeat+1}`);
+  addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');
+  addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));
   positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));
-  const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat;
-  startDealAnimation(msg.activeSeats||[],()=>{
+  const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;
+  // Rotate deal order so first card goes to player left of dealer, dealer gets last card.
+  // Standard poker rule: deal starts from SB (immediately left of dealer) going clockwise.
+  // Exception: heads-up (dealer=SB), deal starts from BB so dealer/SB still gets last card.
+  const rawSeats=msg.activeSeats||[];
+  const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;
+  const dsIdx=rawSeats.indexOf(dealStartSeat);
+  const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;
+  startDealAnimation(dealSeats,()=>{
     setTimeout(()=>{showBet(sbSeat,10);},120);
     setTimeout(()=>{showBet(bbSeat,20);},280);
     if(lastState)applyState(lastState);
@@ -335,43 +358,43 @@ case 'newHand':{
 case 'state':lastState=msg;if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;}if(!dealing)applyState(msg);break;
 case 'playerAction':{
   const pname=msg.name||'Player';
-  const ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?`CALL \u00a3${((msg.amount||0)/100).toFixed(2)}`:`RAISE \u00a3${((msg.amount||0)/100).toFixed(2)}`;
-  seatActions[msg.seat]=ac;addLog(`${pname}: ${ac}`);
+  const ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
+  seatActions[msg.seat]=ac;addLog(pname+': '+ac);
   if(msg.amount>0)showBet(msg.seat,msg.amount);
   hideTurnIndicator();if(lastState)applyState(lastState);break;}
 case 'yourTurn':{
   const ca=msg.callAmt||0;
   if(msg.seat===mySeat){
-    document.getElementById('callBtn').textContent=ca>0?`CALL \u00a3${(ca/100).toFixed(2)}`:'CHECK';
+    document.getElementById('callBtn').textContent=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';
     document.getElementById('raiseAmt').value=((msg.minRaise||40)/100).toFixed(2);
     setActions(true);showMsg('\u2b50 Your turn!',0);
     document.getElementById('waitingMsg').style.display='none';
   }else{
     setActions(false);showMsg('');
     const actingPlayer=lastState&&lastState.players[msg.seat];
-    const actingName=actingPlayer?actingPlayer.name:`Seat ${msg.seat+1}`;
-    showTurnIndicator(`\u23f3 ${actingName} is thinking\u2026`);
+    const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);
+    showTurnIndicator('\u23f3 '+actingName+' is thinking\u2026');
   }break;}
 case 'communityDealt':
-  addLog(`\u25b6 ${(msg.phase||'').toUpperCase()}: ${(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' ')}`,'log-community');
+  addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');
   sweepBetsToPot(()=>{if(lastState)applyState(lastState);});
   break;
 case 'showdown':setPhase('Showdown');hideTurnIndicator();
   sweepBetsToPot(null);
   addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
-case 'playerLeft':addLog(`${msg.name} left the table`);addChat(`\u2b05 ${msg.name} left`);seatActions[msg.seat]='';if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}if(lastState)applyState(lastState);break;
+case 'playerLeft':addLog(msg.name+' left the table');addChat('\u2b05 '+msg.name+' left');seatActions[msg.seat]='';if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}if(lastState)applyState(lastState);break;
 case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
 case 'gamePaused':handlePaused(true,msg.byName);break;
 case 'gameResumed':handlePaused(false,null);break;
 case 'voluntaryAutoFoldAck':break;
-case 'chat':addChat(`${msg.name}: ${msg.text}`);break;
-case 'error':addChat(`\u26a0 ${msg.msg}`);break;}}
-function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML=`<span>${s.name}${s.id===msg.hostId?'<span class="host-badge">HOST</span>':''}</span><span class="chips">\u00a3${(s.chips/100).toFixed(2)}</span>`;pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML=`<span>${p.name}</span><span><button class="btn-sm btn-approve" onclick="approvePlayer('${p.id}',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer('${p.id}',false)">\u2717 Reject</button></span>`;pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
+case 'chat':addChat(msg.name+': '+msg.text);break;
+case 'error':addChat('\u26a0 '+msg.msg);break;}}
+function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(\''+p.id+'\',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(\''+p.id+'\',false)">\u2717 Reject</button></span>';pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
 function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
 let pendingInGame={};
 function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
-function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML=`<span class="jr-name">${p.name}</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove('${p.id}',true)">Admit</button><button class="jr-reject" onclick="inGameApprove('${p.id}',false)">Reject</button></span>`;list.appendChild(row);}}
+function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(\''+p.id+'\',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(\''+p.id+'\',false)">Reject</button></span>';list.appendChild(row);}}
 function inGameApprove(id,accept){wsSend({type:'approve',id,accept});delete pendingInGame[id];refreshInGameJoinNotif();}
 function showTurnIndicator(txt){document.getElementById('turnIndicator').textContent=txt;document.getElementById('turnIndicator').style.display='block';}
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';}
@@ -387,16 +410,8 @@ function handlePaused(isPaused,byName){
   gamePaused=isPaused;
   const btn=document.getElementById('pauseBtn');
   const banner=document.getElementById('pauseBanner');
-  if(isPaused){
-    btn.classList.add('active');btn.textContent='\u25b6 RESUME';
-    banner.style.display='block';
-    if(activityCollapsed)toggleActivityLog();
-    addLog(`\u23f8 Game PAUSED by ${byName||'a player'} \u2014 reviewing hand history`,'log-hand');
-  }else{
-    btn.classList.remove('active');btn.textContent='\u23ae\u23ae PAUSE';
-    banner.style.display='none';
-    addLog('\u25b6 Game RESUMED','log-hand');
-  }
+  if(isPaused){btn.classList.add('active');btn.textContent='\u25b6 RESUME';banner.style.display='block';if(activityCollapsed)toggleActivityLog();addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 reviewing hand history','log-hand');}
+  else{btn.classList.remove('active');btn.textContent='\u23ae\u23ae PAUSE';banner.style.display='none';addLog('\u25b6 Game RESUMED','log-hand');}
 }
 let myAutoFold=false;
 function toggleAutoFold(){
