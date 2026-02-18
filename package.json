@@ -1,12 +1,16 @@
 {
   "name": "syfm-poker",
   "version": "1.0.0",
-  "description": "Multiplayer Texas Hold'em Poker",
+  "description": "SYFM Poker multiplayer Texas Hold'em",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "basic-ftp": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
