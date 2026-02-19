@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SYFM Poker">
+<meta name="mobile-web-app-capable" content="yes">
 <title>SYFM Poker</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
+/* iOS safe areas — keeps UI clear of notch and home bar */
+#gameUI{--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px)}
 #c{width:100%;height:100%;display:block;touch-action:none}
 .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,5,2,0.88);z-index:200}
 .panel{background:linear-gradient(160deg,#1c0e06 0%,#2a1408 100%);border:2px solid #c8a020;border-radius:16px;padding:36px 44px;min-width:340px;max-width:480px;width:90%;text-align:center;box-shadow:0 0 60px rgba(200,160,32,0.20)}
@@ -28,25 +34,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
 #gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
 #gameUI > *{pointer-events:auto}
-#topBar{position:absolute;top:10px;left:10px;right:10px;background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
+#topBar{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
-/* ── Left action panel: vertical column, mid-left ── */
-#actionPanel{position:absolute;left:10px;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:6px;z-index:110;width:100px}
+#actionPanel{position:absolute;left:calc(10px + env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:6px;z-index:110;width:100px}
 .abtn{padding:11px 8px;border-radius:6px;border:none;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;white-space:nowrap;width:100%;text-align:center}
 .abtn-call{background:#1a7a1a}
 .abtn-raise{background:#7a5800}
 .abtn-fold{background:#7a1a1a}
 #raiseAmt{width:100%;padding:8px 4px;border-radius:4px;border:1px solid #c8a020;background:rgba(0,0,0,0.85);color:#fff;font-size:12px;text-align:center;display:none;box-sizing:border-box}
-/* Auto-fold lives in action panel too */
 .tbtn-autofold{background:#3a1a5a;padding:9px 8px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center}
 .tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
-/* ── Bottom info bar: chips/bet/pot, centre bottom ── */
-#bottomBar{position:absolute;bottom:10px;left:120px;right:200px;background:rgba(0,0,0,0.82);padding:7px 12px;border-radius:8px;color:#c8a820;text-align:center}
+#bottomBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(120px + env(safe-area-inset-left,0px));right:calc(200px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.82);padding:7px 12px;border-radius:8px;color:#c8a820;text-align:center}
 #myInfo{font-size:13px;font-weight:bold;color:#ffd700}
-/* ── Bottom-right: Pause + Cash Out on one row ── */
-#controlBar{position:absolute;bottom:10px;right:10px;display:flex;flex-direction:row;gap:6px;align-items:stretch;z-index:110}
+#controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:6px;align-items:stretch;z-index:110}
 .cbtn-pause{padding:9px 12px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#1a4a7a;white-space:nowrap}
 .cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
 .cbtn-cashout{padding:9px 12px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
