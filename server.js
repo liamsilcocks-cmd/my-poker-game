@@ -85,6 +85,20 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  // Keep-alive ping from client (every 5 hands) to prevent Render.com sleep
+  if (req.url && req.url.startsWith('/keepalive')) {
+    const params = new URL(req.url, 'http://x').searchParams;
+    const room = params.get('room') || '?';
+    const hand = params.get('hand') || '?';
+    const ts = new Date().toISOString();
+    console.log(`[KEEPALIVE] ${ts} | Room: ${room} | Hand: ${hand}`);
+    // Log to active room file if we can find it
+    const r = rooms.get(room);
+    if (r && r.G) writeLog(r, `KEEPALIVE sent by client at hand #${hand} — server alive at ${ts}`);
+    res.writeHead(200, {'Content-Type':'text/plain','Access-Control-Allow-Origin':'*'});
+    res.end('alive:'+ts);
+    return;
+  }
   res.writeHead(404); res.end('Not found');
 });
 
@@ -355,6 +369,34 @@ wss.on('connection', ws => {
         break;
       }
 
+      case 'cashOut': {
+        const room = rooms.get(myRoomId);
+        if (!room) return;
+        const s = room.seats.find(s => s?.id === myId);
+        if (!s) return;
+        const chips = s.chips;
+        const seatIdx = s.seat;
+        writeLog(room, `CASH OUT: ${s.name} (Seat ${seatIdx+1}) leaves with £${(chips/100).toFixed(2)}`);
+        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} has cashed out with £${(chips/100).toFixed(2)}` });
+        broadcastAll(room, { type: 'playerLeft', id: myId, name: s.name, seat: seatIdx, reason: 'cashout' });
+        // If it's their turn, fold them first
+        if (room.G && room.G.toAct[0] === seatIdx) {
+          clearActionTimer(room);
+          doFold(room, seatIdx, 'cash out');
+        }
+        // Remove from seat
+        room.seats[seatIdx] = null;
+        // If they were host, transfer host
+        if (room.hostId === myId) {
+          const newHost = room.seats.find(Boolean);
+          if (newHost) {
+            room.hostId = newHost.id;
+            send(newHost.ws, { type: 'chat', name: 'System', text: 'You are now the host.' });
+          }
+        }
+        broadcastAll(room, lobbySnapshot(room));
+        break;
+      }
       case 'chat': {
         const room = rooms.get(myRoomId);
         if (!room) return;
