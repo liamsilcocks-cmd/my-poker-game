@@ -418,7 +418,24 @@ function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABY
 function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
 function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
 const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
-cam.lowerRadiusLimit=8;cam.upperRadiusLimit=26;cam.lowerBetaLimit=0.22;cam.upperBetaLimit=1.32;cam.wheelPrecision=22;cam.attachControl(canvas,true);
+// ── Mobile-safe camera constraints ──────────────────────────────────────────
+// Alpha (horizontal rotation): lock to a narrow 60° arc along the table's long axis
+// Players can glance slightly left/right but can't spin all the way around
+cam.lowerAlphaLimit=-Math.PI/2-0.52;  // ~-120° (-90° centre -30°)
+cam.upperAlphaLimit=-Math.PI/2+0.52;  // ~-60°  (-90° centre +30°)
+// Beta (vertical tilt): allow a gentle tilt range — no flipping under the table
+cam.lowerBetaLimit=0.55;   // ~31° above table — can't go too overhead
+cam.upperBetaLimit=1.18;   // ~68° — can't go below the felt
+// Radius (zoom): keep sensible range
+cam.lowerRadiusLimit=10;
+cam.upperRadiusLimit=22;
+// Wheel/pinch zoom sensitivity
+cam.wheelPrecision=28;
+cam.pinchPrecision=180;
+// Disable panning entirely — this is what causes "lost in space" on mobile
+// when two fingers drift and the target moves off screen
+cam.panningSensibility=0;
+cam.attachControl(canvas,true);
 const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
 h.intensity=0.12;h.diffuse=new BABYLON.Color3(0.7,0.62,0.45);h.groundColor=new BABYLON.Color3(0.04,0.03,0.02);
 spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,12,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.8,scene);
