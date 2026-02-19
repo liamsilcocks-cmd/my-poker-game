@@ -829,7 +829,7 @@ function endRound(room) {
   const remaining = room.seats.filter(s => s && !s.folded && !s.sittingOut);
   if (remaining.length === 1) {
     writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
-    finish(room, remaining[0], 'Last player standing');
+    finish(room, [remaining[0]], 'Last player standing');
   } else if (remaining.length === 0) {
     writeLog(room, `RESULT: No eligible winner found — hand skipped`);
   }
@@ -840,7 +840,7 @@ function showdown(room) {
   const active = room.seats.filter(s => s && !s.folded && !s.sittingOut);
   if (active.length === 1) {
     writeLog(room, `RESULT: ${active[0].name} wins at showdown uncontested`);
-    finish(room, active[0], 'Last player standing');
+    finish(room, [active[0]], 'Last player standing');
     return;
   }
 
@@ -853,39 +853,96 @@ function showdown(room) {
   writeLog(room, '╠' + '═'.repeat(62) + '╣');
   writeLog(room, `║  Board: ${room.G.community.map(c=>c.r+c.s).join('  ').padEnd(53)}║`);
   writeLog(room, '╠' + '═'.repeat(62) + '╣');
-  let best = null, bestScore = -1;
-  for (const p of active) {
+
+  // Score every active player
+  let bestScore = -1;
+  const scored = active.map(p => {
     const allCards = [...p.cards, ...room.G.community];
     const sc = evalBest(allCards);
-    const hn = handName(sc);
     const bf = bestFiveCards(allCards);
+    if (sc > bestScore) bestScore = sc;
+    return { p, sc, bf };
+  });
+
+  for (const { p, sc, bf } of scored) {
     const holeStr = p.cards.map(c=>c.r+c.s).join(' ');
     const bestStr = bf.map(c=>c.r+c.s).join(' ');
+    const hn = handName(sc);
     writeLog(room, `║  ${('Seat '+(p.seat+1)+' '+p.name).padEnd(22)} | Hole: ${holeStr.padEnd(10)} | Best: ${bestStr.padEnd(14)} | ${hn.padEnd(16)}║`);
-    if (sc > bestScore) { bestScore = sc; best = p; }
   }
+
+  // Collect ALL players who share the best score (tied winners)
+  const winners = scored.filter(({ sc }) => sc === bestScore).map(({ p }) => p);
+  const winHandName = handName(bestScore);
+
   writeLog(room, '╠' + '═'.repeat(62) + '╣');
-  writeLog(room, `║  🏆 WINNER: ${best.name} with ${handName(bestScore)}`.padEnd(63) + '║');
+  if (winners.length === 1) {
+    writeLog(room, `║  🏆 WINNER: ${winners[0].name} with ${winHandName}`.padEnd(63) + '║');
+  } else {
+    writeLog(room, `║  🤝 SPLIT POT: ${winners.map(w=>w.name).join(' & ')} — ${winHandName}`.padEnd(63) + '║');
+  }
   writeLog(room, '╚' + '═'.repeat(62) + '╝');
-  setTimeout(() => finish(room, best, handName(bestScore)), 1200);
+
+  setTimeout(() => finish(room, winners, winHandName), 1200);
 }
 
-function finish(room, winner, label) {
-  if (!winner) return;
+function finish(room, winners, label) {
+  // winners is always an array now (1 = sole winner, 2+ = split)
+  if (!winners || winners.length === 0) return;
   clearActionTimer(room);
-  const won = room.G.pot;
-  winner.chips += won;
-  room.G.pot = 0;
-  broadcastAll(room, { type: 'winner', seat: winner.seat, name: winner.name, amount: won, label });
-  broadcastState(room);
 
-  const remaining = room.seats.filter(Boolean).sort((a,b) => b.chips - a.chips);
-  writeLog(room, '');
-  writeLog(room, '┌─ HAND RESULT ─────────────────────────────────────────┐');
-  writeLog(room, `│  ${winner.name} wins £${(won/100).toFixed(2)} (${label})`.padEnd(63) + '│');
+  const pot = room.G.pot;
+  room.G.pot = 0;
+
+  if (winners.length === 1) {
+    // ── Sole winner ────────────────────────────────────────────────────────
+    const winner = winners[0];
+    winner.chips += pot;
+    broadcastAll(room, { type: 'winner', seat: winner.seat, name: winner.name, amount: pot, label });
+    broadcastState(room);
+    writeLog(room, '');
+    writeLog(room, '┌─ HAND RESULT ─────────────────────────────────────────┐');
+    writeLog(room, `│  ${winner.name} wins £${(pot/100).toFixed(2)} (${label})`.padEnd(63) + '│');
+  } else {
+    // ── Split pot ──────────────────────────────────────────────────────────
+    // Divide as evenly as possible; any odd chip goes to first winner in seat order
+    const perPlayer  = Math.floor(pot / winners.length);
+    const remainder  = pot - perPlayer * winners.length;
+    const sorted     = [...winners].sort((a, b) => a.seat - b.seat);
+
+    sorted.forEach((w, i) => {
+      const share = perPlayer + (i === 0 ? remainder : 0);
+      w.chips += share;
+    });
+
+    const names  = sorted.map(w => w.name).join(' & ');
+    const shares = sorted.map(w => `£${(perPlayer/100).toFixed(2)}`).join(' / ');
+
+    // Broadcast one winner event per winner so the client animates chips flying
+    sorted.forEach((w, i) => {
+      const share = perPlayer + (i === 0 ? remainder : 0);
+      broadcastAll(room, {
+        type: 'winner',
+        seat: w.seat,
+        name: w.name,
+        amount: share,
+        label: `Split pot — ${label}`
+      });
+    });
+
+    broadcastState(room);
+    writeLog(room, '');
+    writeLog(room, '┌─ HAND RESULT (SPLIT POT) ─────────────────────────────┐');
+    writeLog(room, `│  🤝 ${names} split £${(pot/100).toFixed(2)} (${label})`.padEnd(63) + '│');
+    writeLog(room, `│  Each receives: ${shares}`.padEnd(63) + '│');
+    if (remainder > 0) {
+      writeLog(room, `│  Odd chip (£${(remainder/100).toFixed(2)}) goes to ${sorted[0].name} (earliest seat)`.padEnd(63) + '│');
+    }
+  }
+
   writeLog(room, '├─ CHIP COUNTS AFTER HAND ──────────────────────────────┤');
-  remaining.forEach(s => {
-    const bar = '█'.repeat(Math.round(s.chips/START_CHIPS*20));
+  room.seats.filter(Boolean).sort((a,b) => b.chips - a.chips).forEach(s => {
+    const bar  = '█'.repeat(Math.round(s.chips / START_CHIPS * 20));
     const note = s.pendingCashOut ? ' [CASHING OUT]' : '';
     writeLog(room, `│  ${('Seat '+(s.seat+1)+' '+s.name).padEnd(22)} £${(s.chips/100).toFixed(2).padStart(7)}  ${bar}${note}`.padEnd(63) + '│');
   });
