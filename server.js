@@ -513,10 +513,13 @@ function startNewHand(room) {
 
   room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; } });
 
-  const playerSummary = active.map(i => {
-    const s = room.seats[i];
-    return `${s.name}(seat${i+1}) £${(s.chips/100).toFixed(2)}`;
-  }).join(', ');
+  // Calculate deal order here so it's available for the log header below
+  const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
+  const dsIdx = active.indexOf(dealStartSeat);
+  const dealOrder = dsIdx >= 0
+    ? [...active.slice(dsIdx), ...active.slice(0, dsIdx)]
+    : active;
+
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const timeStr = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -555,11 +558,6 @@ function startNewHand(room) {
   // Standard poker rule: deal starts from player left of dealer (SB), clockwise,
   // dealer receives their cards last in both rounds.
   // Exception — heads-up: dealer=SB, so start from BB to keep dealer last.
-  const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
-  const dsIdx = active.indexOf(dealStartSeat);
-  const dealOrder = dsIdx >= 0
-    ? [...active.slice(dsIdx), ...active.slice(0, dsIdx)]
-    : active;
 
   for (let rd = 0; rd < 2; rd++)
     for (const si of dealOrder)
