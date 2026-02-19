@@ -184,18 +184,37 @@ function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.
 const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
 let myId=localStorage.getItem('pokerPlayerId')||null,mySeat=0,isHost=false,myRoomId=null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
-function vs(s){return(s-mySeat+NP)%NP;}
+// Dynamic seat positioning: players are spaced evenly around the table
+// based on how many are actually seated, not fixed NP slots.
+// occupiedSeats: sorted list of server seat indices currently at the table
+let occupiedSeats=[];
+function updateOccupiedSeats(seats){
+  // seats is the server seats array (length NP, nulls for empty)
+  occupiedSeats=seats.map((s,i)=>s?i:null).filter(i=>i!==null);
+}
+function vs(serverSeat){
+  // Returns visual slot index 0..(occupiedSeats.length-1),
+  // rotated so mySeat always appears at the bottom (slot 0)
+  if(occupiedSeats.length===0)return(serverSeat-mySeat+NP)%NP;
+  const myIdx=occupiedSeats.indexOf(mySeat);
+  const seatIdx=occupiedSeats.indexOf(serverSeat);
+  if(seatIdx===-1)return 0;
+  const n=occupiedSeats.length;
+  return(seatIdx-myIdx+n)%n;
+}
+function numVisualSeats(){return Math.max(occupiedSeats.length,2);}
 const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true);
 window.addEventListener('resize',()=>engine.resize());
 canvas.addEventListener('click',()=>ensureAudio(),{once:true});
 let scene,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
 const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
-function betPos(vSeat){const a=-Math.PI/2-(vSeat/NP)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
-function seatPos(i){const a=-Math.PI/2-(i/NP)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
+function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
+function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
 function cardPos(si,cn){
   // si = visual seat index, cn = card number (0=first/left, 1=second/right)
-  const a=-Math.PI/2-(si/NP)*Math.PI*2;
+  const n=numVisualSeats();
+  const a=-Math.PI/2-(si/n)*Math.PI*2;
   const rx=TRX*0.70,rz=TRZ*0.70;
   // Perpendicular tangent direction: rotate seat angle +90deg
   const pa=a+Math.PI/2;
@@ -243,58 +262,128 @@ function mkBackTex(){
   tex.update();return tex;
 }
 function mkFrontTex(suit,rank){
-  // 512x768 power-of-2 avoids Chrome WebGL texture clamping
+  // 512x768 power-of-2 prevents Chrome WebGL texture clamping
   const W=512,H=768;
   const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
   const c=tex.getContext();
   const isRed=suit==='\u2665'||suit==='\u2666';
   const col=isRed?'#cc0000':'#111111';
-  // White background + borders
-  c.fillStyle='#ffffff';c.fillRect(0,0,W,H);
-  c.strokeStyle='#aaaaaa';c.lineWidth=8;c.strokeRect(4,4,W-8,H-8);
-  c.strokeStyle='#e0e0e0';c.lineWidth=2;c.strokeRect(22,22,W-44,H-44);
-  // Large suit symbol centred on card
-  c.fillStyle=col;
-  c.font='300px Arial';
-  c.textAlign='center';c.textBaseline='middle';
-  c.fillText(suit,W/2,H/2+10);
-  // For 6 and 9: write the word beneath the suit to prevent confusion
-  if(rank==='6'||rank==='9'){
-    const word=rank==='6'?'SIX':'NINE';
-    c.font='bold 64px Arial';
-    c.fillStyle='rgba('+((isRed)?'180,0,0':'30,30,30')+',0.55)';
-    c.textAlign='center';c.textBaseline='middle';
-    c.fillText(word,W/2,H/2+185);
-  }
-  // Corner indices: rank (or word for 6/9) + suit pip
-  // All four corners drawn explicitly upright — no mirror transforms
-  const is69=rank==='6'||rank==='9';
-  const cornerWord=rank==='6'?'SIX':rank==='9'?'NINE':null;
-  // For 6/9 use the word in the corner so it reads unambiguously
-  const displayRank=is69?cornerWord:rank;
-  const rnkSz=rank==='10'?108:is69?76:128;  // word fits smaller
-  const pipSz=80;
-  const px=18,py=14;
-  const rowH=rnkSz+pipSz+2;
+  const suitName={'\u2660':'SPADES','\u2665':'HEARTS','\u2666':'DIAMONDS','\u2663':'CLUBS'}[suit]||'';
+
+  // ── Background + border ───────────────────────────────────────────────
+  c.fillStyle='#fafafa';c.fillRect(0,0,W,H);
+  c.strokeStyle='#999';c.lineWidth=8;c.strokeRect(4,4,W-8,H-8);
+  // Inner inset box
+  const BX=28,BY=28,BW=W-56,BH=H-56;
+  c.strokeStyle='#bbb';c.lineWidth=2;c.strokeRect(BX,BY,BW,BH);
+
+  // ── Corner index: rank + suit pip ─────────────────────────────────────
+  const rnkSz=rank==='10'?96:108;
+  const pipSz=72;
+  const px=14,py=12;
+  const rowH=rnkSz+pipSz-2;
   const byPy=H-py-rowH;
-  c.fillStyle=col;
-  c.textBaseline='top';
+  c.fillStyle=col;c.textBaseline='top';
   // TOP-LEFT
   c.textAlign='left';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,px,py);
-  c.font=pipSz+'px Arial';c.fillText(suit,px+2,py+rnkSz+2);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,px,py);
+  c.font=pipSz+'px Arial';c.fillText(suit,px+2,py+rnkSz-6);
   // TOP-RIGHT
   c.textAlign='right';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,W-px,py);
-  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,py+rnkSz+2);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-px,py);
+  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,py+rnkSz-6);
   // BOTTOM-LEFT
   c.textAlign='left';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,px,byPy);
-  c.font=pipSz+'px Arial';c.fillText(suit,px+2,byPy+rnkSz+2);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,px,byPy);
+  c.font=pipSz+'px Arial';c.fillText(suit,px+2,byPy+rnkSz-6);
   // BOTTOM-RIGHT
   c.textAlign='right';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(displayRank,W-px,byPy);
-  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,byPy+rnkSz+2);
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-px,byPy);
+  c.font=pipSz+'px Arial';c.fillText(suit,W-px-2,byPy+rnkSz-6);
+
+  // ── Suit name banner just inside the top inner border ─────────────────
+  // Positioned between corner index and inner box top — helps 6/9 and all suits
+  c.fillStyle=isRed?'rgba(160,0,0,0.55)':'rgba(30,30,30,0.45)';
+  c.font='bold 28px Arial';c.textAlign='center';c.textBaseline='top';
+  c.fillText(suitName,W/2,BY+6);
+
+  // ── Pip layout area (inside the inner box) ────────────────────────────
+  // Pip grid runs from just below top corner index to just above bottom corner index
+  const pipAreaTop=BY+44;
+  const pipAreaBot=H-BY-44;
+  const pipAreaH=pipAreaBot-pipAreaTop;
+  const pipAreaMidX=W/2;
+
+  // Pip layouts: [x-fraction 0-1, y-fraction 0-1] within pip area
+  // Designed to match traditional card layouts
+  const layouts={
+    'A': [[0.5,0.5]],
+    '2': [[0.5,0.18],[0.5,0.82]],
+    '3': [[0.5,0.18],[0.5,0.5],[0.5,0.82]],
+    '4': [[0.28,0.18],[0.72,0.18],[0.28,0.82],[0.72,0.82]],
+    '5': [[0.28,0.18],[0.72,0.18],[0.5,0.5],[0.28,0.82],[0.72,0.82]],
+    '6': [[0.28,0.18],[0.72,0.18],[0.28,0.5],[0.72,0.5],[0.28,0.82],[0.72,0.82]],
+    '7': [[0.28,0.18],[0.72,0.18],[0.5,0.34],[0.28,0.5],[0.72,0.5],[0.28,0.82],[0.72,0.82]],
+    '8': [[0.28,0.15],[0.72,0.15],[0.5,0.32],[0.28,0.48],[0.72,0.48],[0.5,0.65],[0.28,0.82],[0.72,0.82]],
+    '9': [[0.28,0.12],[0.72,0.12],[0.28,0.35],[0.72,0.35],[0.5,0.5],[0.28,0.65],[0.72,0.65],[0.28,0.88],[0.72,0.88]],
+    '10':[[0.28,0.12],[0.72,0.12],[0.5,0.26],[0.28,0.40],[0.72,0.40],[0.28,0.60],[0.72,0.60],[0.5,0.74],[0.28,0.88],[0.72,0.88]]
+  };
+
+  const pipSzMap={'A':160,'2':96,'3':88,'4':84,'5':80,'6':76,'7':70,'8':64,'9':60,'10':58};
+  const pSz=pipSzMap[rank]||72;
+  c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
+  c.fillStyle=col;
+
+  if(['J','Q','K'].includes(rank)){
+    // Face cards: styled coloured rectangle + large rank letter + suit
+    const faceX=BX+10,faceY=BY+44,faceW=BW-20,faceH=BH-88;
+    // Coloured band background
+    const faceGrad=c.createLinearGradient(faceX,faceY,faceX,faceY+faceH);
+    if(isRed){faceGrad.addColorStop(0,'#fff0f0');faceGrad.addColorStop(1,'#ffe0e0');}
+    else{faceGrad.addColorStop(0,'#f0f0ff');faceGrad.addColorStop(1,'#e4e4f4');}
+    c.fillStyle=faceGrad;c.fillRect(faceX,faceY,faceW,faceH);
+    c.strokeStyle=col+'55';c.lineWidth=2;c.strokeRect(faceX,faceY,faceW,faceH);
+    // Large rank letter
+    c.fillStyle=col;
+    c.font='bold 240px Georgia,serif';c.textAlign='center';c.textBaseline='middle';
+    c.fillText(rank,W/2,faceY+faceH*0.46);
+    // Suit below letter
+    c.font='120px Arial';
+    c.fillText(suit,W/2,faceY+faceH*0.80);
+  } else if(rank==='A'){
+    // Ace: single giant pip centred
+    c.font='200px Arial';c.textAlign='center';c.textBaseline='middle';
+    c.fillStyle=col;
+    c.fillText(suit,W/2,H/2+10);
+  } else {
+    // Number cards: draw pips from layout table
+    const pips=layouts[rank]||[];
+    const pipAreaLeft=BX+40;
+    const pipAreaRight=W-BX-40;
+    const pipW=pipAreaRight-pipAreaLeft;
+    for(const [fx,fy] of pips){
+      const px=pipAreaLeft+fx*pipW;
+      const py=pipAreaTop+fy*pipAreaH;
+      // Bottom half pips are flipped upside-down on real cards
+      if(fy>0.55){
+        c.save();
+        c.translate(px,py);c.rotate(Math.PI);
+        c.fillText(suit,0,0);
+        c.restore();
+      } else {
+        c.fillText(suit,px,py);
+      }
+    }
+  }
+
+  // ── For 6 and 9: write SIX or NINE small below the suit name banner ──
+  if(rank==='6'||rank==='9'){
+    const word=rank==='6'?'SIX':'NINE';
+    c.fillStyle=isRed?'rgba(160,0,0,0.50)':'rgba(20,20,20,0.40)';
+    c.font='bold 24px Arial';c.textAlign='center';c.textBaseline='top';
+    c.fillText(word,W/2,H-BY-36);
+  }
+
   tex.update();
   return tex;
 }
@@ -351,7 +440,8 @@ function chipsFlyToWinner(winSeat,cb){
 function buildTokens(){function makeToken(name,r,g,b,label){const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene),m=new BABYLON.StandardMaterial(name+'m',scene);m.diffuseColor=new BABYLON.Color3(r,g,b);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);tok.material=m;tok.isVisible=false;tok.renderingGroupId=1;const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false),dc=discTex.getContext();dc.fillStyle='rgb('+Math.round(r*255)+','+Math.round(g*255)+','+Math.round(b*255)+')';dc.beginPath();dc.arc(64,64,62,0,Math.PI*2);dc.fill();dc.strokeStyle='rgba(0,0,0,0.5)';dc.lineWidth=3;dc.stroke();dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';dc.font='bold 42px Arial';dc.textAlign='center';dc.textBaseline='middle';dc.fillText(label,64,64);discTex.update();const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene),dm=new BABYLON.StandardMaterial(name+'dm',scene);dm.diffuseTexture=discTex;dm.emissiveColor=new BABYLON.Color3(1,1,1);dm.disableLighting=true;dm.backFaceCulling=false;disc.material=dm;disc.rotation.x=-Math.PI/2;disc.position.y=0.07;disc.parent=tok;disc.renderingGroupId=2;return tok;}dealerToken=makeToken('dealer',0.95,0.95,0.95,'D');sbToken=makeToken('sb',0.15,0.40,0.90,'SB');bbToken=makeToken('bb',0.90,0.80,0.10,'BB');}
 function positionTokens(dSeat,sbSeat,bbSeat){
   const RX=TRX*0.50,RZ=TRZ*0.50;
-  function seatA(seat){return -Math.PI/2-(seat/NP)*Math.PI*2;}
+  const _n=numVisualSeats();
+  function seatA(seat){return -Math.PI/2-(seat/_n)*Math.PI*2;}
   function place(tok,seat,angOffset){const a=seatA(seat)+angOffset;tok.position=new BABYLON.Vector3(Math.cos(a)*RX,0.38,Math.sin(a)*RZ);tok.isVisible=true;}
   if(dSeat===sbSeat){place(dealerToken,dSeat,0.18);place(sbToken,sbSeat,-0.18);}
   else{place(dealerToken,dSeat,0);place(sbToken,sbSeat,0.06);}
@@ -362,10 +452,66 @@ function updateLabel(seat,name,chips,bet,action,isMe,isDead){const vSeat=vs(seat
 function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);a.setKeys(keys);const ef=ease==='in'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();ef.setEasingMode(ease==='in'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);a.setEasingFunction(ef);return a;}
 function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
 function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
-function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.055,0.025,0.010,1);const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.8,17,new BABYLON.Vector3(0,0.5,0),scene);cam.lowerRadiusLimit=7;cam.upperRadiusLimit=26;cam.lowerBetaLimit=0.20;cam.upperBetaLimit=1.35;cam.wheelPrecision=22;cam.attachControl(canvas,true);const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);h.intensity=0.20;h.diffuse=new BABYLON.Color3(0.55,0.48,0.60);h.groundColor=new BABYLON.Color3(0.06,0.04,0.08);spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,11,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.1,1.4,scene);spotLight.intensity=1.8;spotLight.diffuse=new BABYLON.Color3(1,0.97,0.88);shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=12;const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);f.position.y=-0.22;f.receiveShadows=true;const fm=new BABYLON.StandardMaterial('fm',scene);fm.diffuseColor=new BABYLON.Color3(0.10,0.048,0.020);fm.specularColor=new BABYLON.Color3(0.20,0.10,0.04);fm.specularPower=80;f.material=fm;const T=96,base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.44,diameter:12,tessellation:T},scene);base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;const bm=new BABYLON.StandardMaterial('bm',scene);bm.diffuseColor=new BABYLON.Color3(0.22,0.10,0.04);bm.specularColor=new BABYLON.Color3(0.55,0.32,0.08);bm.specularPower=160;base.material=bm;const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.42,tessellation:T,radialSegments:20},scene);rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.18;const rm=new BABYLON.StandardMaterial('rm',scene);rm.diffuseColor=new BABYLON.Color3(0.30,0.14,0.05);rm.specularColor=new BABYLON.Color3(0.80,0.50,0.15);rm.specularPower=220;rm.emissiveColor=new BABYLON.Color3(0.04,0.02,0.005);rail.material=rm;const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.22;const ftm=new BABYLON.StandardMaterial('ftm',scene);ftm.diffuseColor=new BABYLON.Color3(0.05,0.22,0.48);ftm.specularColor=new BABYLON.Color3(0.01,0.04,0.08);ftm.specularPower=6;felt.material=ftm;felt.receiveShadows=true;
+function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
+const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
+cam.lowerRadiusLimit=8;cam.upperRadiusLimit=26;cam.lowerBetaLimit=0.22;cam.upperBetaLimit=1.32;cam.wheelPrecision=22;cam.attachControl(canvas,true);
+// Ambient — very dim warm fill
+const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
+h.intensity=0.12;h.diffuse=new BABYLON.Color3(0.7,0.62,0.45);h.groundColor=new BABYLON.Color3(0.04,0.03,0.02);
+// Main overhead spot — warm casino bulb colour
+spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,12,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.8,scene);
+spotLight.intensity=2.2;spotLight.diffuse=new BABYLON.Color3(1.0,0.92,0.72);
+// Second softer fill from front-left to reduce harsh shadows on felt
+const fillLight=new BABYLON.PointLight('fill',new BABYLON.Vector3(-4,7,4),scene);
+fillLight.intensity=0.5;fillLight.diffuse=new BABYLON.Color3(0.8,0.75,0.55);
+shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=16;
+// Floor — dark almost-black wood-look
+const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);
+f.position.y=-0.22;f.receiveShadows=true;
+const fm=new BABYLON.StandardMaterial('fm',scene);
+fm.diffuseColor=new BABYLON.Color3(0.06,0.04,0.02);
+fm.specularColor=new BABYLON.Color3(0.25,0.15,0.06);fm.specularPower=120;f.material=fm;
+// Table base — dark espresso wood
+const T=96;
+const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.52,diameter:12,tessellation:T},scene);
+base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;
+const bm=new BABYLON.StandardMaterial('bm',scene);
+bm.diffuseColor=new BABYLON.Color3(0.14,0.07,0.02);
+bm.specularColor=new BABYLON.Color3(0.70,0.45,0.12);bm.specularPower=220;
+base.material=bm;
+// Padded rail — deep burgundy/walnut leather look
+const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.52,tessellation:T,radialSegments:24},scene);
+rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.22;
+const rm=new BABYLON.StandardMaterial('rm',scene);
+rm.diffuseColor=new BABYLON.Color3(0.18,0.06,0.03);   // dark oxblood leather
+rm.specularColor=new BABYLON.Color3(0.60,0.25,0.08);rm.specularPower=180;
+rm.emissiveColor=new BABYLON.Color3(0.02,0.005,0.002);
+rail.material=rm;
+// Gold trim ring between rail and felt
+const trim=BABYLON.MeshBuilder.CreateTorus('trim',{diameter:10.9,thickness:0.08,tessellation:T,radialSegments:8},scene);
+trim.scaling.x=TRX/(10.9/2)*0.93;trim.scaling.z=TRZ/(10.9/2)*0.93;trim.position.y=0.30;
+const trm=new BABYLON.StandardMaterial('trm',scene);
+trm.diffuseColor=new BABYLON.Color3(0.72,0.52,0.08);
+trm.specularColor=new BABYLON.Color3(1,0.9,0.4);trm.specularPower=400;
+trm.emissiveColor=new BABYLON.Color3(0.12,0.08,0.01);
+trim.material=trm;
+// Felt — rich casino green matching the reference
+const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
+felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.28;
+const ftm=new BABYLON.StandardMaterial('ftm',scene);
+ftm.diffuseColor=new BABYLON.Color3(0.04,0.20,0.09);  // deep forest casino green
+ftm.specularColor=new BABYLON.Color3(0.02,0.06,0.03);ftm.specularPower=4;
+felt.material=ftm;felt.receiveShadows=true;
+// Inner felt inlay line (subtle lighter ring)
+const inlay=BABYLON.MeshBuilder.CreateTorus('inlay',{diameter:9.8,thickness:0.04,tessellation:T,radialSegments:6},scene);
+inlay.scaling.x=TRX/(9.8/2)*0.86;inlay.scaling.z=TRZ/(9.8/2)*0.86;inlay.position.y=0.32;
+const ilm=new BABYLON.StandardMaterial('ilm',scene);
+ilm.diffuseColor=new BABYLON.Color3(0.08,0.32,0.14);
+ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
+inlay.material=ilm;
 const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
 let seatActions={};
-function applyState(st){if(!st)return;lastState=st;for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').textContent='YOUR CHIPS: \u00a3'+(p0.chips/100).toFixed(2)+'  |  BET: \u00a3'+(p0.bet/100).toFixed(2);document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
+function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedSeats(st.players);for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').textContent='YOUR CHIPS: \u00a3'+(p0.chips/100).toFixed(2)+'  |  BET: \u00a3'+(p0.bet/100).toFixed(2);document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
 function getOrCreateCommunityMesh(idx){if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];const m=nextCardMesh();communityCardMeshes[idx]=m;return m;}
 function startDealAnimation(activeSeats,afterDone){
   // activeSeats is already rotated by the caller so SB is first, dealer is last
@@ -392,7 +538,7 @@ function handleServerMsg(msg){switch(msg.type){
 case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
-case 'lobby':renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
+case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
 case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;break;
@@ -416,7 +562,7 @@ case 'newHand':{
     setTimeout(()=>{showBet(bbSeat,20);},280);
     if(lastState)applyState(lastState);
   });break;}
-case 'state':lastState=msg;if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;}if(!dealing)applyState(msg);break;
+case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;}if(!dealing)applyState(msg);break;
 case 'playerAction':{
   const pname=msg.name||'Player';
   const ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
