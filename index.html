@@ -32,23 +32,26 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
-/* ── Bottom bar: single row of everything ── */
-#bottomBar{position:absolute;bottom:10px;left:10px;right:10px;background:rgba(0,0,0,0.82);padding:8px 10px;border-radius:8px;color:#c8a820}
+/* ── Bottom bar: action buttons ── */
+#bottomBar{position:absolute;bottom:10px;left:10px;right:200px;background:rgba(0,0,0,0.82);padding:8px 10px;border-radius:8px;color:#c8a820}
 #myInfo{font-size:13px;font-weight:bold;color:#ffd700;text-align:center;margin-bottom:6px}
-/* Single unified row: info tools + action buttons all inline */
 #bottomRow{display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:nowrap;overflow-x:auto}
 .abtn{padding:9px 14px;border-radius:6px;border:none;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;white-space:nowrap;flex-shrink:0}
 .abtn-call{background:#1a7a1a}
 .abtn-raise{background:#7a5800}
 .abtn-fold{background:#7a1a1a}
-.abtn-cashout{background:#4a2a00;border:1px solid #c8a020}
 #raiseAmt{width:72px;padding:8px 4px;border-radius:4px;border:1px solid #c8a020;background:rgba(0,0,0,0.8);color:#fff;font-size:13px;text-align:center;flex-shrink:0}
 .tbtn{padding:8px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;transition:background .15s,box-shadow .15s;white-space:nowrap;flex-shrink:0}
-.tbtn-pause{background:#1a4a7a}
-.tbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
 .tbtn-autofold{background:#3a1a5a}
 .tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
 .tbtn-fs{background:#1a3a1a}
+/* ── Bottom-right: Pause + Cash Out always visible ── */
+#controlBar{position:absolute;bottom:10px;right:10px;display:flex;flex-direction:column;gap:5px;align-items:stretch;z-index:110;width:180px}
+.cbtn-pause{padding:10px 14px;border-radius:6px;border:none;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;background:#1a4a7a;white-space:nowrap;text-align:center}
+.cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
+.cbtn-cashout{padding:10px 14px;border-radius:6px;border:1px solid #c8a020;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap;text-align:center}
+.cbtn-cashout.pending{background:#6a1a00;border-color:#ff6040;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.65}}
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
 /* ── Chat & Activity: top-right, collapsed by default ── */
 #sideBoxes{position:absolute;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
@@ -82,7 +85,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .jr-reject{background:#6a1a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
 #turnIndicator{position:absolute;bottom:68px;left:10px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
 #pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
-#pauseBanner::after{content:'PAUSED - reviewing\2026';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,0,0.25);font-size:clamp(28px,5vw,60px);font-weight:bold;letter-spacing:4px;white-space:nowrap;pointer-events:none}
+#pauseBanner::after{content:'PAUSED \2014 any player can resume';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,0,0.25);font-size:clamp(20px,3.5vw,52px);font-weight:bold;letter-spacing:3px;white-space:nowrap;pointer-events:none}
 </style>
 </head>
 <body>
@@ -140,7 +143,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="roomBadge">ROOM &mdash;</div>
     <button class="tbtn tbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
   </div>
-  <!-- Single bottom row: chips info + action buttons + tools all in one line -->
+  <!-- Bottom-left: action buttons only -->
   <div id="bottomBar">
     <div id="myInfo">CHIPS: &pound;10.00</div>
     <div id="bottomRow">
@@ -149,12 +152,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       <input type="number" id="raiseAmt" value="0.40" step="0.20" min="0.40" style="display:none">
       <button class="abtn abtn-raise" id="raiseBtn" style="display:none">RAISE</button>
       <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
-      <!-- Permanent tool buttons -->
-      <button class="tbtn tbtn-pause" id="pauseBtn" onclick="togglePause()">&#9646;&#9646;</button>
+      <!-- Auto-fold toggle -->
       <button class="tbtn tbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
-      <button class="abtn abtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
-      <button class="tbtn tbtn-fs" id="fsBtn2" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
     </div>
+  </div>
+  <!-- Bottom-right: Pause + Cash Out — always visible, separate from action bar -->
+  <div id="controlBar">
+    <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">&#9646;&#9646; PAUSE</button>
+    <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
   </div>
   <div id="pauseBanner"></div>
   <div id="msg"></div>
@@ -196,17 +201,11 @@ function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.
 const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
 let myId=localStorage.getItem('pokerPlayerId')||null,mySeat=0,isHost=false,myRoomId=null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
-// Dynamic seat positioning: players are spaced evenly around the table
-// based on how many are actually seated, not fixed NP slots.
-// occupiedSeats: sorted list of server seat indices currently at the table
 let occupiedSeats=[];
 function updateOccupiedSeats(seats){
-  // seats is the server seats array (length NP, nulls for empty)
   occupiedSeats=seats.map((s,i)=>s?i:null).filter(i=>i!==null);
 }
 function vs(serverSeat){
-  // Returns visual slot index 0..(occupiedSeats.length-1),
-  // rotated so mySeat always appears at the bottom (slot 0)
   if(occupiedSeats.length===0)return(serverSeat-mySeat+NP)%NP;
   const myIdx=occupiedSeats.indexOf(mySeat);
   const seatIdx=occupiedSeats.indexOf(serverSeat);
@@ -224,11 +223,9 @@ const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
 function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
 function cardPos(si,cn){
-  // si = visual seat index, cn = card number (0=first/left, 1=second/right)
   const n=numVisualSeats();
   const a=-Math.PI/2-(si/n)*Math.PI*2;
   const rx=TRX*0.70,rz=TRZ*0.70;
-  // Perpendicular tangent direction: rotate seat angle +90deg
   const pa=a+Math.PI/2;
   const off=(cn===0?-0.68:0.68);
   return new BABYLON.Vector3(
@@ -243,26 +240,20 @@ function mkBackTex(){
   const W=512,H=768;
   const tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true);
   const c=tex.getContext();
-  // Deep navy-to-midnight gradient
   const g=c.createLinearGradient(0,0,W,H);
   g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');
   c.fillStyle=g;c.fillRect(0,0,W,H);
-  // Gold outer border
   c.strokeStyle='#c8a020';c.lineWidth=14;c.strokeRect(7,7,W-14,H-14);
-  // Inner border
   c.strokeStyle='rgba(200,160,32,0.55)';c.lineWidth=3;c.strokeRect(24,24,W-48,H-48);
-  // Subtle diagonal hatching
   c.strokeStyle='rgba(200,160,32,0.10)';c.lineWidth=1;
   for(let x=-H;x<W+H;x+=20){
     c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();
     c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();
   }
-  // SYFM in large bold gold — same style as the suit on the felt
   c.fillStyle='rgba(200,160,32,0.82)';
   c.font='bold 118px Arial';
   c.textAlign='center';c.textBaseline='middle';
   c.fillText('SYFM',W/2,H/2);
-  // Smaller SYFM top-left and bottom-right corners for orientation
   c.font='bold 36px Arial';
   c.fillStyle='rgba(200,160,32,0.55)';
   c.textAlign='left';c.textBaseline='top';
@@ -274,7 +265,6 @@ function mkBackTex(){
   tex.update();return tex;
 }
 function mkFrontTex(suit,rank){
-  // 512x768 power-of-2 — avoids Chrome WebGL clamping
   const W=512,H=768;
   const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
   const c=tex.getContext();
@@ -282,29 +272,20 @@ function mkFrontTex(suit,rank){
   const col=isRed?'#cc0000':'#111111';
   const suitNames={'\u2660':'SPADES','\u2665':'HEARTS','\u2666':'DIAMONDS','\u2663':'CLUBS'};
   const suitName=suitNames[suit]||'';
-
-  // Background + thick outer border
   c.fillStyle='#fafafa';c.fillRect(0,0,W,H);
   c.strokeStyle=col;c.lineWidth=10;c.strokeRect(5,5,W-10,H-10);
-  // Inner inset box
   const BX=30,BY=30,BW=W-60,BH=H-60;
   c.strokeStyle=col+'44';c.lineWidth=2;c.strokeRect(BX,BY,BW,BH);
-
-  // ── Corner indices (rank + suit pip) ────────────────────────────────
-  // Use tight textBaseline='hanging' to avoid clipping ascenders
   const rnkSz=rank==='10'?88:100;
   const cPipSz=64;
   const cx=16,cy=14;
   c.fillStyle=col;
-  // TOP-LEFT
   c.textAlign='left';c.textBaseline='top';
   c.font='bold '+rnkSz+'px Arial';c.fillText(rank,cx,cy);
   c.font=cPipSz+'px Arial';c.fillText(suit,cx+2,cy+rnkSz+2);
-  // TOP-RIGHT
   c.textAlign='right';c.textBaseline='top';
   c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-cx,cy);
   c.font=cPipSz+'px Arial';c.fillText(suit,W-cx-2,cy+rnkSz+2);
-  // BOTTOM — upside-down via transform so they read correctly when card is rotated
   c.save();c.translate(W,H);c.rotate(Math.PI);
   c.textAlign='left';c.textBaseline='top';
   c.font='bold '+rnkSz+'px Arial';c.fillText(rank,cx,cy);
@@ -313,22 +294,15 @@ function mkFrontTex(suit,rank){
   c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-cx,cy);
   c.font=cPipSz+'px Arial';c.fillText(suit,W-cx-2,cy+rnkSz+2);
   c.restore();
-
-  // ── Suit name in strong colour just below top inner border ───────────
-  c.fillStyle=col;  // proper red or black — NOT grey
+  c.fillStyle=col;
   c.font='bold 30px Arial';c.textAlign='center';c.textBaseline='top';
   c.fillText(suitName,W/2,BY+8);
-
-  // ── Pip area (below corner + suit name) ──────────────────────────────
   const pipTop=BY+52;
   const pipBot=H-BY-52;
   const pipH=pipBot-pipTop;
   const pipLeft=BX+32;
   const pipRight=W-BX-32;
   const pipW=pipRight-pipLeft;
-
-  // Traditional pip layouts [x-fraction, y-fraction, flipBottom?]
-  // x,y fractions within pip area; bottom-half pips are rotated 180° on real cards
   const L={
     '2': [[0.5,0.12,false],[0.5,0.88,true]],
     '3': [[0.5,0.12,false],[0.5,0.5,false],[0.5,0.88,true]],
@@ -340,34 +314,23 @@ function mkFrontTex(suit,rank){
     '9': [[0.2,0.10,false],[0.8,0.10,false],[0.2,0.34,false],[0.8,0.34,false],[0.5,0.50,false],[0.2,0.66,true],[0.8,0.66,true],[0.2,0.90,true],[0.8,0.90,true]],
     '10':[[0.2,0.10,false],[0.8,0.10,false],[0.5,0.26,false],[0.2,0.40,false],[0.8,0.40,false],[0.2,0.60,true],[0.8,0.60,true],[0.5,0.74,true],[0.2,0.90,true],[0.8,0.90,true]]
   };
-
-  // Pip sizes — nice and big so readable on mobile
   const pSzMap={'A':190,'2':120,'3':112,'4':108,'5':102,'6':96,'7':90,'8':84,'9':78,'10':74};
   const pSz=pSzMap[rank]||90;
-
   if(rank==='A'){
-    // Ace: single massive centred pip
     c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
     c.fillStyle=col;c.fillText(suit,W/2,pipTop+pipH*0.5);
-
   }else if(['J','Q','K'].includes(rank)){
-    // Face cards: clean coloured panel with rank initial + suit
     const fX=BX+8,fY=BY+50,fW=BW-16,fH=BH-100;
-    // Tinted background panel
     c.fillStyle=isRed?'#fff5f5':'#f5f5ff';
     c.fillRect(fX,fY,fW,fH);
     c.strokeStyle=col+'33';c.lineWidth=3;c.strokeRect(fX,fY,fW,fH);
-    // Large rank letter — using fillText metrics (no clip issues with textBaseline=middle)
     c.fillStyle=col;
-    c.font='bold 260px Arial';  // Arial has reliable metrics, no clipping
+    c.font='bold 260px Arial';
     c.textAlign='center';c.textBaseline='middle';
     c.fillText(rank,fX+fW/2,fY+fH*0.44);
-    // Suit below
     c.font='110px Arial';
     c.fillText(suit,fX+fW/2,fY+fH*0.82);
-
   }else{
-    // Number cards: pip layout
     const pips=L[rank]||[];
     c.fillStyle=col;
     for(const [fx,fy,flip] of pips){
@@ -384,15 +347,12 @@ function mkFrontTex(suit,rank){
       }
     }
   }
-
-  // For 6 and 9: extra disambiguation text at bottom (subtle)
   if(rank==='6'||rank==='9'){
     const word=rank==='6'?'SIX':'NINE';
     c.fillStyle=col+'66';
     c.font='bold 26px Arial';c.textAlign='center';c.textBaseline='bottom';
     c.fillText(word,W/2,H-BY-10);
   }
-
   tex.update();return tex;
 }
 function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
@@ -415,13 +375,6 @@ function animChipArc(chips,srcPos,dstBase,staggerMs,baseY,cb){
     chip.animations=[a];
     setTimeout(()=>{scene.beginAnimation(chip,0,22,false,1.4,()=>{snd_chip();done++;if(done===chips.length&&cb)cb();});},i*staggerMs);
   });}
-function showBet(serverSeat,amount){
-  if(amount<=0)return;
-  const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);
-  const existH=seatBetChips[serverSeat].length*0.060;
-  const chips=buildChipStack(amount);
-  seatBetChips[serverSeat].push(...chips);
-  animChipArc(chips,src,dst,38,0.32+existH,null);}
 function sweepBetsToPot(cb){
   const all=[];seatBetChips.forEach(arr=>all.push(...arr));
   seatBetChips=Array.from({length:NP},()=>[]);
@@ -463,23 +416,18 @@ function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animat
 function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
 const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
 cam.lowerRadiusLimit=8;cam.upperRadiusLimit=26;cam.lowerBetaLimit=0.22;cam.upperBetaLimit=1.32;cam.wheelPrecision=22;cam.attachControl(canvas,true);
-// Ambient — very dim warm fill
 const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
 h.intensity=0.12;h.diffuse=new BABYLON.Color3(0.7,0.62,0.45);h.groundColor=new BABYLON.Color3(0.04,0.03,0.02);
-// Main overhead spot — warm casino bulb colour
 spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,12,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.8,scene);
 spotLight.intensity=2.2;spotLight.diffuse=new BABYLON.Color3(1.0,0.92,0.72);
-// Second softer fill from front-left to reduce harsh shadows on felt
 const fillLight=new BABYLON.PointLight('fill',new BABYLON.Vector3(-4,7,4),scene);
 fillLight.intensity=0.5;fillLight.diffuse=new BABYLON.Color3(0.8,0.75,0.55);
 shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=16;
-// Floor — dark almost-black wood-look
 const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);
 f.position.y=-0.22;f.receiveShadows=true;
 const fm=new BABYLON.StandardMaterial('fm',scene);
 fm.diffuseColor=new BABYLON.Color3(0.06,0.04,0.02);
 fm.specularColor=new BABYLON.Color3(0.25,0.15,0.06);fm.specularPower=120;f.material=fm;
-// Table base — dark espresso wood
 const T=96;
 const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.52,diameter:12,tessellation:T},scene);
 base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;
@@ -487,15 +435,13 @@ const bm=new BABYLON.StandardMaterial('bm',scene);
 bm.diffuseColor=new BABYLON.Color3(0.14,0.07,0.02);
 bm.specularColor=new BABYLON.Color3(0.70,0.45,0.12);bm.specularPower=220;
 base.material=bm;
-// Padded rail — deep burgundy/walnut leather look
 const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.52,tessellation:T,radialSegments:24},scene);
 rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.22;
 const rm=new BABYLON.StandardMaterial('rm',scene);
-rm.diffuseColor=new BABYLON.Color3(0.18,0.06,0.03);   // dark oxblood leather
+rm.diffuseColor=new BABYLON.Color3(0.18,0.06,0.03);
 rm.specularColor=new BABYLON.Color3(0.60,0.25,0.08);rm.specularPower=180;
 rm.emissiveColor=new BABYLON.Color3(0.02,0.005,0.002);
 rail.material=rm;
-// Gold trim ring between rail and felt
 const trim=BABYLON.MeshBuilder.CreateTorus('trim',{diameter:10.9,thickness:0.08,tessellation:T,radialSegments:8},scene);
 trim.scaling.x=TRX/(10.9/2)*0.93;trim.scaling.z=TRZ/(10.9/2)*0.93;trim.position.y=0.30;
 const trm=new BABYLON.StandardMaterial('trm',scene);
@@ -503,14 +449,12 @@ trm.diffuseColor=new BABYLON.Color3(0.72,0.52,0.08);
 trm.specularColor=new BABYLON.Color3(1,0.9,0.4);trm.specularPower=400;
 trm.emissiveColor=new BABYLON.Color3(0.12,0.08,0.01);
 trim.material=trm;
-// Felt — rich casino green matching the reference
 const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
 felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.28;
 const ftm=new BABYLON.StandardMaterial('ftm',scene);
-ftm.diffuseColor=new BABYLON.Color3(0.04,0.20,0.09);  // deep forest casino green
+ftm.diffuseColor=new BABYLON.Color3(0.04,0.20,0.09);
 ftm.specularColor=new BABYLON.Color3(0.02,0.06,0.03);ftm.specularPower=4;
 felt.material=ftm;felt.receiveShadows=true;
-// Inner felt inlay line (subtle lighter ring)
 const inlay=BABYLON.MeshBuilder.CreateTorus('inlay',{diameter:9.8,thickness:0.04,tessellation:T,radialSegments:6},scene);
 inlay.scaling.x=TRX/(9.8/2)*0.86;inlay.scaling.z=TRZ/(9.8/2)*0.86;inlay.position.y=0.32;
 const ilm=new BABYLON.StandardMaterial('ilm',scene);
@@ -522,12 +466,10 @@ let seatActions={};
 function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedSeats(st.players);for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').textContent='YOUR CHIPS: \u00a3'+(p0.chips/100).toFixed(2)+'  |  BET: \u00a3'+(p0.bet/100).toFixed(2);document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
 function getOrCreateCommunityMesh(idx){if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];const m=nextCardMesh();communityCardMeshes[idx]=m;return m;}
 function startDealAnimation(activeSeats,afterDone){
-  // activeSeats is already rotated by the caller so SB is first, dealer is last
   dealing=true;
   for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}
   for(const m of communityCardMeshes){if(m)m.isVisible=false;}
   communityCardMeshes=[];freeAllChips();
-  // Build deal sequence: one card to each player (round 1), then second card (round 2)
   const seq=[];
   for(let rd=0;rd<2;rd++)for(const si of activeSeats)seq.push(si);
   const dealt={};for(const si of activeSeats)dealt[si]=0;
@@ -553,14 +495,14 @@ case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none'
 case 'newHand':{
   seatActions={};showMsg('');setActions(false);hideTurnIndicator();
   document.getElementById('waitingMsg').style.display='none';
+  // Reset cash-out button styling at start of each hand
+  const coBtn=document.getElementById('cashOutBtn');
+  coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
   handNumber++;maybeKeepAlive();
   addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');
   addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));
   positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));
   const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;
-  // Rotate deal order so first card goes to player left of dealer, dealer gets last card.
-  // Standard poker rule: deal starts from SB (immediately left of dealer) going clockwise.
-  // Exception: heads-up (dealer=SB), deal starts from BB so dealer/SB still gets last card.
   const rawSeats=msg.activeSeats||[];
   const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;
   const dsIdx=rawSeats.indexOf(dealStartSeat);
@@ -598,10 +540,25 @@ case 'showdown':setPhase('Showdown');hideTurnIndicator();
   sweepBetsToPot(null);
   addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
-case 'playerLeft':addLog(msg.name+' left the table');addChat('\u2b05 '+msg.name+' left');seatActions[msg.seat]='';if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}if(lastState)applyState(lastState);break;
+case 'playerLeft':
+  addLog(msg.name+' left the table');
+  addChat('\u2b05 '+msg.name+' left');
+  seatActions[msg.seat]='';
+  if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}
+  // If this was us leaving (immediate cash-out), reload
+  if(msg.id===myId){setTimeout(()=>location.reload(),600);return;}
+  if(lastState)applyState(lastState);
+  break;
 case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
 case 'gamePaused':handlePaused(true,msg.byName);break;
-case 'gameResumed':handlePaused(false,null);break;
+case 'gameResumed':handlePaused(false,msg.byName);break;
+// ── Deferred cash-out acknowledged ──────────────────────────────────────────
+case 'cashOutPending':{
+  const btn=document.getElementById('cashOutBtn');
+  btn.classList.add('pending');
+  btn.textContent='CASH OUT \u23f3';
+  showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);
+  break;}
 case 'voluntaryAutoFoldAck':break;
 case 'chat':addChat(msg.name+': '+msg.text);break;
 case 'error':addChat('\u26a0 '+msg.msg);break;}}
@@ -618,7 +575,6 @@ function setActions(v){
     const el=document.getElementById(id);
     if(el)el.style.display=v?'inline-flex':'none';
   });
-  // raiseAmt is an input, use block/none
   const ra=document.getElementById('raiseAmt');
   if(ra)ra.style.display=v?'inline-block':'none';
 }
@@ -628,11 +584,10 @@ function addChat(txt){
   const log=document.getElementById('chatLog'),div=document.createElement('div');
   div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;
   while(log.children.length>60)log.removeChild(log.firstChild);
-  // Flash the chat header if it's collapsed so users notice new messages
   if(chatCollapsed){
     const box=document.getElementById('chatBox');
     box.classList.remove('flash');
-    void box.offsetWidth; // reflow to restart animation
+    void box.offsetWidth;
     box.classList.add('flash');
     setTimeout(()=>box.classList.remove('flash'),2200);
   }
@@ -642,7 +597,6 @@ let keepAliveHandCount=0;
 function maybeKeepAlive(){
   keepAliveHandCount++;
   if(keepAliveHandCount%5===0){
-    const ts=new Date().toLocaleTimeString('en-GB');
     fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber)
       .then(r=>r.text()).then(txt=>{
         addLog('\u{1F4E1} Keep-alive sent (hand #'+handNumber+') — server: '+txt,'log-action');
@@ -658,8 +612,17 @@ function handlePaused(isPaused,byName){
   gamePaused=isPaused;
   const btn=document.getElementById('pauseBtn');
   const banner=document.getElementById('pauseBanner');
-  if(isPaused){btn.classList.add('active');btn.textContent='\u25b6 RESUME';banner.style.display='block';addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 reviewing hand history','log-hand');}
-  else{btn.classList.remove('active');btn.textContent='\u23ae\u23ae PAUSE';banner.style.display='none';addLog('\u25b6 Game RESUMED','log-hand');}
+  if(isPaused){
+    btn.classList.add('active');
+    btn.textContent='\u25b6 RESUME';
+    banner.style.display='block';
+    addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 any player can resume','log-hand');
+  } else {
+    btn.classList.remove('active');
+    btn.textContent='\u23ae\u23ae PAUSE';
+    banner.style.display='none';
+    addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');
+  }
 }
 let myAutoFold=false;
 function toggleAutoFold(){
@@ -669,14 +632,21 @@ function toggleAutoFold(){
   if(myAutoFold){btn.classList.add('active');btn.textContent='\u274c AUTO-FOLD ON';showMsg('\u274c Auto-fold ON \u2014 you will fold every hand until you turn it off',3200);}
   else{btn.classList.remove('active');btn.textContent='\u25b6 AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
 }
-let activityCollapsed=true;  // start collapsed
+function showBet(serverSeat,amount){
+  if(amount<=0)return;
+  const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);
+  const existH=seatBetChips[serverSeat].length*0.060;
+  const chips=buildChipStack(amount);
+  seatBetChips[serverSeat].push(...chips);
+  animChipArc(chips,src,dst,38,0.32+existH,null);}
+let activityCollapsed=true;
 function toggleActivityLog(){
   activityCollapsed=!activityCollapsed;
   const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');
   logEl.style.display=activityCollapsed?'none':'flex';
   toggle.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';
 }
-let chatCollapsed=true;  // start collapsed
+let chatCollapsed=true;
 function toggleChat(){
   chatCollapsed=!chatCollapsed;
   const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');
@@ -687,7 +657,7 @@ function toggleFullscreen(){if(!document.fullscreenElement){document.documentEle
 function doCashOut(){
   if(!confirm('Cash out and leave the table with your remaining chips?'))return;
   wsSend({type:'cashOut'});
-  setTimeout(()=>location.reload(),800);
+  // Server sends either cashOutPending (mid-hand) or playerLeft (immediate)
 }
 document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
