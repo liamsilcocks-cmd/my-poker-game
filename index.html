@@ -227,10 +227,11 @@ function cardPos(si,cn){
   const a=-Math.PI/2-(si/n)*Math.PI*2;
   const rx=TRX*0.70,rz=TRZ*0.70;
   const pa=a+Math.PI/2;
-  const off=(cn===0?-0.68:0.68);
+  // Wider offset + explicit Y gap so card 1 never sits under card 0
+  const off=(cn===0?-0.80:0.80);
   return new BABYLON.Vector3(
     Math.cos(a)*rx+Math.cos(pa)*off,
-    0.30+cn*0.003,
+    0.30+cn*0.012,
     Math.sin(a)*rz+Math.sin(pa)*off
   );
 }
@@ -272,10 +273,11 @@ function mkFrontTex(suit,rank){
   const col=isRed?'#cc0000':'#111111';
   const suitNames={'\u2660':'SPADES','\u2665':'HEARTS','\u2666':'DIAMONDS','\u2663':'CLUBS'};
   const suitName=suitNames[suit]||'';
+  // Pure white card face — no rim border
   c.fillStyle='#fafafa';c.fillRect(0,0,W,H);
-  c.strokeStyle=col;c.lineWidth=10;c.strokeRect(5,5,W-10,H-10);
+  // Very subtle drop-shadow edge (1px grey, no colour tint)
+  c.strokeStyle='rgba(80,80,80,0.18)';c.lineWidth=3;c.strokeRect(2,2,W-4,H-4);
   const BX=30,BY=30,BW=W-60,BH=H-60;
-  c.strokeStyle=col+'44';c.lineWidth=2;c.strokeRect(BX,BY,BW,BH);
   const rnkSz=rank==='10'?88:100;
   const cPipSz=64;
   const cx=16,cy=14;
@@ -323,7 +325,7 @@ function mkFrontTex(suit,rank){
     const fX=BX+8,fY=BY+50,fW=BW-16,fH=BH-100;
     c.fillStyle=isRed?'#fff5f5':'#f5f5ff';
     c.fillRect(fX,fY,fW,fH);
-    c.strokeStyle=col+'33';c.lineWidth=3;c.strokeRect(fX,fY,fW,fH);
+    // No border on face panel — clean look
     c.fillStyle=col;
     c.font='bold 260px Arial';
     c.textAlign='center';c.textBaseline='middle';
@@ -431,16 +433,15 @@ fm.specularColor=new BABYLON.Color3(0.25,0.15,0.06);fm.specularPower=120;f.mater
 const T=96;
 const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.52,diameter:12,tessellation:T},scene);
 base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;
-const bm=new BABYLON.StandardMaterial('bm',scene);
-bm.diffuseColor=new BABYLON.Color3(0.14,0.07,0.02);
-bm.specularColor=new BABYLON.Color3(0.70,0.45,0.12);bm.specularPower=220;
+const bm=new BABYLON.PBRMaterial('bm',scene);
+bm.albedoColor=new BABYLON.Color3(0.12,0.06,0.02);
+bm.roughness=0.28;bm.metallic=0;
 base.material=bm;
 const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.52,tessellation:T,radialSegments:24},scene);
 rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.22;
-const rm=new BABYLON.StandardMaterial('rm',scene);
-rm.diffuseColor=new BABYLON.Color3(0.18,0.06,0.03);
-rm.specularColor=new BABYLON.Color3(0.60,0.25,0.08);rm.specularPower=180;
-rm.emissiveColor=new BABYLON.Color3(0.02,0.005,0.002);
+const rm=new BABYLON.PBRMaterial('rm',scene);
+rm.albedoColor=new BABYLON.Color3(0.16,0.04,0.02);
+rm.roughness=0.82;rm.metallic=0;
 rail.material=rm;
 const trim=BABYLON.MeshBuilder.CreateTorus('trim',{diameter:10.9,thickness:0.08,tessellation:T,radialSegments:8},scene);
 trim.scaling.x=TRX/(10.9/2)*0.93;trim.scaling.z=TRZ/(10.9/2)*0.93;trim.position.y=0.30;
@@ -451,9 +452,10 @@ trm.emissiveColor=new BABYLON.Color3(0.12,0.08,0.01);
 trim.material=trm;
 const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
 felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.28;
-const ftm=new BABYLON.StandardMaterial('ftm',scene);
-ftm.diffuseColor=new BABYLON.Color3(0.04,0.20,0.09);
-ftm.specularColor=new BABYLON.Color3(0.02,0.06,0.03);ftm.specularPower=4;
+const ftm=new BABYLON.PBRMaterial('ftm',scene);
+ftm.albedoColor=new BABYLON.Color3(0.02,0.16,0.07);
+ftm.roughness=0.96;ftm.metallic=0;
+ftm.sheen.isEnabled=true;ftm.sheen.intensity=0.38;ftm.sheen.color=new BABYLON.Color3(0.08,0.28,0.12);
 felt.material=ftm;felt.receiveShadows=true;
 const inlay=BABYLON.MeshBuilder.CreateTorus('inlay',{diameter:9.8,thickness:0.04,tessellation:T,radialSegments:6},scene);
 inlay.scaling.x=TRX/(9.8/2)*0.86;inlay.scaling.z=TRZ/(9.8/2)*0.86;inlay.position.y=0.32;
