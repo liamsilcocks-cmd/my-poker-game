@@ -92,7 +92,6 @@ const server = http.createServer((req, res) => {
     const hand = params.get('hand') || '?';
     const ts = new Date().toISOString();
     console.log(`[KEEPALIVE] ${ts} | Room: ${room} | Hand: ${hand}`);
-    // Log to active room file if we can find it
     const r = rooms.get(room);
     if (r && r.G) writeLog(r, `KEEPALIVE sent by client at hand #${hand} — server alive at ${ts}`);
     res.writeHead(200, {'Content-Type':'text/plain','Access-Control-Allow-Origin':'*'});
@@ -112,7 +111,8 @@ function getOrCreateRoom(roomId) {
       id: roomId, seats: Array(NP).fill(null), hostId: null,
       gameActive: false, pendingJoins: [], G: null, dealerSeat: -1,
       actionTimer: null, handNum: 0,
-      paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT, actionTimerStarted: 0
+      paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT,
+      actionTimerStarted: 0
     });
   }
   return rooms.get(roomId);
@@ -148,6 +148,7 @@ function tableSnapshot(room, forId) {
       return {
         seat: s.seat, name: s.name, chips: s.chips, bet: s.bet,
         folded: s.folded, disconnected: s.disconnected || false,
+        pendingCashOut: s.pendingCashOut || false,
         cards: showCards ? s.cards : s.cards.map(() => 'back'),
         active: !s.sittingOut
       };
@@ -182,6 +183,7 @@ function clearActionTimer(room) {
   }
 }
 
+// ─── Pause / Resume — any seated player can pause or resume ──────────────────
 function pauseGame(room, byName) {
   if (room.paused) return;
   room.paused = true;
@@ -190,14 +192,15 @@ function pauseGame(room, byName) {
   console.log(`Room ${room.id} PAUSED by ${byName}`);
 }
 
-function resumeGame(room) {
+function resumeGame(room, byName) {
   if (!room.paused) return;
   room.paused = false;
-  broadcastAll(room, { type: 'gameResumed' });
+  broadcastAll(room, { type: 'gameResumed', byName });
+  // Restart action timer for whoever was due to act
   if (room.G && room.actionTimerSeat >= 0 && room.G.toAct[0] === room.actionTimerSeat) {
     startActionTimer(room, room.actionTimerSeat, room.actionTimerRemaining || ACTION_TIMEOUT);
   }
-  console.log(`Room ${room.id} RESUMED`);
+  console.log(`Room ${room.id} RESUMED by ${byName}`);
 }
 
 // ─── Connections ──────────────────────────────────────────────────────────────
@@ -327,6 +330,7 @@ wss.on('connection', ws => {
         break;
       }
 
+      // ── Pause: any seated player can pause ──────────────────────────────────
       case 'pause': {
         const room = rooms.get(myRoomId);
         if (!room || !room.gameActive) return;
@@ -336,12 +340,13 @@ wss.on('connection', ws => {
         break;
       }
 
+      // ── Resume: any seated player can resume ────────────────────────────────
       case 'resume': {
         const room = rooms.get(myRoomId);
         if (!room || !room.gameActive) return;
         const p = room.seats.find(s => s?.id === myId);
         if (!p) return;
-        resumeGame(room);
+        resumeGame(room, p.name);
         break;
       }
 
@@ -369,34 +374,45 @@ wss.on('connection', ws => {
         break;
       }
 
+      // ── Cash Out: deferred if currently in an active hand ──────────────────
       case 'cashOut': {
         const room = rooms.get(myRoomId);
         if (!room) return;
         const s = room.seats.find(s => s?.id === myId);
         if (!s) return;
-        const chips = s.chips;
-        const seatIdx = s.seat;
-        writeLog(room, `CASH OUT: ${s.name} (Seat ${seatIdx+1}) leaves with £${(chips/100).toFixed(2)}`);
-        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} has cashed out with £${(chips/100).toFixed(2)}` });
-        broadcastAll(room, { type: 'playerLeft', id: myId, name: s.name, seat: seatIdx, reason: 'cashout' });
-        // If it's their turn, fold them first
-        if (room.G && room.G.toAct[0] === seatIdx) {
-          clearActionTimer(room);
-          doFold(room, seatIdx, 'cash out');
-        }
-        // Remove from seat
-        room.seats[seatIdx] = null;
-        // If they were host, transfer host
-        if (room.hostId === myId) {
-          const newHost = room.seats.find(Boolean);
-          if (newHost) {
-            room.hostId = newHost.id;
-            send(newHost.ws, { type: 'chat', name: 'System', text: 'You are now the host.' });
+
+        const inActiveHand = room.G && !s.folded && !s.sittingOut &&
+          room.G.phase !== 'idle' && s.cards && s.cards.length > 0;
+
+        if (inActiveHand) {
+          // Mark for cash-out at end of this hand; fold them out immediately so
+          // the hand can progress, but chips are preserved until hand ends.
+          s.pendingCashOut = true;
+          send(ws, { type: 'cashOutPending' });
+          broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} will cash out after this hand` });
+          writeLog(room, `CASH OUT PENDING: ${s.name} (Seat ${s.seat+1}) requested cash-out mid-hand — will be processed at hand end | Stack: £${(s.chips/100).toFixed(2)}`);
+          // Fold them from the current hand
+          if (room.G.toAct[0] === s.seat) {
+            clearActionTimer(room);
+            doFold(room, s.seat, 'cash out');
+          } else if (!s.folded) {
+            s.folded = true;
+            const idx = room.G.toAct.indexOf(s.seat);
+            if (idx !== -1) room.G.toAct.splice(idx, 1);
+            broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (cashing out)' });
+            writeLog(room, `FOLD (cash out): ${s.name}`);
+            broadcastState(room);
+            const alive = room.seats.filter(p => p && !p.folded && !p.sittingOut);
+            if (alive.length <= 1) endRound(room);
           }
+          broadcastState(room);
+        } else {
+          // Not in an active hand — cash out immediately
+          executeCashOut(room, s);
         }
-        broadcastAll(room, lobbySnapshot(room));
         break;
       }
+
       case 'chat': {
         const room = rooms.get(myRoomId);
         if (!room) return;
@@ -422,7 +438,7 @@ wss.on('connection', ws => {
 
     const s = room.seats.find(s => s?.id === myId);
     if (!s) return;
-    if (s.ws !== ws) return; // stale socket, player already reconnected
+    if (s.ws !== ws) return; // stale socket
 
     s.disconnected = true;
     s.ws = null;
@@ -430,7 +446,6 @@ wss.on('connection', ws => {
     writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) left — ${RECONNECT_GRACE_MS/1000}s grace period started | Stack: £${(s.chips/100).toFixed(2)}`);
     broadcastState(room);
 
-    // Fold immediately if it's their turn — game can't wait
     if (room.G && room.G.toAct[0] === s.seat) {
       clearActionTimer(room);
       doFold(room, s.seat, 'disconnected');
@@ -441,7 +456,7 @@ wss.on('connection', ws => {
       s.autoFold = true;
       s._disconnectTimer = null;
       broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out — auto-folding until host re-admits` });
-      writeLog(room, `TIMEOUT: ${s.name} (Seat ${s.seat+1}) failed to reconnect within ${RECONNECT_GRACE_MS/1000}s — auto-fold enabled until re-admitted by host`);
+      writeLog(room, `TIMEOUT: ${s.name} (Seat ${s.seat+1}) failed to reconnect — auto-fold enabled | Stack: £${(s.chips/100).toFixed(2)}`);
 
       if (room.G && !s.folded) {
         s.folded = true;
@@ -465,13 +480,43 @@ wss.on('connection', ws => {
   ws.on('error', err => console.error('WS error:', err.message));
 });
 
+// ─── Execute an immediate cash-out for a player ───────────────────────────────
+function executeCashOut(room, s) {
+  const chips = s.chips;
+  const seatIdx = s.seat;
+  const logMsg = `CASH OUT: ${s.name} (Seat ${seatIdx+1}) leaves with £${(chips/100).toFixed(2)}`;
+  console.log(logMsg);
+  if (room.G) writeLog(room, logMsg);
+
+  broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} has cashed out with £${(chips/100).toFixed(2)}` });
+  broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: seatIdx, reason: 'cashout' });
+
+  room.seats[seatIdx] = null;
+
+  if (room.hostId === s.id) {
+    const newHost = room.seats.find(Boolean);
+    if (newHost) {
+      room.hostId = newHost.id;
+      send(newHost.ws, { type: 'chat', name: 'System', text: 'You are now the host.' });
+    }
+  }
+  broadcastAll(room, lobbySnapshot(room));
+  broadcastState(room);
+}
+
 function mkPlayer(ws, id, name, seat) {
-  return { ws, id, name, chips: START_CHIPS, seat, cards: [], bet: 0, folded: false, disconnected: false, autoFold: false, _disconnectTimer: null };
+  return {
+    ws, id, name, chips: START_CHIPS, seat, cards: [], bet: 0,
+    folded: false, disconnected: false, autoFold: false,
+    pendingCashOut: false, _disconnectTimer: null
+  };
 }
 
 // ─── Game helpers ─────────────────────────────────────────────────────────────
 function shuffle(d) {
-  for (let i = d.length - 1; i > 0; i--) { const j = 0 | Math.random() * (i + 1); [d[i], d[j]] = [d[j], d[i]]; }
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = 0 | Math.random() * (i + 1); [d[i], d[j]] = [d[j], d[i]];
+  }
   return d;
 }
 function buildDeck() {
@@ -515,6 +560,14 @@ function startNewHand(room) {
   room.actionTimerRemaining = ACTION_TIMEOUT;
   room.actionTimerStarted = 0;
 
+  // ── Process any pending cash-outs from the previous hand ─────────────────
+  room.seats.forEach((s, i) => {
+    if (s && s.pendingCashOut) {
+      executeCashOut(room, s);
+      // executeCashOut nulls the seat, so just continue
+    }
+  });
+
   room.seats.forEach(s => {
     if (s) {
       s.sittingOut = false;
@@ -537,8 +590,6 @@ function startNewHand(room) {
 
   room.handNum = (room.handNum || 0) + 1;
 
-  // ── Blind positions ───────────────────────────────────────────────────────
-  // Heads-up (TDA Rule 34): dealer = SB, acts first preflop
   const isHeadsUp = active.length === 2;
   const sbSeat = isHeadsUp ? room.dealerSeat : nextSeat(room.dealerSeat, active);
   const bbSeat = nextSeat(sbSeat, active);
@@ -555,7 +606,6 @@ function startNewHand(room) {
 
   room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; } });
 
-  // Calculate deal order here so it's available for the log header below
   const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
   const dsIdx = active.indexOf(dealStartSeat);
   const dealOrder = dsIdx >= 0
@@ -574,6 +624,7 @@ function startNewHand(room) {
     if (i === bbSeat) tags.push('BB');
     return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | Stack: £${(s.chips/100).toFixed(2).padStart(7)} ${tags.length?'['+tags.join('+')+']':''}`;
   }).join('\n');
+
   fs.writeFileSync(logPath,
     '╔' + '═'.repeat(62) + '╗\n' +
     '║  SYFM POKER — HAND LOG' + ' '.repeat(39) + '║\n' +
@@ -587,25 +638,17 @@ function startNewHand(room) {
     '╠' + '═'.repeat(62) + '╣\n' +
     `║  Format: ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | Blinds: SB £${(SB/100).toFixed(2)} / BB £${(BB/100).toFixed(2)} | Total chips in play: £${(totalChips/100).toFixed(2)}`.padEnd(63) + '║\n' +
     `║  Deal order: ${dealOrder.map(i=>room.seats[i].name).join(' → ')}`.padEnd(63) + '║\n' +
-    '╚' + '═'.repeat(62) + '╝\n' +
-    '\n'
+    '╚' + '═'.repeat(62) + '╝\n\n'
   );
 
-  // Post blinds
   room.seats[sbSeat].chips -= SB; room.seats[sbSeat].bet = SB;
   room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB;
   room.G.pot = SB + BB;
-
-  // ── Deal hole cards in correct order: SB first, dealer last ──────────────
-  // Standard poker rule: deal starts from player left of dealer (SB), clockwise,
-  // dealer receives their cards last in both rounds.
-  // Exception — heads-up: dealer=SB, so start from BB to keep dealer last.
 
   for (let rd = 0; rd < 2; rd++)
     for (const si of dealOrder)
       room.seats[si].cards.push(room.G.deck.shift());
 
-  // Log hole cards with full detail
   writeLog(room, '┌─ HOLE CARDS DEALT ─────────────────────────────┐');
   dealOrder.forEach(i => {
     const s = room.seats[i];
@@ -618,12 +661,11 @@ function startNewHand(room) {
   });
   writeLog(room, '└────────────────────────────────────────────────┘');
 
-  // Build preflop act order
   room.G.toAct = buildActOrder(room, preflopStart, active);
 
   broadcastAll(room, {
     type: 'newHand', dealerSeat: room.dealerSeat, sbSeat, bbSeat,
-    pot: room.G.pot, activeSeats: dealOrder  // send in deal order so client animation matches
+    pot: room.G.pot, activeSeats: dealOrder
   });
 
   room.seats.forEach(s => {
@@ -696,9 +738,7 @@ function handleAction(room, seat, action, amount) {
     p.chips -= ca; p.bet += ca; G.pot += ca;
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    const callStackLeft = p.chips;
-    writeLog(room, `${act==='check'?'CHECK ':'CALL  '} | ${p.name.padEnd(18)} | Amount: ${ca>0?'£'+(ca/100).toFixed(2).padStart(7):'  ---   '} | Stack after: £${(callStackLeft/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`);
-
+    writeLog(room, `${act==='check'?'CHECK ':'CALL  '} | ${p.name.padEnd(18)} | Amount: ${ca>0?'£'+(ca/100).toFixed(2).padStart(7):'  ---   '} | Stack after: £${(p.chips/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`);
     broadcastState(room);
     acted(room, seat, false);
 
@@ -786,14 +826,11 @@ function advPhase(room) {
 
 function endRound(room) {
   clearActionTimer(room);
-  // Must exclude sittingOut players — they were never dealt in, so folded=false
-  // but they are not valid winners of this hand
   const remaining = room.seats.filter(s => s && !s.folded && !s.sittingOut);
   if (remaining.length === 1) {
     writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
     finish(room, remaining[0], 'Last player standing');
   } else if (remaining.length === 0) {
-    // Edge case: shouldn't happen, but just in case log it
     writeLog(room, `RESULT: No eligible winner found — hand skipped`);
   }
 }
@@ -849,7 +886,8 @@ function finish(room, winner, label) {
   writeLog(room, '├─ CHIP COUNTS AFTER HAND ──────────────────────────────┤');
   remaining.forEach(s => {
     const bar = '█'.repeat(Math.round(s.chips/START_CHIPS*20));
-    writeLog(room, `│  ${('Seat '+(s.seat+1)+' '+s.name).padEnd(22)} £${(s.chips/100).toFixed(2).padStart(7)}  ${bar}`.padEnd(63) + '│');
+    const note = s.pendingCashOut ? ' [CASHING OUT]' : '';
+    writeLog(room, `│  ${('Seat '+(s.seat+1)+' '+s.name).padEnd(22)} £${(s.chips/100).toFixed(2).padStart(7)}  ${bar}${note}`.padEnd(63) + '│');
   });
   writeLog(room, '└───────────────────────────────────────────────────────┘');
   writeLog(room, '');
@@ -915,15 +953,15 @@ function score5(cards) {
     if (uniq[0] - uniq[4] === 4) {
       isStraight = true; sHigh = uniq[0];
     } else if (uniq[0] === 14 && uniq[1] === 5 && uniq[2] === 4 && uniq[3] === 3 && uniq[4] === 2) {
-      isStraight = true; sHigh = 5; // wheel A-2-3-4-5
+      isStraight = true; sHigh = 5;
     }
   }
 
   const pack = rArr => rArr.reduce((acc, r, i) => acc + r * Math.pow(15, 4 - i), 0);
   const freq = groups[0].n, freq2 = groups[1]?.n || 0;
 
-  if (flush && isStraight && sHigh === 14) return 9e8 + pack(ranks); // royal flush
-  if (flush && isStraight)                  return 8e8 + sHigh * 1e6; // straight flush
+  if (flush && isStraight && sHigh === 14) return 9e8 + pack(ranks);
+  if (flush && isStraight)                  return 8e8 + sHigh * 1e6;
   if (freq === 4)                           return 7e8 + pack(tbRanks);
   if (freq === 3 && freq2 === 2)            return 6e8 + pack(tbRanks);
   if (flush)                                return 5e8 + pack(ranks);
