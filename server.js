@@ -407,7 +407,7 @@ wss.on('connection', ws => {
         if (idx !== -1) room.G.toAct.splice(idx, 1);
         broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (timed out)' });
         broadcastState(room);
-        const alive = room.seats.filter(p => p && !p.folded);
+        const alive = room.seats.filter(p => p && !p.folded && !p.sittingOut);
         if (alive.length <= 1) endRound(room);
       }
 
@@ -609,7 +609,7 @@ function promptToAct(room) {
     else break;
   }
 
-  const alive = room.seats.filter(s => s && !s.folded);
+  const alive = room.seats.filter(s => s && !s.folded && !s.sittingOut);
   if (alive.length <= 1) { endRound(room); return; }
   if (!G.toAct.length) { advPhase(room); return; }
 
@@ -744,16 +744,21 @@ function advPhase(room) {
 
 function endRound(room) {
   clearActionTimer(room);
-  const remaining = room.seats.filter(s => s && !s.folded);
+  // Must exclude sittingOut players — they were never dealt in, so folded=false
+  // but they are not valid winners of this hand
+  const remaining = room.seats.filter(s => s && !s.folded && !s.sittingOut);
   if (remaining.length === 1) {
     writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
     finish(room, remaining[0], 'Last player standing');
+  } else if (remaining.length === 0) {
+    // Edge case: shouldn't happen, but just in case log it
+    writeLog(room, `RESULT: No eligible winner found — hand skipped`);
   }
 }
 
 function showdown(room) {
   clearActionTimer(room);
-  const active = room.seats.filter(s => s && !s.folded);
+  const active = room.seats.filter(s => s && !s.folded && !s.sittingOut);
   if (active.length === 1) {
     writeLog(room, `RESULT: ${active[0].name} wins at showdown uncontested`);
     finish(room, active[0], 'Last player standing');
