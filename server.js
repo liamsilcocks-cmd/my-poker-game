@@ -709,8 +709,9 @@ function promptToAct(room) {
 
   const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
   const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
+  const firstBet = G.currentBet === 0; // no bet yet this street = BET not RAISE
 
-  broadcastAll(room, { type: 'yourTurn', seat, callAmt, minRaise, pot: G.pot, currentBet: G.currentBet });
+  broadcastAll(room, { type: 'yourTurn', seat, callAmt, minRaise, pot: G.pot, currentBet: G.currentBet, firstBet });
   startActionTimer(room, seat);
 }
 
@@ -813,6 +814,20 @@ function advPhase(room) {
     broadcastState(room);
 
     const active = activePlaying(room);
+
+    // Check if any player can still act (has chips and isn't all-in)
+    const canAct = active.filter(i => {
+      const p = room.seats[i];
+      return p && !p.folded && p.chips > 0;
+    });
+
+    if (canAct.length <= 1) {
+      // All (or all but one) players are all-in — run board automatically
+      writeLog(room, `│  All players all-in — running board automatically   │`);
+      setTimeout(() => advPhase(room), 1200);
+      return;
+    }
+
     const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
     G.toAct = buildActOrder(room, postStart, active);
     writeLog(room, `Act order: ${G.toAct.map(i => room.seats[i].name).join(' → ')}`);
