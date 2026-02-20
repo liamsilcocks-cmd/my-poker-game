@@ -43,7 +43,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-call{background:#1a7a1a}
 .abtn-raise{background:#7a5800}
 .abtn-fold{background:#7a1a1a}
-#raiseAmt{width:100%;padding:8px 4px;border-radius:4px;border:1px solid #c8a020;background:rgba(0,0,0,0.85);color:#fff;font-size:12px;text-align:center;display:none;box-sizing:border-box}
+/* ── Raise drum wheels ── */
+#raiseWheel{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
+#raiseDisplay{font-size:11px;font-weight:bold;color:#ffd700;text-align:center;background:rgba(0,0,0,0.6);border-radius:4px;padding:2px 0;width:100%}
+.drum-row{display:flex;gap:4px;justify-content:center;width:100%}
+.drum{display:flex;flex-direction:column;align-items:center;gap:1px;flex:1}
+.drum-label{font-size:8px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
+.drum-track{background:rgba(0,0,0,0.75);border:1px solid #6a5010;border-radius:6px;overflow:hidden;width:100%;position:relative;height:72px;cursor:pointer;user-select:none;touch-action:none}
+.drum-track::before,.drum-track::after{content:'';position:absolute;left:0;right:0;height:22px;z-index:2;pointer-events:none}
+.drum-track::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,0.78),transparent)}
+.drum-track::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,0.78),transparent)}
+.drum-highlight{position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:24px;border-top:1px solid #c8a020;border-bottom:1px solid #c8a020;pointer-events:none;z-index:1}
+.drum-inner{position:absolute;width:100%}
+.drum-item{height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;color:#a08040}
+.drum-item.sel{color:#ffd700;font-size:15px}
+.drum-arrow{background:none;border:none;color:#c8a060;font-size:13px;cursor:pointer;padding:0;width:100%;text-align:center;line-height:1.2;-webkit-tap-highlight-color:transparent}
+.drum-arrow:active{color:#ffd700}
 .tbtn-autofold{background:#3a1a5a;padding:9px 8px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center}
 .tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
 #bottomBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.82);padding:6px 10px;border-radius:8px;color:#c8a820;text-align:left;width:100px;z-index:110}
@@ -148,7 +163,30 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <!-- Left side: vertical action buttons, shown only on your turn -->
   <div id="actionPanel">
     <button class="abtn abtn-call" id="callBtn" style="display:none">CALL</button>
-    <input type="number" id="raiseAmt" value="0.40" step="0.20" min="0.40">
+    <!-- Raise drum wheel picker -->
+    <div id="raiseWheel">
+      <div id="raiseDisplay">RAISE £0.40</div>
+      <div class="drum-row">
+        <div class="drum">
+          <div class="drum-label">£</div>
+          <button class="drum-arrow" onclick="drumStep('pounds',-1)">▲</button>
+          <div class="drum-track" id="drumPounds">
+            <div class="drum-highlight"></div>
+            <div class="drum-inner" id="drumPoundsInner"></div>
+          </div>
+          <button class="drum-arrow" onclick="drumStep('pounds',1)">▼</button>
+        </div>
+        <div class="drum">
+          <div class="drum-label">p (20p)</div>
+          <button class="drum-arrow" onclick="drumStep('pence',-1)">▲</button>
+          <div class="drum-track" id="drumPence">
+            <div class="drum-highlight"></div>
+            <div class="drum-inner" id="drumPenceInner"></div>
+          </div>
+          <button class="drum-arrow" onclick="drumStep('pence',1)">▼</button>
+        </div>
+      </div>
+    </div>
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">RAISE</button>
     <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
     <button class="tbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
@@ -543,7 +581,7 @@ case 'yourTurn':{
   const ca=msg.callAmt||0;
   if(msg.seat===mySeat){
     document.getElementById('callBtn').textContent=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';
-    document.getElementById('raiseAmt').value=((msg.minRaise||40)/100).toFixed(2);
+    drumSetMin(msg.minRaise||40);
     setActions(true);showMsg('\u2b50 Your turn!',0);
     document.getElementById('waitingMsg').style.display='none';
   }else{
@@ -597,8 +635,8 @@ function setActions(v){
     const el=document.getElementById(id);
     if(el)el.style.display=v?'block':'none';
   });
-  const ra=document.getElementById('raiseAmt');
-  if(ra)ra.style.display=v?'block':'none';
+  const rw=document.getElementById('raiseWheel');
+  if(rw)rw.style.display=v?'flex':'none';
 }
 function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);}
@@ -683,14 +721,123 @@ function doCashOut(){
 }
 document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
-document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');const val=Math.round(parseFloat(document.getElementById('raiseAmt').value)*100)||40;wsSend({type:'action',action:'raise',amount:val});};
+document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('brightSlider').oninput=(e)=>{if(spotLight)spotLight.intensity=parseFloat(e.target.value);};
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
 document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
-const scn=createScene();
+// ── Raise drum wheels ─────────────────────────────────────────────────────────
+(function(){
+  // State
+  let poundsIdx=0, penceIdx=0, minRaisePence=40;
+
+  // Pounds options: 0–99 (will be clamped to what's affordable + min raise)
+  const POUNDS=Array.from({length:100},(_,i)=>i);
+  // Pence options: 0,20,40,60,80
+  const PENCE=[0,20,40,60,80];
+
+  function buildDrum(innerId, items, getIdx){
+    const inner=document.getElementById(innerId);
+    inner.innerHTML='';
+    // Pad with blank ghost items so selected item centres in the 72px track (3 visible rows of 24px)
+    const pad=1;
+    for(let p=0;p<pad;p++){const g=document.createElement('div');g.className='drum-item';g.textContent='\u00a0';inner.appendChild(g);}
+    items.forEach((v,i)=>{
+      const d=document.createElement('div');
+      d.className='drum-item'+(i===getIdx()?' sel':'');
+      d.textContent=String(v).padStart(2,'0');
+      inner.appendChild(d);
+    });
+    for(let p=0;p<pad;p++){const g=document.createElement('div');g.className='drum-item';g.textContent='\u00a0';inner.appendChild(g);}
+    renderDrum(innerId,getIdx()+pad);
+  }
+
+  function renderDrum(innerId,centreRow){
+    const inner=document.getElementById(innerId);
+    const itemH=24,trackH=72;
+    const offset=(trackH/2)-(centreRow*itemH)-(itemH/2);
+    inner.style.transform=`translateY(${offset}px)`;
+    // Update selected class
+    Array.from(inner.children).forEach((el,i)=>{
+      el.classList.toggle('sel',i===centreRow);
+    });
+  }
+
+  function rebuildAll(){
+    buildDrum('drumPoundsInner',POUNDS,()=>poundsIdx);
+    buildDrum('drumPenceInner',PENCE,()=>penceIdx);
+    updateDisplay();
+  }
+
+  function updateDisplay(){
+    const total=POUNDS[poundsIdx]*100+PENCE[penceIdx];
+    const clamped=Math.max(total,minRaisePence);
+    // Show the actual value that will be sent (clamped to min)
+    const p=Math.floor(clamped/100), pn=clamped%100;
+    document.getElementById('raiseDisplay').textContent=
+      'RAISE \u00a3'+p+'.'+String(pn).padStart(2,'0');
+  }
+
+  window.drumStep=function(drum,dir){
+    ensureAudio();
+    snd_chip();
+    if(drum==='pounds'){
+      poundsIdx=Math.max(0,Math.min(POUNDS.length-1,poundsIdx+dir));
+      buildDrum('drumPoundsInner',POUNDS,()=>poundsIdx);
+    } else {
+      penceIdx=Math.max(0,Math.min(PENCE.length-1,penceIdx+dir));
+      buildDrum('drumPenceInner',PENCE,()=>penceIdx);
+    }
+    updateDisplay();
+  };
+
+  window.drumSetMin=function(minPence){
+    minRaisePence=minPence||40;
+    // Set drums to the minimum raise amount
+    poundsIdx=Math.min(Math.floor(minRaisePence/100),POUNDS.length-1);
+    penceIdx=PENCE.indexOf(minRaisePence%100);
+    if(penceIdx===-1){
+      // Round up to next 20p slot
+      const nextP=PENCE.find(p=>p>=minRaisePence%100);
+      penceIdx=nextP!==undefined?PENCE.indexOf(nextP):0;
+      if(penceIdx===-1)penceIdx=0;
+    }
+    rebuildAll();
+  };
+
+  window.drumGetPence=function(){
+    const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];
+    return Math.max(raw,minRaisePence);
+  };
+
+  // Touch/swipe on drum tracks
+  function attachSwipe(trackId,drum){
+    const el=document.getElementById(trackId);
+    let startY=0,startIdx=0;
+    el.addEventListener('touchstart',e=>{
+      startY=e.touches[0].clientY;
+      startIdx=drum==='pounds'?poundsIdx:penceIdx;
+      e.preventDefault();
+    },{passive:false});
+    el.addEventListener('touchmove',e=>{
+      const dy=startY-e.touches[0].clientY;
+      const steps=Math.round(dy/24);
+      const list=drum==='pounds'?POUNDS:PENCE;
+      const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));
+      if(drum==='pounds'&&ni!==poundsIdx){poundsIdx=ni;buildDrum('drumPoundsInner',POUNDS,()=>poundsIdx);updateDisplay();}
+      if(drum==='pence'&&ni!==penceIdx){penceIdx=ni;buildDrum('drumPenceInner',PENCE,()=>penceIdx);updateDisplay();}
+      e.preventDefault();
+    },{passive:false});
+  }
+
+  attachSwipe('drumPounds','pounds');
+  attachSwipe('drumPence','pence');
+
+  // Init on load
+  window.addEventListener('load',()=>rebuildAll());
+})();
 engine.runRenderLoop(()=>scn.render());
 </script>
 </body>
