@@ -38,7 +38,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
-#actionPanel{position:absolute;left:calc(10px + env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:6px;z-index:110;width:100px}
+#actionPanel{position:absolute;left:0;padding-left:calc(8px + env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:6px;z-index:110;width:calc(116px + env(safe-area-inset-left,0px))}
+/* ── Vertical table pan slider ── */
+#tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.55);border-radius:20px;padding:8px 6px;border:1px solid rgba(200,160,32,0.3)}
+#tableSlider label{font-size:9px;color:#c8a060;letter-spacing:1px;writing-mode:horizontal-tb;text-align:center}
+#tablePan{-webkit-appearance:slider-vertical;appearance:slider-vertical;writing-mode:vertical-lr;direction:rtl;width:28px;height:140px;cursor:pointer;accent-color:#c8a020;background:transparent}
+/* Fallback for browsers that ignore slider-vertical */
+@supports not (appearance:slider-vertical){
+  #tablePan{transform:rotate(180deg);width:140px;height:28px;writing-mode:initial;direction:initial;-webkit-appearance:none;appearance:none;background:linear-gradient(to right,#c8a020,#c8a020) no-repeat center;background-size:100% 3px;border-radius:2px}
+  #tableSlider{flex-direction:row;height:auto;width:160px;right:50%;transform:translateX(50%);top:auto;bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+}
 .abtn{padding:11px 8px;border-radius:6px;border:none;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;white-space:nowrap;width:100%;text-align:center}
 .abtn-call{background:#1a7a1a}
 .abtn-raise{background:#7a5800}
@@ -196,6 +205,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="myInfo">CHIPS: &pound;10.00</div>
   </div>
   <!-- Bottom-right: Pause + Cash Out — always visible, separate from action bar -->
+  <!-- Vertical slider: pan table up/down -->
+  <div id="tableSlider">
+    <label>▲</label>
+    <input type="range" id="tablePan" min="-3" max="3" step="0.1" value="0.5">
+    <label>▼</label>
+  </div>
   <div id="controlBar">
     <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">&#9646;&#9646; PAUSE</button>
     <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
@@ -361,16 +376,13 @@ function mkFrontTex(suit,rank){
     c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
     c.fillStyle=col;c.fillText(suit,W/2,pipTop+pipH*0.5);
   }else if(['J','Q','K'].includes(rank)){
-    const fX=BX+8,fY=BY+50,fW=BW-16,fH=BH-100;
-    c.fillStyle=isRed?'#fff5f5':'#f5f5ff';
-    c.fillRect(fX,fY,fW,fH);
-    // No border on face panel — clean look
+    // Draw face letter and suit directly on the white card — no inner box
     c.fillStyle=col;
     c.font='bold 260px Arial';
     c.textAlign='center';c.textBaseline='middle';
-    c.fillText(rank,fX+fW/2,fY+fH*0.44);
-    c.font='110px Arial';
-    c.fillText(suit,fX+fW/2,fY+fH*0.82);
+    c.fillText(rank,W/2,H*0.52);
+    c.font='100px Arial';
+    c.fillText(suit,W/2,H*0.78);
   }else{
     const pips=L[rank]||[];
     c.fillStyle=col;
@@ -470,9 +482,12 @@ cam.upperRadiusLimit=22;
 // Wheel/pinch zoom sensitivity
 cam.wheelPrecision=28;
 cam.pinchPrecision=180;
-// Disable panning entirely — this is what causes "lost in space" on mobile
-// when two fingers drift and the target moves off screen
-cam.panningSensibility=0;
+// Panning: Y axis only — players can drag the table up/down to see cards better
+// X and Z locked to zero so camera can't drift sideways and get "lost"
+cam.panningSensibility=800;
+cam.panningAxis=new BABYLON.Vector3(0,1,0);
+cam.panningDistanceLimit=3;   // Max 3 units up or down from centre
+cam.panningOriginTarget=new BABYLON.Vector3(0,0.5,0);
 cam.attachControl(canvas,true);
 const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
 h.intensity=0.12;h.diffuse=new BABYLON.Color3(0.7,0.62,0.45);h.groundColor=new BABYLON.Color3(0.04,0.03,0.02);
@@ -647,6 +662,8 @@ case 'yourTurn':{
   const ca=msg.callAmt||0;
   if(msg.seat===mySeat){
     document.getElementById('callBtn').textContent=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';
+    // BET if no current bet on the street, RAISE if someone has already bet
+    document.getElementById('raiseBtn').textContent=msg.firstBet?'BET':'RAISE';
     drumSetMin(msg.minRaise||40);
     setActions(true);showMsg('\u2b50 Your turn!',0);
     document.getElementById('waitingMsg').style.display='none';
@@ -794,6 +811,11 @@ document.getElementById('brightSlider').oninput=(e)=>{if(spotLight)spotLight.int
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
 document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
+// ── Table pan slider ──────────────────────────────────────────────────────────
+document.getElementById('tablePan').addEventListener('input', function(){
+  if(cam) cam.target.y = parseFloat(this.value);
+});
+
 // ── Raise drum wheels ─────────────────────────────────────────────────────────
 (function(){
   // State
