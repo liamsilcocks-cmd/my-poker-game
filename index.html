@@ -38,38 +38,36 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
-#actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:5px;z-index:110;width:108px;padding:6px 6px 6px calc(6px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.78);border-radius:0 8px 8px 0;border-right:1px solid #6a5010;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
-/* ── Vertical table pan slider ── */
-#tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.55);border-radius:20px;padding:8px 6px;border:1px solid rgba(200,160,32,0.3)}
-#tableSlider label{font-size:9px;color:#c8a060;letter-spacing:1px;writing-mode:horizontal-tb;text-align:center}
-#tablePan{-webkit-appearance:slider-vertical;appearance:slider-vertical;writing-mode:vertical-lr;direction:rtl;width:28px;height:140px;cursor:pointer;accent-color:#c8a020;background:transparent}
-/* Fallback for browsers that ignore slider-vertical */
-@supports not (appearance:slider-vertical){
-  #tablePan{transform:rotate(180deg);width:140px;height:28px;writing-mode:initial;direction:initial;-webkit-appearance:none;appearance:none;background:linear-gradient(to right,#c8a020,#c8a020) no-repeat center;background-size:100% 3px;border-radius:2px}
-  #tableSlider{flex-direction:row;height:auto;width:160px;right:50%;transform:translateX(50%);top:auto;bottom:calc(60px + env(safe-area-inset-bottom,0px))}
-}
-.abtn{padding:11px 8px;border-radius:6px;border:none;font-size:13px;font-weight:bold;cursor:pointer;color:#fff;white-space:nowrap;width:100%;text-align:center}
+/* ── Left action panel: slim strip, big tap targets ── */
+#actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:7px;z-index:110;width:86px;padding:10px 8px 10px calc(8px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.88);border-radius:0 12px 12px 0;border-right:1px solid #6a5010;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
+.abtn{padding:15px 6px;border-radius:8px;border:none;font-size:14px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
 .abtn-call{background:#1a7a1a}
 .abtn-raise{background:#7a5800}
 .abtn-fold{background:#7a1a1a}
-/* ── Raise drum wheels ── */
-#raiseWheel{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
-#raiseDisplay{font-size:11px;font-weight:bold;color:#ffd700;text-align:center;background:rgba(0,0,0,0.6);border-radius:4px;padding:2px 0;width:100%}
-.drum-row{display:flex;gap:4px;justify-content:center;width:100%}
-.drum{display:flex;flex-direction:column;align-items:center;gap:1px;flex:1}
-.drum-label{font-size:8px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
-.drum-track{background:rgba(0,0,0,0.75);border:1px solid #6a5010;border-radius:6px;overflow:hidden;width:100%;position:relative;height:96px;cursor:pointer;user-select:none;touch-action:none}
+.tbtn-autofold{background:#3a1a5a;padding:12px 6px;border-radius:8px;border:none;font-size:11px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
+.tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
+/* ── Drum overlay: floats to the right of the action panel when RAISE is tapped ── */
+#drumOverlay{position:absolute;left:95px;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:115;width:170px;padding:10px;background:rgba(0,0,0,0.92);border-radius:12px;border:1px solid #c8a020;box-shadow:0 0 20px rgba(0,0,0,0.8)}
+#raiseDisplay{font-size:14px;font-weight:bold;color:#ffd700;text-align:center;background:rgba(0,0,0,0.5);border-radius:6px;padding:5px 0;width:100%}
+.drum-row{display:flex;gap:8px;justify-content:center;width:100%}
+.drum{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1}
+.drum-label{font-size:10px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
+.drum-track{background:rgba(0,0,0,0.75);border:1px solid #6a5010;border-radius:8px;overflow:hidden;width:100%;position:relative;height:96px;cursor:pointer;user-select:none;touch-action:none}
 .drum-track::before,.drum-track::after{content:'';position:absolute;left:0;right:0;height:28px;z-index:2;pointer-events:none}
 .drum-track::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,0.82),transparent)}
 .drum-track::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,0.82),transparent)}
 .drum-highlight{position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:32px;border-top:1px solid #c8a020;border-bottom:1px solid #c8a020;pointer-events:none;z-index:1}
 .drum-inner{position:absolute;width:100%}
-.drum-item{height:32px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:bold;color:#a08040}
-.drum-item.sel{color:#ffd700;font-size:21px}
-.drum-arrow{background:rgba(255,255,255,0.07);border:none;color:#e0c060;font-size:22px;cursor:pointer;padding:6px 0;width:100%;text-align:center;line-height:1;-webkit-tap-highlight-color:transparent;border-radius:4px}
-.drum-arrow:active{background:rgba(200,160,32,0.28);color:#ffd700}
-.tbtn-autofold{background:#3a1a5a;padding:9px 8px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center}
-.tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
+.drum-item{height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#a08040}
+.drum-item.sel{color:#ffd700;font-size:22px}
+.drum-arrow{background:rgba(255,255,255,0.08);border:none;color:#e0c060;font-size:24px;cursor:pointer;padding:7px 0;width:100%;text-align:center;line-height:1;-webkit-tap-highlight-color:transparent;border-radius:5px}
+.drum-arrow:active{background:rgba(200,160,32,0.3);color:#ffd700}
+/* Confirm raise button inside drum overlay */
+#drumConfirm{padding:11px 0;border-radius:8px;border:none;font-size:14px;font-weight:bold;cursor:pointer;color:#fff;width:100%;background:#7a5800;-webkit-tap-highlight-color:transparent}
+/* ── Vertical table pan slider ── */
+#tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
+#tableSlider label{font-size:11px;color:#c8a060}
+#tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:28px;height:130px;cursor:pointer;accent-color:#c8a020}
 #bottomBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.82);padding:6px 10px;border-radius:8px;color:#c8a820;text-align:left;width:100px;z-index:110}
 #myInfo{font-size:11px;font-weight:bold;color:#ffd700;line-height:1.5}
 #controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:6px;align-items:stretch;z-index:110}
@@ -169,36 +167,37 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="roomBadge">ROOM &mdash;</div>
     <button class="tbtn tbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
   </div>
-  <!-- Left side: vertical action buttons, shown only on your turn -->
+  <!-- Left action strip: 4 big buttons, shown only on your turn -->
   <div id="actionPanel">
     <button class="abtn abtn-call" id="callBtn" style="display:none">CALL</button>
-    <!-- Raise drum wheel picker -->
-    <div id="raiseWheel">
-      <div id="raiseDisplay">RAISE £0.40</div>
-      <div class="drum-row">
-        <div class="drum">
-          <div class="drum-label">£</div>
-          <button class="drum-arrow" onclick="drumStep('pounds',-1)">▲</button>
-          <div class="drum-track" id="drumPounds">
-            <div class="drum-highlight"></div>
-            <div class="drum-inner" id="drumPoundsInner"></div>
-          </div>
-          <button class="drum-arrow" onclick="drumStep('pounds',1)">▼</button>
-        </div>
-        <div class="drum">
-          <div class="drum-label">p (20p)</div>
-          <button class="drum-arrow" onclick="drumStep('pence',-1)">▲</button>
-          <div class="drum-track" id="drumPence">
-            <div class="drum-highlight"></div>
-            <div class="drum-inner" id="drumPenceInner"></div>
-          </div>
-          <button class="drum-arrow" onclick="drumStep('pence',1)">▼</button>
-        </div>
-      </div>
-    </div>
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">RAISE</button>
     <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
-    <button class="tbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
+    <button class="tbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO<br>FOLD</button>
+  </div>
+  <!-- Drum overlay: floats right of action panel when RAISE tapped -->
+  <div id="drumOverlay">
+    <div id="raiseDisplay">RAISE £0.40</div>
+    <div class="drum-row">
+      <div class="drum">
+        <div class="drum-label">£</div>
+        <button class="drum-arrow" onclick="drumStep('pounds',-1)">▲</button>
+        <div class="drum-track" id="drumPounds">
+          <div class="drum-highlight"></div>
+          <div class="drum-inner" id="drumPoundsInner"></div>
+        </div>
+        <button class="drum-arrow" onclick="drumStep('pounds',1)">▼</button>
+      </div>
+      <div class="drum">
+        <div class="drum-label">p (20p)</div>
+        <button class="drum-arrow" onclick="drumStep('pence',-1)">▲</button>
+        <div class="drum-track" id="drumPence">
+          <div class="drum-highlight"></div>
+          <div class="drum-inner" id="drumPenceInner"></div>
+        </div>
+        <button class="drum-arrow" onclick="drumStep('pence',1)">▼</button>
+      </div>
+    </div>
+    <button id="drumConfirm" onclick="confirmRaise()">✓ RAISE</button>
   </div>
   <!-- Bottom centre: chips/bet info -->
   <div id="bottomBar">
@@ -272,7 +271,7 @@ const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true);
 window.addEventListener('resize',()=>engine.resize());
 canvas.addEventListener('click',()=>ensureAudio(),{once:true});
-let scene,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
+let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
 const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
 function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
@@ -290,7 +289,7 @@ function cardPos(si,cn){
   );
 }
 const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
-const COM_POS=[new BABYLON.Vector3(-2.84,0.42,0.55),new BABYLON.Vector3(-1.42,0.42,0.55),new BABYLON.Vector3(0.00,0.42,0.55),new BABYLON.Vector3(1.42,0.42,0.55),new BABYLON.Vector3(2.84,0.42,0.55)];
+const COM_POS=[new BABYLON.Vector3(-2.84,0.55,0.55),new BABYLON.Vector3(-1.42,0.55,0.55),new BABYLON.Vector3(0.00,0.55,0.55),new BABYLON.Vector3(1.42,0.55,0.55),new BABYLON.Vector3(2.84,0.55,0.55)];
 function mkBackTex(){
   const W=512,H=768;
   const tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true);
@@ -467,7 +466,11 @@ function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,pro
 function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
 function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
 function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
-const cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
+// Group 3 (community cards) always renders after group 1 (hole cards) — no depth fighting
+scene.setRenderingAutoClearDepthStencil(1,false);
+scene.setRenderingAutoClearDepthStencil(2,false);
+scene.setRenderingAutoClearDepthStencil(3,false);
+cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
 // ── Mobile-safe camera constraints ──────────────────────────────────────────
 // Alpha (horizontal rotation): lock to a narrow 60° arc along the table's long axis
 // Players can glance slightly left/right but can't spin all the way around
@@ -482,12 +485,9 @@ cam.upperRadiusLimit=22;
 // Wheel/pinch zoom sensitivity
 cam.wheelPrecision=28;
 cam.pinchPrecision=180;
-// Panning: Y axis only — players can drag the table up/down to see cards better
-// X and Z locked to zero so camera can't drift sideways and get "lost"
-cam.panningSensibility=800;
-cam.panningAxis=new BABYLON.Vector3(0,1,0);
-cam.panningDistanceLimit=3;   // Max 3 units up or down from centre
-cam.panningOriginTarget=new BABYLON.Vector3(0,0.5,0);
+// Panning disabled — prevents "lost in space" on mobile
+// Vertical view is controlled by the table pan slider instead
+cam.panningSensibility=0;
 cam.attachControl(canvas,true);
 const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
 h.intensity=0.12;h.diffuse=new BABYLON.Color3(0.7,0.62,0.45);h.groundColor=new BABYLON.Color3(0.04,0.03,0.02);
@@ -540,8 +540,7 @@ function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedS
 function getOrCreateCommunityMesh(idx){
   if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
   const m=nextCardMesh();
-  // Community cards render above hole cards — higher group + higher Y in COM_POS
-  m.renderingGroupId=2;
+  m.renderingGroupId=3; // Highest group — always renders above hole cards (1) and labels (2)
   communityCardMeshes[idx]=m;
   return m;
 }
@@ -721,12 +720,19 @@ function hideTurnIndicator(){document.getElementById('turnIndicator').style.disp
 function setActions(v){
   const panel=document.getElementById('actionPanel');
   if(panel)panel.style.display=v?'flex':'none';
+  // Always hide drum overlay when actions change
+  const drum=document.getElementById('drumOverlay');
+  if(drum)drum.style.display='none';
   ['callBtn','raiseBtn','foldBtn'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=v?'block':'none';
   });
-  const rw=document.getElementById('raiseWheel');
-  if(rw)rw.style.display=v?'flex':'none';
+}
+function confirmRaise(){
+  ensureAudio();
+  document.getElementById('drumOverlay').style.display='none';
+  setActions(false);showMsg('');
+  wsSend({type:'action',action:'raise',amount:drumGetPence()});
 }
 function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);}
@@ -811,7 +817,11 @@ function doCashOut(){
 }
 document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
-document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
+document.getElementById('raiseBtn').onclick=()=>{
+  ensureAudio();
+  const d=document.getElementById('drumOverlay');
+  d.style.display=d.style.display==='flex'?'none':'flex';
+};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('brightSlider').oninput=(e)=>{if(spotLight)spotLight.intensity=parseFloat(e.target.value);};
