@@ -39,12 +39,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
 /* ── Left action panel: slim strip, big tap targets ── */
-#actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:7px;z-index:110;width:86px;padding:10px 8px 10px calc(8px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.88);border-radius:0 12px 12px 0;border-right:1px solid #6a5010;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
-.abtn{padding:15px 6px;border-radius:8px;border:none;font-size:14px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
-.abtn-call{background:#1a7a1a}
-.abtn-raise{background:#7a5800}
-.abtn-fold{background:#7a1a1a}
-.tbtn-autofold{background:#3a1a5a;padding:12px 6px;border-radius:8px;border:none;font-size:11px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
+#actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:90px;padding:10px 8px 10px calc(8px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.90);border-radius:0 14px 14px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
+.abtn{padding:18px 4px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
+.abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
+.abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
+.abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
+.tbtn-autofold{background:#3a1a5a;padding:12px 4px;border-radius:8px;border:none;border-bottom:3px solid #1a0a3a;font-size:11px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
 .tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
 /* ── Drum overlay: floats to the right of the action panel when RAISE is tapped ── */
 #drumOverlay{position:absolute;left:95px;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:115;width:170px;padding:10px;background:rgba(0,0,0,0.92);border-radius:12px;border:1px solid #c8a020;box-shadow:0 0 20px rgba(0,0,0,0.8)}
@@ -280,15 +280,14 @@ function cardPos(si,cn){
   const a=-Math.PI/2-(si/n)*Math.PI*2;
   const rx=TRX*0.70,rz=TRZ*0.70;
   const pa=a+Math.PI/2;
-  // Clear gap between the two hole cards
   const off=(cn===0?-0.72:0.72);
   return new BABYLON.Vector3(
     Math.cos(a)*rx+Math.cos(pa)*off,
-    0.30+cn*0.012,
+    0.40+cn*0.018,  // Well above felt top (0.315), clear Y stagger between cards
     Math.sin(a)*rz+Math.sin(pa)*off
   );
 }
-const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
+const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.42,0);
 const COM_POS=[new BABYLON.Vector3(-2.84,0.55,0.55),new BABYLON.Vector3(-1.42,0.55,0.55),new BABYLON.Vector3(0.00,0.55,0.55),new BABYLON.Vector3(1.42,0.55,0.55),new BABYLON.Vector3(2.84,0.55,0.55)];
 function mkBackTex(){
   const W=512,H=768;
@@ -409,7 +408,7 @@ function mkFrontTex(suit,rank){
 }
 function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
 function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.28,height:1.80},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
-function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.28;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
+function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.40;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
 const CHIP_DENOM=[{val:500,col:[0.52,0.06,0.62]},{val:100,col:[0.14,0.20,0.88]},{val:25,col:[0.10,0.60,0.16]},{val:5,col:[0.85,0.10,0.10]},{val:1,col:[0.90,0.88,0.86]}];
 function buildChipPool(){for(const d of CHIP_DENOM){for(let i=0;i<60;i++){const chip=BABYLON.MeshBuilder.CreateCylinder('chip_'+d.val+'_'+i,{height:0.072,diameter:0.34,tessellation:32},scene),m=new BABYLON.StandardMaterial('cmat_'+d.val+'_'+i,scene);m.diffuseColor=new BABYLON.Color3(...d.col);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(...d.col.map(v=>v*0.22));chip.material=m;chip.isVisible=false;chip.renderingGroupId=1;chip._dval=d.val;chipPool.push(chip);}}}
 function acquireChip(forVal){const d=CHIP_DENOM.find(d=>d.val<=forVal)||CHIP_DENOM[CHIP_DENOM.length-1];const ch=chipPool.find(c=>!c.isVisible&&c._dval===d.val)||chipPool.find(c=>!c.isVisible)||null;if(ch)ch.isVisible=true;return ch;}
@@ -466,10 +465,6 @@ function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,pro
 function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
 function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
 function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
-// Group 3 (community cards) always renders after group 1 (hole cards) — no depth fighting
-scene.setRenderingAutoClearDepthStencil(1,false);
-scene.setRenderingAutoClearDepthStencil(2,false);
-scene.setRenderingAutoClearDepthStencil(3,false);
 cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
 // ── Mobile-safe camera constraints ──────────────────────────────────────────
 // Alpha (horizontal rotation): lock to a narrow 60° arc along the table's long axis
@@ -540,7 +535,6 @@ function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedS
 function getOrCreateCommunityMesh(idx){
   if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
   const m=nextCardMesh();
-  m.renderingGroupId=3; // Highest group — always renders above hole cards (1) and labels (2)
   communityCardMeshes[idx]=m;
   return m;
 }
