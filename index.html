@@ -49,16 +49,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .drum-row{display:flex;gap:4px;justify-content:center;width:100%}
 .drum{display:flex;flex-direction:column;align-items:center;gap:1px;flex:1}
 .drum-label{font-size:8px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
-.drum-track{background:rgba(0,0,0,0.75);border:1px solid #6a5010;border-radius:6px;overflow:hidden;width:100%;position:relative;height:72px;cursor:pointer;user-select:none;touch-action:none}
-.drum-track::before,.drum-track::after{content:'';position:absolute;left:0;right:0;height:22px;z-index:2;pointer-events:none}
-.drum-track::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,0.78),transparent)}
-.drum-track::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,0.78),transparent)}
-.drum-highlight{position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:24px;border-top:1px solid #c8a020;border-bottom:1px solid #c8a020;pointer-events:none;z-index:1}
+.drum-track{background:rgba(0,0,0,0.75);border:1px solid #6a5010;border-radius:6px;overflow:hidden;width:100%;position:relative;height:96px;cursor:pointer;user-select:none;touch-action:none}
+.drum-track::before,.drum-track::after{content:'';position:absolute;left:0;right:0;height:28px;z-index:2;pointer-events:none}
+.drum-track::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,0.82),transparent)}
+.drum-track::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,0.82),transparent)}
+.drum-highlight{position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:32px;border-top:1px solid #c8a020;border-bottom:1px solid #c8a020;pointer-events:none;z-index:1}
 .drum-inner{position:absolute;width:100%}
-.drum-item{height:24px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;color:#a08040}
-.drum-item.sel{color:#ffd700;font-size:15px}
-.drum-arrow{background:none;border:none;color:#c8a060;font-size:13px;cursor:pointer;padding:0;width:100%;text-align:center;line-height:1.2;-webkit-tap-highlight-color:transparent}
-.drum-arrow:active{color:#ffd700}
+.drum-item{height:32px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:bold;color:#a08040}
+.drum-item.sel{color:#ffd700;font-size:21px}
+.drum-arrow{background:rgba(255,255,255,0.07);border:none;color:#e0c060;font-size:22px;cursor:pointer;padding:6px 0;width:100%;text-align:center;line-height:1;-webkit-tap-highlight-color:transparent;border-radius:4px}
+.drum-arrow:active{background:rgba(200,160,32,0.28);color:#ffd700}
 .tbtn-autofold{background:#3a1a5a;padding:9px 8px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center}
 .tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
 #bottomBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.82);padding:6px 10px;border-radius:8px;color:#c8a820;text-align:left;width:100px;z-index:110}
@@ -275,7 +275,7 @@ function cardPos(si,cn){
   );
 }
 const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.32,0);
-const COM_POS=[new BABYLON.Vector3(-2.84,0.305,0),new BABYLON.Vector3(-1.42,0.305,0),new BABYLON.Vector3(0.00,0.305,0),new BABYLON.Vector3(1.42,0.305,0),new BABYLON.Vector3(2.84,0.305,0)];
+const COM_POS=[new BABYLON.Vector3(-2.84,0.315,0.55),new BABYLON.Vector3(-1.42,0.315,0.55),new BABYLON.Vector3(0.00,0.315,0.55),new BABYLON.Vector3(1.42,0.315,0.55),new BABYLON.Vector3(2.84,0.315,0.55)];
 function mkBackTex(){
   const W=512,H=768;
   const tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true);
@@ -465,7 +465,7 @@ cam.upperAlphaLimit=-Math.PI/2+0.52;  // ~-60°  (-90° centre +30°)
 cam.lowerBetaLimit=0.55;   // ~31° above table — can't go too overhead
 cam.upperBetaLimit=1.18;   // ~68° — can't go below the felt
 // Radius (zoom): keep sensible range
-cam.lowerRadiusLimit=10;
+cam.lowerRadiusLimit=5;
 cam.upperRadiusLimit=22;
 // Wheel/pinch zoom sensitivity
 cam.wheelPrecision=28;
@@ -822,7 +822,7 @@ document.getElementById('joinBtn').onclick=()=>{const name=document.getElementBy
 
   function renderDrum(innerId,centreRow){
     const inner=document.getElementById(innerId);
-    const itemH=24,trackH=72;
+    const itemH=32,trackH=96;
     const offset=(trackH/2)-(centreRow*itemH)-(itemH/2);
     inner.style.transform=`translateY(${offset}px)`;
     // Update selected class
@@ -889,7 +889,7 @@ document.getElementById('joinBtn').onclick=()=>{const name=document.getElementBy
     },{passive:false});
     el.addEventListener('touchmove',e=>{
       const dy=startY-e.touches[0].clientY;
-      const steps=Math.round(dy/24);
+      const steps=Math.round(dy/32);
       const list=drum==='pounds'?POUNDS:PENCE;
       const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));
       if(drum==='pounds'&&ni!==poundsIdx){poundsIdx=ni;buildDrum('drumPoundsInner',POUNDS,()=>poundsIdx);updateDisplay();}
