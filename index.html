@@ -239,7 +239,7 @@ function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,
 function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([delay,freq])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq*0.8,t+delay);o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);g.gain.setValueAtTime(0,t+delay);g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+delay);o.stop(t+delay+0.3);});}
 const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
-let myId=localStorage.getItem('pokerPlayerId')||null,mySeat=0,isHost=false,myRoomId=null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
+let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
 let occupiedSeats=[];
 function updateOccupiedSeats(seats){
   occupiedSeats=seats.map((s,i)=>s?i:null).filter(i=>i!==null);
@@ -540,8 +540,74 @@ function startDealAnimation(activeSeats,afterDone){
     animDeal(m,target,()=>{snd_deal();if(lastState&&lastState.players[si]){const cd=lastState.players[si].cards[cn];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());}setTimeout(next,80);});
   }
   next();}
-function connectWS(name,roomId,playerId){const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);ws.onopen=()=>{ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));};ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};ws.onclose=()=>{showMsg('\u26a0 Disconnected from server',0);setTimeout(()=>location.reload(),4000);};ws.onerror=()=>{document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';};}
+// ── WebSocket with auto-reconnect ────────────────────────────────────────────
+let _reconnectTimer=null, _reconnectAttempts=0, _intentionalClose=false;
+const MAX_RECONNECT_ATTEMPTS=10;
+const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,8000,8000,8000];
+
+function connectWS(name,roomId,playerId){
+  _intentionalClose=false;
+  if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  ws=new WebSocket(proto+'//'+location.host);
+  ws.onopen=()=>{
+    _reconnectAttempts=0;
+    // Hide any reconnecting banner
+    const rb=document.getElementById('reconnectBanner');
+    if(rb)rb.style.display='none';
+    ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));
+  };
+  ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};
+  ws.onclose=()=>{
+    if(_intentionalClose)return;
+    if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){
+      showMsg('\u26a0 Lost connection — please reload',0);
+      return;
+    }
+    const delay=RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
+    _reconnectAttempts++;
+    showReconnectBanner(_reconnectAttempts,delay);
+    _reconnectTimer=setTimeout(()=>{
+      if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);
+    },delay);
+  };
+  ws.onerror=()=>{
+    // onclose fires right after onerror, let that handle retry
+    if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){
+      // Haven't joined yet — show login error
+      document.getElementById('loginErr').textContent='Could not connect to server.';
+      document.getElementById('loginOverlay').style.display='flex';
+      document.getElementById('waitingOverlay').style.display='none';
+      document.getElementById('lobbyOverlay').style.display='none';
+    }
+  };
+}
+
+function showReconnectBanner(attempt,delayMs){
+  let rb=document.getElementById('reconnectBanner');
+  if(!rb){
+    rb=document.createElement('div');
+    rb.id='reconnectBanner';
+    rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:12px;padding:18px 28px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;pointer-events:none;white-space:pre-line';
+    document.body.appendChild(rb);
+  }
+  rb.style.display='block';
+  rb.textContent='\u26a0 Reconnecting\u2026 (attempt '+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+(delayMs/1000).toFixed(0)+'s';
+}
+
 function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
+
+// ── Reconnect when page regains focus (back from call / app switch) ───────────
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&myName&&myRoomId&&myId){
+    if(!ws||ws.readyState===WebSocket.CLOSED||ws.readyState===WebSocket.CLOSING){
+      if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}
+      _reconnectAttempts=0;
+      showReconnectBanner(1,0);
+      connectWS(myName,myRoomId,myId);
+    }
+  }
+});
 function handleServerMsg(msg){switch(msg.type){
 case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
@@ -604,7 +670,7 @@ case 'playerLeft':
   seatActions[msg.seat]='';
   if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}
   // If this was us leaving (immediate cash-out), reload
-  if(msg.id===myId){setTimeout(()=>location.reload(),600);return;}
+  if(msg.id===myId){_intentionalClose=true;setTimeout(()=>location.reload(),600);return;}
   if(lastState)applyState(lastState);
   break;
 case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
@@ -716,8 +782,8 @@ function toggleChat(){
 function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{});}else{document.exitFullscreen();}}
 function doCashOut(){
   if(!confirm('Cash out and leave the table with your remaining chips?'))return;
+  _intentionalClose=true;
   wsSend({type:'cashOut'});
-  // Server sends either cashOutPending (mid-hand) or playerLeft (immediate)
 }
 document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
@@ -726,7 +792,7 @@ document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('brightSlider').oninput=(e)=>{if(spotLight)spotLight.intensity=parseFloat(e.target.value);};
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
+document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
 // ── Raise drum wheels ─────────────────────────────────────────────────────────
 (function(){
