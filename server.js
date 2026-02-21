@@ -149,6 +149,7 @@ function tableSnapshot(room, forId) {
         seat: s.seat, name: s.name, chips: s.chips, bet: s.bet,
         folded: s.folded, disconnected: s.disconnected || false,
         pendingCashOut: s.pendingCashOut || false,
+        voluntaryAutoFold: s.voluntaryAutoFold || false,
         cards: showCards ? s.cards : s.cards.map(() => 'back'),
         active: !s.sittingOut
       };
@@ -356,7 +357,7 @@ wss.on('connection', ws => {
         const p = room.seats.find(s => s?.id === myId);
         if (!p) return;
         p.voluntaryAutoFold = msg.enabled === true;
-        writeLog(room, `${p.name} voluntary auto-fold: ${p.voluntaryAutoFold}`);
+        writeLog(room, `AUTO-FOLD ${p.voluntaryAutoFold ? 'ON' : 'OFF'}: ${p.name} ${p.voluntaryAutoFold ? 'has enabled auto-fold — will fold every hand' : 'has turned auto-fold OFF and is back in the game'}`);
         if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
           clearActionTimer(room);
           doFold(room, p.seat, 'auto-fold');
