@@ -150,6 +150,8 @@ function tableSnapshot(room, forId) {
         folded: s.folded, disconnected: s.disconnected || false,
         pendingCashOut: s.pendingCashOut || false,
         voluntaryAutoFold: s.voluntaryAutoFold || false,
+        spectator: s.spectator || false,
+        pendingBuyBack: s.pendingBuyBack || false,
         cards: showCards ? s.cards : s.cards.map(() => 'back'),
         active: !s.sittingOut
       };
@@ -351,6 +353,48 @@ wss.on('connection', ws => {
         break;
       }
 
+      case 'buyBack': {
+        const room = rooms.get(myRoomId);
+        if (!room) return;
+        const p = room.seats.find(s => s?.id === myId);
+        if (!p || !p.pendingBuyBack) return;
+
+        if (msg.accept) {
+          // Buy back in — add a fresh stack
+          p.chips = START_CHIPS;
+          p.pendingBuyBack = false;
+          p.sittingOut = false;
+          p.spectator = false;
+          writeLog(room, `BUY-BACK: ${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)}`);
+          broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)}!` });
+          send(p.ws, { type: 'buyBackAccepted', chips: START_CHIPS });
+        } else {
+          // Decline — become a spectator
+          p.pendingBuyBack = false;
+          p.sittingOut = true;
+          p.spectator = true;
+          writeLog(room, `SPECTATOR: ${p.name} declined buy-back — watching as spectator`);
+          broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} is now spectating.` });
+          send(p.ws, { type: 'spectating' });
+        }
+
+        // Check if we now have enough players to start (or can't continue)
+        const stillDeciding = room.seats.filter(s => s?.pendingBuyBack).length;
+        if (stillDeciding === 0) {
+          // All decisions in — check if enough active players
+          const playable = room.seats.filter(s => s && !s.sittingOut && !s.spectator && !s.autoFold && s.chips > 0);
+          if (playable.length < 2) {
+            writeLog(room, 'Not enough players to continue — returning to lobby');
+            broadcastAll(room, { type: 'waitingForPlayers' });
+            room.gameActive = false;
+            broadcastAll(room, lobbySnapshot(room));
+          } else {
+            startNewHand(room);
+          }
+        }
+        break;
+      }
+
       case 'voluntaryAutoFold': {
         const room = rooms.get(myRoomId);
         if (!room) return;
@@ -528,7 +572,7 @@ function buildDeck() {
 
 function activePlaying(room) {
   return room.seats
-    .map((s, i) => (s && !s.sittingOut && !s.autoFold) ? i : null)
+    .map((s, i) => (s && !s.sittingOut && !s.autoFold && !s.spectator && !s.pendingBuyBack && s.chips > 0) ? i : null)
     .filter(i => i !== null);
 }
 
@@ -969,14 +1013,30 @@ function finish(room, winners, label) {
   if (logPath) setTimeout(() => ftpUpload(logPath), 500);
 
   setTimeout(() => {
+    // Check for busted players — offer buy-back instead of ejecting
+    let anyBusted = false;
     room.seats.forEach((s, i) => {
-      if (s && s.chips <= 0) {
-        writeLog(room, `BUST: ${s.name} eliminated`);
-        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: i, reason: 'busted' });
-        room.seats[i] = null;
+      if (s && s.chips <= 0 && !s.pendingBuyBack) {
+        anyBusted = true;
+        s.pendingBuyBack = true;
+        s.sittingOut = true;
+        writeLog(room, `BUST: ${s.name} (Seat ${i+1}) is out of chips — offering buy-back`);
+        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} is out of chips!` });
+        send(s.ws, { type: 'buyBackOffer', chips: START_CHIPS });
       }
     });
-    startNewHand(room);
+
+    // Check if game can continue (need 2+ players with chips or pending buy-back decision)
+    const canPlay = room.seats.filter(s => s && (s.chips > 0 || s.pendingBuyBack) && !s.spectator).length;
+    if (canPlay < 2 && !anyBusted) {
+      startNewHand(room);
+    } else if (!anyBusted) {
+      startNewHand(room);
+    } else {
+      // Wait for buy-back decisions before starting next hand
+      // startNewHand will be called after all decisions come in
+      broadcastState(room);
+    }
   }, 5000);
 }
 
