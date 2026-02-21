@@ -31,6 +31,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .player-row .chips{color:#ffd700;font-weight:bold}
 .host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
 .pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
+/* ── Cookie / UAT notice overlay ── */
+#cookieOverlay{z-index:500}
+#cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px;overflow-y:auto;max-height:92vh}
+#cookieOverlay h2{text-align:center;margin-bottom:4px;font-size:1.35rem}
+.cookie-subtitle{color:#e09020;font-size:.82rem;letter-spacing:1px;text-transform:uppercase;text-align:center;margin-bottom:18px;display:block}
+.cookie-table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:.85rem}
+.cookie-table th{background:rgba(200,160,32,0.18);color:#ffd700;padding:7px 10px;text-align:left;border:1px solid #4a3a10;font-size:.8rem;letter-spacing:.5px}
+.cookie-table td{padding:7px 10px;border:1px solid #3a2a08;color:#d0b860;vertical-align:top;line-height:1.45}
+.cookie-table tr:nth-child(even) td{background:rgba(255,255,255,0.03)}
+.cookie-table td:first-child{color:#ffd700;font-weight:bold;white-space:nowrap;width:36%}
+.cookie-uat{margin-top:16px;padding:10px 14px;background:rgba(180,40,40,0.18);border:1px solid #8a2020;border-radius:8px;color:#e08080;font-size:.85rem;line-height:1.5;text-align:center}
+.cookie-uat strong{color:#ff9090}
+.cookie-btns{display:flex;gap:10px;margin-top:20px}
+.cookie-btns .btn-gold{flex:1;margin-top:0;font-size:1rem;padding:12px}
+.btn-deny{flex:1;padding:12px;border-radius:8px;border:1px solid #6a2020;background:linear-gradient(135deg,#4a1a1a,#2a0a0a);color:#c06060;font-size:1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
+.btn-deny:hover{opacity:.8}
 #gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
 #gameUI > *{pointer-events:auto}
 #topBar{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
@@ -121,7 +137,52 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="loginOverlay" class="overlay">
+<!-- ── Cookie & UAT Notice — must be accepted before login screen shows ── -->
+<div id="cookieOverlay" class="overlay">
+  <div class="panel">
+    <h2>🍪 Cookie Notice</h2>
+    <span class="cookie-subtitle">Please read before continuing</span>
+    <p style="color:#c8a060;font-size:.9rem;line-height:1.6;margin-bottom:4px">
+      Whilst no cookies are deliberately created to track you or your behaviour,
+      the following data is stored locally and on our server for the purposes of
+      playing this game online:
+    </p>
+    <table class="cookie-table">
+      <thead>
+        <tr><th>Feature</th><th>How it's handled</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>User Identity</td>
+          <td>Generated as a random string and saved in Local Storage.</td>
+        </tr>
+        <tr>
+          <td>Session Tracking</td>
+          <td>Handled by a persistent WebSocket connection (ws).</td>
+        </tr>
+        <tr>
+          <td>Game History</td>
+          <td>Written to text files on the server disk and uploaded via FTP.</td>
+        </tr>
+        <tr>
+          <td>Reconnection</td>
+          <td>The client reads the ID from Local Storage and sends it to the server to &ldquo;resume&rdquo; their seat.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="cookie-uat">
+      ⚠️ <strong>Development &amp; UAT Notice</strong><br>
+      This game is in development and UAT.<br>
+      You should <strong>never</strong> bet any real money using this game.
+    </div>
+    <div class="cookie-btns">
+      <button class="btn-gold" onclick="cookieAccept()">✅ Accept &amp; Continue</button>
+      <button class="btn-deny" onclick="cookieDeny()">✖ Deny</button>
+    </div>
+  </div>
+</div>
+
+<div id="loginOverlay" class="overlay" style="display:none">
   <div class="panel">
     <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px">
       <circle cx="36" cy="36" r="34" fill="#1a1a1a" stroke="#c8a020" stroke-width="4"/>
@@ -1168,6 +1229,16 @@ document.getElementById('tablePan').addEventListener('input', function(){
   attachSwipe('drumPence','pence');
   window.addEventListener('load',()=>rebuildAll());
 })();
+// ── Cookie notice gate ────────────────────────────────────────────────────────
+function cookieAccept() {
+  document.getElementById('cookieOverlay').style.display = 'none';
+  document.getElementById('loginOverlay').style.display  = 'flex';
+}
+function cookieDeny() {
+  // Redirect to Disney — no game access
+  window.location.replace('https://www.disney.com');
+}
+
 const scn=createScene();
 engine.runRenderLoop(()=>scn.render());
 </script>
