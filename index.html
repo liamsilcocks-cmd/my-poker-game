@@ -743,8 +743,11 @@ function startDealAnimation(activeSeats,afterDone){
 
 // ── WebSocket with auto-reconnect ────────────────────────────────────────────
 let _reconnectTimer=null, _reconnectAttempts=0, _intentionalClose=false;
-const MAX_RECONNECT_ATTEMPTS=10;
-const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,8000,8000,8000];
+let _serverShutdown=false; // set when server sends explicit shutdown notice
+const MAX_RECONNECT_ATTEMPTS=12;
+const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,10000,10000,10000,10000,10000];
+// After a known server shutdown we wait longer before first retry (Render cold-start ~10-20s)
+const SHUTDOWN_FIRST_DELAY=12000;
 
 function connectWS(name,roomId,playerId){
   _intentionalClose=false;
@@ -753,6 +756,7 @@ function connectWS(name,roomId,playerId){
   ws=new WebSocket(proto+'//'+location.host);
   ws.onopen=()=>{
     _reconnectAttempts=0;
+    _serverShutdown=false;
     const rb=document.getElementById('reconnectBanner');
     if(rb)rb.style.display='none';
     ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));
@@ -761,15 +765,18 @@ function connectWS(name,roomId,playerId){
   ws.onclose=()=>{
     if(_intentionalClose)return;
     if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){
-      showMsg('\u26a0 Lost connection \u2014 please reload',0);
+      showRestartPrompt();
       return;
     }
-    const delay=RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
+    // If server told us it was shutting down, wait longer for cold-start
+    const baseDelay=_serverShutdown&&_reconnectAttempts===0
+      ? SHUTDOWN_FIRST_DELAY
+      : RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
     _reconnectAttempts++;
-    showReconnectBanner(_reconnectAttempts,delay);
+    showReconnectBanner(_reconnectAttempts,baseDelay);
     _reconnectTimer=setTimeout(()=>{
       if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);
-    },delay);
+    },baseDelay);
   };
   ws.onerror=()=>{
     if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){
@@ -781,16 +788,36 @@ function connectWS(name,roomId,playerId){
   };
 }
 
+// Show the reconnect banner with attempt count and countdown
 function showReconnectBanner(attempt,delayMs){
   let rb=document.getElementById('reconnectBanner');
   if(!rb){
     rb=document.createElement('div');
     rb.id='reconnectBanner';
-    rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:12px;padding:18px 28px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;pointer-events:none;white-space:pre-line';
+    rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';
     document.body.appendChild(rb);
   }
   rb.style.display='block';
-  rb.textContent='\u26a0 Reconnecting\u2026 (attempt '+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+(delayMs/1000).toFixed(0)+'s';
+  const secs=Math.round(delayMs/1000);
+  const shutMsg=_serverShutdown?'\nServer restarting — please wait…':'';
+  rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+secs+'s'+shutMsg;
+  // Live countdown
+  if(rb._countdown)clearInterval(rb._countdown);
+  let remaining=secs;
+  rb._countdown=setInterval(()=>{
+    remaining--;
+    if(remaining<=0){clearInterval(rb._countdown);rb._countdown=null;return;}
+    const sm=_serverShutdown?'\nServer restarting — please wait…':'';
+    rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+remaining+'s'+sm;
+  },1000);
+}
+
+// Called when all reconnect attempts exhausted — show a hard reload prompt
+function showRestartPrompt(){
+  let rb=document.getElementById('reconnectBanner');
+  if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';document.body.appendChild(rb);}
+  rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.96);border:2px solid #c84040;border-radius:14px;padding:24px 32px;color:#ff9090;font-size:15px;font-weight:bold;text-align:center;z-index:999;min-width:280px';
+  rb.innerHTML='⚠ Lost connection to server.<br><br><span style="color:#c8a060;font-weight:normal;font-size:13px">The server may have restarted.<br>Your seat will be held if you reconnect.</span><br><br><button onclick="location.reload()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:14px;font-weight:bold;cursor:pointer">🔄 Reload &amp; Reconnect</button>';
 }
 
 function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
@@ -807,6 +834,13 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 function handleServerMsg(msg){switch(msg.type){
+case 'serverShutdown':{
+  // Server is shutting down cleanly (SIGTERM from Render).
+  // Set flag so reconnect logic waits longer and shows the right message.
+  _serverShutdown=true;
+  showReconnectBanner(0, SHUTDOWN_FIRST_DELAY);
+  addLog('⚠ Server restarting — will reconnect automatically…','log-fold');
+  break;}
 case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
