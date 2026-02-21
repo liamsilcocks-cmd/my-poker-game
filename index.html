@@ -78,8 +78,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
 #tablePan::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
 #tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
-#bottomBar{position:absolute;top:calc(56px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.80);padding:5px 16px;border-radius:8px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:110;white-space:nowrap;pointer-events:none}
-#myInfo{font-size:12px;font-weight:bold;color:#ffd700;line-height:1.6}
+#bottomBar{position:absolute;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
+#myInfo{font-size:14px;font-weight:bold;color:#ffd700;line-height:1.5;letter-spacing:0.5px}
 
 /* ── FIX #1: Fullscreen button — shown on ALL platforms including Android.
    Only hidden on iOS (which doesn't support the Fullscreen API at all).    ── */
@@ -120,6 +120,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #activityLog .log-action{color:#90c870}
 #activityLog .log-win{color:#40e870;font-weight:bold}
 #activityLog .log-community{color:#a0b8ff}
+#activityLog .log-fold{color:#e07050}
+#activityLog .log-system{color:#c8a060;font-style:italic}
 #waitingMsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:20px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none}
 #joinRequestNotif{position:absolute;top:58px;right:240px;background:rgba(10,40,10,0.95);padding:12px 14px;border-radius:10px;color:#e0e0e0;font-size:13px;display:none;border:1px solid #20a040;min-width:200px;z-index:10}
 #joinRequestNotif h4{color:#40e060;margin-bottom:6px;font-size:14px}
@@ -840,6 +842,10 @@ case 'serverShutdown':{
   _serverShutdown=true;
   showReconnectBanner(0, SHUTDOWN_FIRST_DELAY);
   addLog('⚠ Server restarting — will reconnect automatically…','log-fold');
+  break;}
+case 'logEvent':{
+  // System event from server — goes to activity log only, never the chat box
+  addLog(msg.text,'log-system');
   break;}
 case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
