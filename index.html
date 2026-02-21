@@ -154,7 +154,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <div id="buyBackOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h2>💸 Out of Chips!</h2>
-    <p id="buyBackMsg">You've run out of chips. Would you like to buy back in for <strong>£10.00</strong>?</p>
+    <p id="buyBackMsg">You've run out of chips. Buy back in for <strong>£10.00</strong>?</p>
+    <p style="color:#e09020;font-size:22px;font-weight:bold;margin:4px 0">⏱ <span id="buyBackTimer">15</span>s</p>
     <button class="btn-gold" onclick="respondBuyBack(true)">✅ BUY BACK IN — £10.00</button>
     <button class="btn-gold" style="background:linear-gradient(135deg,#6a1a1a,#3a0a0a);margin-top:8px" onclick="respondBuyBack(false)">👀 Watch as Spectator</button>
   </div>
@@ -787,9 +788,17 @@ case 'voluntaryAutoFoldAck':
   addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));
   break;
 case 'buyBackOffer':{
-  // Show buy-back overlay over the game
   document.getElementById('buyBackOverlay').style.display='flex';
   addLog('\uD83D\uDCB8 You are out of chips! Choose to buy back in or spectate.','log-hand');
+  // 15-second countdown — default to spectator on expiry
+  let _bbSecs=15;
+  const _bbEl=document.getElementById('buyBackTimer');
+  _bbEl.textContent=_bbSecs;
+  window._buyBackInterval=setInterval(()=>{
+    _bbSecs--;
+    _bbEl.textContent=_bbSecs;
+    if(_bbSecs<=0){clearInterval(window._buyBackInterval);respondBuyBack(false);}
+  },1000);
   break;}
 case 'buyBackAccepted':{
   document.getElementById('buyBackOverlay').style.display='none';
@@ -807,11 +816,10 @@ case 'error':addChat('\u26a0 '+msg.msg);break;}}
 function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(\''+p.id+'\',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(\''+p.id+'\',false)">\u2717 Reject</button></span>';pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
 function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
 function respondBuyBack(accept){
+  if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}
   wsSend({type:'buyBack',accept});
-  if(!accept){
-    document.getElementById('buyBackOverlay').style.display='none';
-    document.getElementById('spectatorBanner').style.display='block';
-  }
+  document.getElementById('buyBackOverlay').style.display='none';
+  if(!accept) document.getElementById('spectatorBanner').style.display='block';
 }
 let pendingInGame={};
 function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
