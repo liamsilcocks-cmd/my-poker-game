@@ -68,18 +68,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
 #tablePan::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
 #tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
-#bottomBar{position:absolute;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);padding:7px 18px;border-radius:8px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:110;white-space:nowrap;pointer-events:none}
-#myInfo{font-size:13px;font-weight:bold;color:#ffd700;line-height:1.8}
-/* ── Persistent bottom-left: auto-fold toggle + fullscreen ── */
+#bottomBar{position:absolute;top:calc(56px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.80);padding:5px 16px;border-radius:8px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:110;white-space:nowrap;pointer-events:none}
+#myInfo{font-size:12px;font-weight:bold;color:#ffd700;line-height:1.6}
+/* ── Persistent bottom-left: auto-fold toggle only ── */
 #persistBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));display:flex;flex-direction:row;gap:6px;z-index:112}
 .pbtn{padding:10px 12px;border-radius:8px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;-webkit-tap-highlight-color:transparent;white-space:nowrap}
 .pbtn-autofold{background:#3a1a5a;border-bottom:2px solid #1a0a3a}
 .pbtn-autofold.active{background:#8a10cc;border-color:#cc44ff;box-shadow:0 0 10px rgba(180,60,255,0.7)}
 .pbtn-fs{background:#1a3a5a;border-bottom:2px solid #0a1a3a}
-/* Fullscreen button — bottom left, always visible for Android */
-#fsCornerBtn{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:110;background:rgba(0,0,0,0.65);border:1px solid #6a5010;border-radius:8px;padding:8px 10px;font-size:16px;color:#c8a060;cursor:pointer;-webkit-tap-highlight-color:transparent}
-/* Auto-fold button — always visible bottom of action panel area */
-#autoFoldPersist{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:111;display:none}
+/* Hide fullscreen button on iOS (Safari doesn't support Fullscreen API) */
+@supports (-webkit-touch-callout: none){.pbtn-fs{display:none!important}}
 #controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:6px;align-items:stretch;z-index:110}
 .cbtn-pause{padding:9px 12px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#1a4a7a;white-space:nowrap}
 .cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
@@ -105,9 +103,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #activityLog .log-action{color:#90c870}
 #activityLog .log-win{color:#40e870;font-weight:bold}
 #activityLog .log-community{color:#a0b8ff}
-#brightness{position:absolute;top:58px;left:10px;background:rgba(0,0,0,0.65);padding:8px 12px;border-radius:8px;color:#c8a820}
-#brightness label{display:block;font-size:10px;margin-bottom:3px}
-#brightSlider{width:90px}
+
 #waitingMsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:20px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none}
 #joinRequestNotif{position:absolute;top:58px;right:240px;background:rgba(10,40,10,0.95);padding:12px 14px;border-radius:10px;color:#e0e0e0;font-size:13px;display:none;border:1px solid #20a040;min-width:200px;z-index:10}
 #joinRequestNotif h4{color:#40e060;margin-bottom:6px;font-size:14px}
@@ -118,6 +114,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .jr-admit{background:#1a6a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
 .jr-reject{background:#6a1a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
 #turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
+/* Countdown ring shown near player's cards when it's their turn */
+#myCountdown{position:absolute;bottom:calc(56px + env(safe-area-inset-bottom,0px));right:calc(14px + env(safe-area-inset-right,0px));display:none;z-index:111;pointer-events:none}
+#myCountdown svg{filter:drop-shadow(0 0 4px rgba(0,0,0,0.8))}
+#myCountdownNum{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:bold;color:#ffd700;text-shadow:0 1px 3px rgba(0,0,0,1)}
 #pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
 #pauseBanner::after{content:'PAUSED \2014 any player can resume';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,0,0.25);font-size:clamp(20px,3.5vw,52px);font-weight:bold;letter-spacing:3px;white-space:nowrap;pointer-events:none}
 </style>
@@ -174,8 +174,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <div id="topBar">
     <div id="phase">PRE-FLOP</div>
     <div id="pot">POT: &pound;0.00</div>
+    <div id="myNameBadge" style="font-size:12px;color:#80cfff;padding:3px 8px;background:rgba(0,80,160,0.25);border-radius:6px;white-space:nowrap"></div>
     <div id="roomBadge">ROOM &mdash;</div>
-    <button class="tbtn tbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
   </div>
   <!-- Left action panel: always visible on your turn, drums between call and raise -->
   <div id="actionPanel">
@@ -232,6 +232,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <div id="pauseBanner"></div>
   <div id="msg"></div>
   <div id="waitingMsg"></div>
+  <!-- Countdown ring for my turn -->
+  <div id="myCountdown">
+    <svg width="52" height="52" viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="22" fill="rgba(0,0,0,0.7)" stroke="#333" stroke-width="3"/>
+      <circle id="myCountdownRing" cx="26" cy="26" r="22" fill="none" stroke="#c8a020" stroke-width="4"
+        stroke-dasharray="138.2" stroke-dashoffset="0" stroke-linecap="round"
+        transform="rotate(-90 26 26)"/>
+    </svg>
+    <div id="myCountdownNum">30</div>
+  </div>
   <div id="joinRequestNotif">
     <h4>&#9203; Players want to join</h4>
     <div id="joinReqList"></div>
@@ -250,10 +260,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       <div id="activityHeader" onclick="toggleActivityLog()">&#128203; LOG <span id="activityToggle">&#9654; expand</span></div>
       <div id="activityLog"></div>
     </div>
-  </div>
-  <div id="brightness">
-    <label>&#9728; Brightness</label>
-    <input type="range" id="brightSlider" min="0.5" max="3.5" step="0.1" value="1.8">
   </div>
 </div>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -434,7 +440,15 @@ function mkFrontTex(suit,rank){
   }
   tex.update();return tex;
 }
-function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
+let cardFoldedMat=null;
+function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;
+  // Grey washed-out material for folded cards
+  cardFoldedMat=new BABYLON.StandardMaterial('folded',scene);
+  const fTex=new BABYLON.DynamicTexture('foldedTex',{width:64,height:64},scene,false);
+  const fc=fTex.getContext();fc.fillStyle='#555';fc.fillRect(0,0,64,64);fTex.update();
+  cardFoldedMat.diffuseTexture=fTex;cardFoldedMat.diffuseColor=new BABYLON.Color3(0.45,0.45,0.45);
+  cardFoldedMat.specularColor=new BABYLON.Color3(0,0,0);cardFoldedMat.alpha=0.55;cardFoldedMat.backFaceCulling=false;
+  for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
 function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.28,height:1.80},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
 function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.40;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.billboardMode=BABYLON.Mesh.BILLBOARDMODE_NONE;m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
 const CHIP_DENOM=[{val:500,col:[0.52,0.06,0.62]},{val:100,col:[0.14,0.20,0.88]},{val:25,col:[0.10,0.60,0.16]},{val:5,col:[0.85,0.10,0.10]},{val:1,col:[0.90,0.88,0.86]}];
@@ -579,7 +593,9 @@ ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
 inlay.material=ilm;
 const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
 let seatActions={};
-function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedSeats(st.players);for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false);else updateLabel(i,null,0,0,'',false,false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
+function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedSeats(st.players);for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false);else updateLabel(i,null,0,0,'',false,false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;
+        if(p.folded){if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;return;}
+        if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
 function getOrCreateCommunityMesh(idx){
   if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
   const m=nextCardMesh();
@@ -682,7 +698,7 @@ case 'rejected':document.getElementById('waitingOverlay').style.display='none';d
 case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
-case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;break;
+case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');break;
 case 'newHand':{
   seatActions={};showMsg('');setActions(false);hideTurnIndicator();
   document.getElementById('waitingMsg').style.display='none';
@@ -703,7 +719,7 @@ case 'newHand':{
     setTimeout(()=>{showBet(bbSeat,20);},280);
     if(lastState)applyState(lastState);
   });break;}
-case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;}if(!dealing)applyState(msg);break;
+case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');}if(!dealing)applyState(msg);break;
 case 'playerAction':{
   const pname=msg.name||'Player';
   let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
@@ -717,16 +733,16 @@ case 'yourTurn':{
   const ca=msg.callAmt||0;
   if(msg.seat===mySeat){
     document.getElementById('callBtn').textContent=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';
-    // BET if no current bet on the street, RAISE if someone has already bet
     document.getElementById('raiseBtn').textContent=msg.firstBet?'BET':'RAISE';
     drumSetMin(msg.minRaise||40);
     setActions(true);showMsg('\u2b50 Your turn!',0);
     document.getElementById('waitingMsg').style.display='none';
+    startCountdown(true,'You');
   }else{
     setActions(false);showMsg('');
     const actingPlayer=lastState&&lastState.players[msg.seat];
     const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);
-    showTurnIndicator('\u23f3 '+actingName+' is thinking\u2026');
+    startCountdown(false,actingName);
   }break;}
 case 'communityDealt':
   addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');
@@ -768,7 +784,42 @@ function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGame
 function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(\''+p.id+'\',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(\''+p.id+'\',false)">Reject</button></span>';list.appendChild(row);}}
 function inGameApprove(id,accept){wsSend({type:'approve',id,accept});delete pendingInGame[id];refreshInGameJoinNotif();}
 function showTurnIndicator(txt){document.getElementById('turnIndicator').textContent=txt;document.getElementById('turnIndicator').style.display='block';}
-function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';}
+function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
+
+// ── Turn countdown timer ──────────────────────────────────────────────────────
+const TURN_SECS=30;
+let _countdownInterval=null;
+function startCountdown(isMe,playerName){
+  clearInterval(_countdownInterval);
+  let secs=TURN_SECS;
+  const ring=document.getElementById('myCountdownRing');
+  const num=document.getElementById('myCountdownNum');
+  const myBox=document.getElementById('myCountdown');
+  const circumference=138.2;
+  function tick(){
+    const frac=secs/TURN_SECS;
+    const colour=secs>10?'#c8a020':secs>5?'#e07020':'#e03030';
+    if(isMe){
+      myBox.style.display='block';
+      ring.style.stroke=colour;
+      ring.style.strokeDashoffset=String(circumference*(1-frac));
+      num.textContent=secs;
+      num.style.color=colour;
+      showTurnIndicator('\u23f3 Your turn! ('+secs+'s)');
+    } else {
+      myBox.style.display='none';
+      showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');
+    }
+    if(secs<=0){clearInterval(_countdownInterval);return;}
+    secs--;
+  }
+  tick();
+  _countdownInterval=setInterval(tick,1000);
+}
+function stopCountdown(){
+  clearInterval(_countdownInterval);
+  document.getElementById('myCountdown').style.display='none';
+}
 function setActions(v){
   const panel=document.getElementById('actionPanel');
   if(panel)panel.style.display=v?'flex':'none';
@@ -865,12 +916,12 @@ function doCashOut(){
   _intentionalClose=true;
   wsSend({type:'cashOut'});
 }
-document.addEventListener('fullscreenchange',()=>{document.getElementById('fsBtn').textContent=document.fullscreenElement?'\u29c4':'\u26f6';});
+document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtnPersist');if(btn)btn.textContent=document.fullscreenElement?'\u29c4 EXIT FULL':'\u26f6 FULLSCREEN';});
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
 document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
-document.getElementById('brightSlider').oninput=(e)=>{if(spotLight)spotLight.intensity=parseFloat(e.target.value);};
+
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
 document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
