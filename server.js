@@ -34,6 +34,13 @@ function writeLog(room, line) {
   try { fs.appendFileSync(room.G.logPath, `[${ts}] ${line}\n`); } catch {}
 }
 
+// logEvent — sends a system notification to the activity/output log panel
+// on every client. Unlike `type:'chat'`, this does NOT appear in the player
+// chat box — it goes only to the log feed (addLog on the client side).
+function logEvent(room, text) {
+  broadcastAll(room, { type: 'logEvent', text });
+}
+
 // FTP upload after hand finishes
 async function ftpUpload(localPath) {
   const host = process.env.FTP_HOST;
@@ -299,7 +306,7 @@ wss.on('connection', ws => {
             send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
             send(ws, lobbySnapshot(room));
             if (room.G) send(ws, tableSnapshot(room, myId));
-            broadcastAll(room, { type: 'chat', name: 'System', text: `${existing.name} reconnected` });
+            logEvent(room, `🔄 ${existing.name} reconnected`);
           }
           return;
         }
@@ -348,7 +355,7 @@ wss.on('connection', ws => {
             send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
             send(p.ws, lobbySnapshot(room));
             if (room.G) send(p.ws, tableSnapshot(room, p.id));
-            broadcastAll(room, { type: 'chat', name: 'System', text: `${existSeat.name} re-admitted to the table` });
+            logEvent(room, `✅ ${existSeat.name} re-admitted to the table`);
           } else {
             const seat = room.seats.findIndex(s => s === null);
             if (seat === -1) {
@@ -409,27 +416,31 @@ wss.on('connection', ws => {
         if (!p || !p.pendingBuyBack) return;
 
         if (p._buyBackTimer) { clearTimeout(p._buyBackTimer); p._buyBackTimer = null; }
+        const resolve = p._onBuyBackResolved;
+        p._onBuyBackResolved = null;
 
         if (msg.accept) {
           p.chips = START_CHIPS;
           p.pendingBuyBack = false;
           p.spectator = false;
-          // FIX buy-back mid-hand: keep sittingOut=true so they don't
-          // receive action prompts for the current hand in progress.
-          // startNewHand() resets sittingOut to false for everyone at hand start.
+          p.buyInCount = (p.buyInCount || 1) + 1;
+          p.buyInTotal = (p.buyInTotal || START_CHIPS) + START_CHIPS;
+          // Keep sittingOut=true so they don't get action prompts mid-hand.
+          // startNewHand() clears sittingOut for all players at hand start.
           p.sittingOut = true;
-          writeLog(room, `BUY-BACK: ${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)} — will join next hand`);
-          broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)} — joining next hand!` });
+          writeLog(room, `BUY-BACK: ${p.name} has bought back in for \u00a3${(START_CHIPS/100).toFixed(2)} \u2014 will join next hand | ${buyInTag(p)}`);
+          logEvent(room, `\u2705 ${p.name} bought back in for \u00a3${(START_CHIPS/100).toFixed(2)} \u2014 joining next hand | ${buyInTag(p)}`);
           send(p.ws, { type: 'buyBackAccepted', chips: START_CHIPS });
         } else {
           p.pendingBuyBack = false;
           p.sittingOut = true;
           p.spectator = true;
-          writeLog(room, `SPECTATOR: ${p.name} declined buy-back — watching as spectator`);
-          broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} is now spectating.` });
+          writeLog(room, `SPECTATOR: ${p.name} declined buy-back \u2014 watching as spectator`);
+          logEvent(room, `\ud83d\udc40 ${p.name} declined buy-back \u2014 now spectating`);
           send(p.ws, { type: 'spectating' });
         }
         broadcastState(room);
+        if (resolve) resolve(); // may trigger startNewHand if all buy-backs resolved
         break;
       }
 
@@ -471,7 +482,7 @@ wss.on('connection', ws => {
         if (inActiveHand) {
           s.pendingCashOut = true;
           send(ws, { type: 'cashOutPending' });
-          broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} will cash out after this hand` });
+          logEvent(room, `💰 ${s.name} will cash out after this hand`);
           writeLog(room, `CASH OUT PENDING: ${s.name} (Seat ${s.seat+1}) requested cash-out mid-hand — will be processed at hand end | Stack: £${(s.chips/100).toFixed(2)}`);
           if (room.G.toAct[0] === s.seat) {
             clearActionTimer(room);
@@ -523,8 +534,8 @@ wss.on('connection', ws => {
 
     s.disconnected = true;
     s.ws = null;
-    broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} disconnected — reconnecting...` });
-    writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) left — ${RECONNECT_GRACE_MS/1000}s grace period started | Stack: £${(s.chips/100).toFixed(2)}`);
+    logEvent(room, `⚠ ${s.name} disconnected — reconnecting...`);
+    writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) left — ${RECONNECT_GRACE_MS/1000}s grace period started | Stack: £${(s.chips/100).toFixed(2)} | ${buyInTag(s)}`);
     broadcastState(room);
 
     // If they were mid-action, fold them immediately
@@ -544,7 +555,7 @@ wss.on('connection', ws => {
       s._timeoutCount++;
       s._disconnectTimer = null;
 
-      writeLog(room, `TIMEOUT #${s._timeoutCount}: ${s.name} (Seat ${s.seat+1}) failed to reconnect | Stack: £${(s.chips/100).toFixed(2)}`);
+      writeLog(room, `TIMEOUT #${s._timeoutCount}: ${s.name} (Seat ${s.seat+1}) failed to reconnect | Stack: £${(s.chips/100).toFixed(2)} | ${buyInTag(s)}`);
 
       if (s._timeoutCount >= 3) {
         // ── Triple timeout: evict the seat entirely ──────────────────────────
@@ -552,7 +563,7 @@ wss.on('connection', ws => {
         // occupied forever, we remove the player from the room so a fresh join
         // works correctly and the room can be cleaned up properly.
         console.log(`[ROOM ${room.id}] ${s.name} timed out 3 times — evicting seat ${s.seat+1}`);
-        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} has been removed after 3 timeouts` });
+        logEvent(room, `❌ ${s.name} removed after 3 timeouts`);
         broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'timeout-eviction' });
         writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) removed after 3 timeouts`);
 
@@ -571,7 +582,7 @@ wss.on('connection', ws => {
           const newHost = room.seats.find(h => h && h.id !== s.id && h.ws?.readyState === 1);
           if (newHost) {
             room.hostId = newHost.id;
-            send(newHost.ws, { type: 'chat', name: 'System', text: 'You are now the host.' });
+            send(newHost.ws, { type: 'logEvent', text: '👑 You are now the host.' });
           } else {
             room.hostId = null;
           }
@@ -585,7 +596,7 @@ wss.on('connection', ws => {
       } else {
         // ── First / second timeout: autoFold and ask host to re-admit ────────
         s.autoFold = true;
-        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out (${s._timeoutCount}/3) — auto-folding until re-admitted` });
+        logEvent(room, `⏱ ${s.name} timed out (${s._timeoutCount}/3) — auto-folding until re-admitted`);
         writeLog(room, `TIMEOUT ${s._timeoutCount}/3: ${s.name} — auto-fold enabled`);
 
         if (room.G && !s.folded) {
@@ -612,11 +623,11 @@ wss.on('connection', ws => {
 function executeCashOut(room, s) {
   const chips = s.chips;
   const seatIdx = s.seat;
-  const logMsg = `CASH OUT: ${s.name} (Seat ${seatIdx+1}) leaves with £${(chips/100).toFixed(2)}`;
+  const logMsg = `CASH OUT: ${s.name} (Seat ${seatIdx+1}) leaves with £${(chips/100).toFixed(2)} | ${buyInTag(s)}`;
   console.log(logMsg);
   if (room.G) writeLog(room, logMsg);
 
-  broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} has cashed out with £${(chips/100).toFixed(2)}` });
+  logEvent(room, `💰 ${s.name} cashed out with £${(chips/100).toFixed(2)} | ${buyInTag(s)}`);
   broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: seatIdx, reason: 'cashout' });
 
   room.seats[seatIdx] = null;
@@ -625,7 +636,7 @@ function executeCashOut(room, s) {
     const newHost = room.seats.find(Boolean);
     if (newHost) {
       room.hostId = newHost.id;
-      send(newHost.ws, { type: 'chat', name: 'System', text: 'You are now the host.' });
+      send(newHost.ws, { type: 'logEvent', text: '👑 You are now the host.' });
     }
   }
   broadcastAll(room, lobbySnapshot(room));
@@ -637,8 +648,15 @@ function mkPlayer(ws, id, name, seat) {
   return {
     ws, id, name, chips: START_CHIPS, seat, cards: [], bet: 0,
     folded: false, disconnected: false, autoFold: false,
-    pendingCashOut: false, _disconnectTimer: null
+    pendingCashOut: false, _disconnectTimer: null,
+    buyInCount: 1,               // counts from 1 — the initial £10 buy-in
+    buyInTotal: START_CHIPS      // running total spent buying in (pence)
   };
+}
+
+// Format a player's buy-in summary for log lines, e.g. "[Buy-ins: 2 | Total in: £20.00]"
+function buyInTag(s) {
+  return `[Buy-ins: ${s.buyInCount} | Total in: \u00a3${(s.buyInTotal/100).toFixed(2)}]`;
 }
 
 // ─── Game helpers ─────────────────────────────────────────────────────────────
@@ -792,7 +810,8 @@ function startNewHand(room) {
     if (i === room.dealerSeat) tags.push('DEALER');
     if (i === sbSeat) tags.push('SB');
     if (i === bbSeat) tags.push('BB');
-    return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | Stack: £${(s.chips/100).toFixed(2).padStart(7)} ${tags.length?'['+tags.join('+')+']':''}`;
+    const tagStr = tags.length ? ' ['+tags.join('+')+']' : '';
+    return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | Stack: £${(s.chips/100).toFixed(2).padStart(7)}${tagStr}\n             ${buyInTag(s)}`;
   }).join('\n');
 
   fs.writeFileSync(logPath,
@@ -1275,7 +1294,8 @@ function finish(room, winners, label) {
   room.seats.filter(Boolean).sort((a,b) => b.chips - a.chips).forEach(s => {
     const bar  = '█'.repeat(Math.round(s.chips / START_CHIPS * 20));
     const note = s.pendingCashOut ? ' [CASHING OUT]' : '';
-    writeLog(room, `│  ${('Seat '+(s.seat+1)+' '+s.name).padEnd(22)} £${(s.chips/100).toFixed(2).padStart(7)}  ${bar}${note}`.padEnd(63) + '│');
+    writeLog(room, `│  ${('Seat '+(s.seat+1)+' '+s.name).padEnd(22)} £${(s.chips/100).toFixed(2).padStart(7)}  ${bar}${note}`);
+    writeLog(room, `│      ${buyInTag(s)}`.padEnd(63) + '│');
   });
   writeLog(room, '└───────────────────────────────────────────────────────┘');
   writeLog(room, '');
@@ -1284,30 +1304,51 @@ function finish(room, winners, label) {
   if (logPath) setTimeout(() => ftpUpload(logPath), 500);
 
   setTimeout(() => {
-    // FIX #5: Offer buy-back to any busted player regardless of player count
-    room.seats.forEach((s, i) => {
-      if (s && s.chips <= 0 && !s.pendingBuyBack && !s.spectator) {
-        s.pendingBuyBack = true;
+    // Offer buy-back to every busted player regardless of player count.
+    // KEY FIX: we must NOT call startNewHand until every pending buy-back
+    // has resolved (accept OR timeout), otherwise in 2-player mode the
+    // hand starts with only 1 eligible player → waitingForPlayers fires
+    // and the host sees a dead "Start Game" button.
+    const busted = room.seats.filter(s =>
+      s && s.chips <= 0 && !s.pendingBuyBack && !s.spectator
+    );
+
+    if (busted.length === 0) {
+      startNewHand(room);
+      return;
+    }
+
+    let pendingCount = busted.length;
+
+    function onBuyBackResolved() {
+      pendingCount--;
+      if (pendingCount <= 0) startNewHand(room);
+    }
+
+    busted.forEach(s => {
+      s.pendingBuyBack = true;
+      s.sittingOut = true;
+      writeLog(room, `BUST: ${s.name} (Seat ${s.seat+1}) is out of chips — offering buy-back (15s) | ${buyInTag(s)}`);
+      logEvent(room, `\ud83d\udcb8 ${s.name} is out of chips \u2014 buy-back offer sent | ${buyInTag(s)}`);
+      send(s.ws, { type: 'buyBackOffer', chips: START_CHIPS });
+
+      if (s._buyBackTimer) clearTimeout(s._buyBackTimer);
+      s._buyBackTimer = setTimeout(() => {
+        if (!s.pendingBuyBack) return;
+        s.pendingBuyBack = false;
         s.sittingOut = true;
-        writeLog(room, `BUST: ${s.name} (Seat ${i+1}) is out of chips — offering buy-back (15s)`);
-        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} is out of chips!` });
-        send(s.ws, { type: 'buyBackOffer', chips: START_CHIPS });
+        s.spectator = true;
+        writeLog(room, `SPECTATOR (timeout): ${s.name} did not respond \u2014 now spectating | ${buyInTag(s)}`);
+        logEvent(room, `\ud83d\udc40 ${s.name} did not respond to buy-back \u2014 now spectating | ${buyInTag(s)}`);
+        send(s.ws, { type: 'spectating' });
+        broadcastState(room);
+        onBuyBackResolved();
+      }, 15000);
 
-        s._buyBackTimer = setTimeout(() => {
-          if (!s.pendingBuyBack) return;
-          s.pendingBuyBack = false;
-          s.sittingOut = true;
-          s.spectator = true;
-          writeLog(room, `SPECTATOR (timeout): ${s.name} did not respond — now spectating`);
-          broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} is now spectating.` });
-          send(s.ws, { type: 'spectating' });
-          broadcastState(room);
-        }, 15000);
-      }
+      // Store resolver so the buyBack message handler can fire it
+      s._onBuyBackResolved = onBuyBackResolved;
     });
-
-    startNewHand(room);
-  }, 5000);
+  }, 4000);
 }
 
 // ─── Hand evaluator ───────────────────────────────────────────────────────────
