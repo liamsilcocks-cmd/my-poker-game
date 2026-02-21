@@ -11,7 +11,6 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
-/* iOS safe areas — keeps UI clear of notch and home bar */
 #gameUI{--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px)}
 #c{width:100%;height:100%;display:block;touch-action:none}
 .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,5,2,0.88);z-index:200}
@@ -38,15 +37,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
-/* ── Action panel: flush to left edge ── */
 #actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px 10px 10px calc(6px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
 .abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
 .abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
 .abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
-.tbtn-autofold{background:#3a1a5a;padding:10px 8px;border-radius:8px;border:none;border-bottom:3px solid #1a0a3a;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
-.tbtn-autofold.active{background:#8a1010;box-shadow:0 0 8px rgba(200,30,30,0.7)}
-/* ── Drums: live inside the action panel ── */
 #drumWidget{width:100%;display:none;flex-direction:column;gap:5px;align-items:center}
 #raiseDisplay{font-size:13px;font-weight:bold;color:#ffd700;text-align:center;background:rgba(0,0,0,0.5);border-radius:5px;padding:4px 0;width:100%}
 .drum-row{display:flex;gap:6px;justify-content:center;width:100%}
@@ -62,7 +57,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .drum-item.sel{color:#ffd700;font-size:22px}
 .drum-arrow{background:rgba(255,255,255,0.08);border:none;color:#e0c060;font-size:24px;cursor:pointer;padding:7px 0;width:100%;text-align:center;line-height:1;-webkit-tap-highlight-color:transparent;border-radius:5px}
 .drum-arrow:active{background:rgba(200,160,32,0.3);color:#ffd700}
-/* ── Vertical table pan slider ── */
 #tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
 #tableSlider label{font-size:11px;color:#c8a060}
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
@@ -70,8 +64,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
 #bottomBar{position:absolute;top:calc(56px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.80);padding:5px 16px;border-radius:8px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:110;white-space:nowrap;pointer-events:none}
 #myInfo{font-size:12px;font-weight:bold;color:#ffd700;line-height:1.6}
-/* ── Persistent bottom-left: auto-fold toggle only ── */
-/* ── Bottom-right: single row — pause | cashout | autofold | fullscreen ── */
+
+/* ── FIX #1: Fullscreen button — shown on ALL platforms including Android.
+   Only hidden on iOS (which doesn't support the Fullscreen API at all).    ── */
 #controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:112}
 .cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;line-height:1;cursor:pointer;color:#fff;background:#1a4a7a}
 .cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
@@ -80,14 +75,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.65}}
 .cbtn-autofold{padding:9px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#3a1a5a;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .cbtn-autofold.active{background:#8a10cc;box-shadow:0 0 10px rgba(180,60,255,0.7)}
-.cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent}
-@supports (-webkit-touch-callout:none){.cbtn-fs{display:none!important}}
-/* ── Countdown ring: bottom-left, never overlaps right-side controls ── */
+/* FIX #1: Show fullscreen button everywhere except iOS Safari (no API support) */
+.cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent;display:block}
+/* Hide only on iOS Safari using the -webkit-touch-callout trick */
+@supports (-webkit-touch-callout:none) and (not (display:-webkit-box)){
+  /* This targets iOS Safari specifically */
+  .cbtn-fs{display:none!important}
+}
+
 #myCountdown{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));display:none;z-index:111;pointer-events:none}
 #myCountdown svg{filter:drop-shadow(0 0 4px rgba(0,0,0,0.8))}
 #myCountdownNum{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:bold;color:#ffd700;text-shadow:0 1px 3px rgba(0,0,0,1)}
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
-/* ── Chat & Activity: top-right, collapsed by default ── */
 #sideBoxes{position:absolute;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
 #chatBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #3a2a10;overflow:hidden}
 #chatBox.flash #chatHeader{animation:chatFlash 0.6s ease 3}
@@ -105,7 +104,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #activityLog .log-action{color:#90c870}
 #activityLog .log-win{color:#40e870;font-weight:bold}
 #activityLog .log-community{color:#a0b8ff}
-
 #waitingMsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:20px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none}
 #joinRequestNotif{position:absolute;top:58px;right:240px;background:rgba(10,40,10,0.95);padding:12px 14px;border-radius:10px;color:#e0e0e0;font-size:13px;display:none;border:1px solid #20a040;min-width:200px;z-index:10}
 #joinRequestNotif h4{color:#40e060;margin-bottom:6px;font-size:14px}
@@ -150,7 +148,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   </div>
 </div>
 
-<!-- Buy-back offer overlay -->
+<!-- Buy-back offer overlay — FIX #5: works for any player count -->
 <div id="buyBackOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h2>💸 Out of Chips!</h2>
@@ -160,8 +158,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <button class="btn-gold" style="background:linear-gradient(135deg,#6a1a1a,#3a0a0a);margin-top:8px" onclick="respondBuyBack(false)">👀 Watch as Spectator</button>
   </div>
 </div>
-
-<!-- Spectator banner inside game UI -->
 
 <div id="waitingOverlay" class="overlay" style="display:none">
   <div class="panel">
@@ -189,10 +185,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="myNameBadge" style="font-size:12px;color:#80cfff;padding:3px 8px;background:rgba(0,80,160,0.25);border-radius:6px;white-space:nowrap"></div>
     <div id="roomBadge">ROOM &mdash;</div>
   </div>
-  <!-- Left action panel: always visible on your turn, drums between call and raise -->
   <div id="actionPanel">
-    <button class="abtn abtn-call" id="callBtn" style="display:none">CALL</button>
-    <!-- Drums: always shown when it's your turn -->
+    <!-- FIX #4: callBtn text set dynamically — "CHECK" when no bet to call -->
+    <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
     <div id="drumWidget">
       <div id="raiseDisplay">£0.40</div>
       <div class="drum-row">
@@ -219,30 +214,28 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET / RAISE</button>
     <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
   </div>
-  <!-- drumOverlay stub -->
   <div id="drumOverlay" style="display:none"></div>
-  <!-- Bottom centre: chips/bet info -->
   <div id="bottomBar">
     <div id="myInfo">Stack £10.00</div>
   </div>
-  <!-- Vertical slider: pan table up/down -->
   <div id="tableSlider">
     <label>▲</label>
     <input type="range" id="tablePan" min="-3" max="3" step="0.1" value="0.5">
     <label>▼</label>
   </div>
-  <!-- Single bottom-right row: pause | cashout | autofold | fullscreen -->
+  <!-- FIX #1: Fullscreen button — no longer unconditionally hidden on touch devices.
+       CSS now only hides it on iOS Safari (which lacks the Fullscreen API).
+       Android Chrome supports fullscreen fine and will show the button.       -->
   <div id="controlBar">
     <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">⏸</button>
     <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
     <button class="cbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
-    <button class="cbtn-fs" onclick="toggleFullscreen()">⛶</button>
+    <button class="cbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
   </div>
   <div id="pauseBanner"></div>
   <div id="spectatorBanner">👀 You are spectating — no cards will be dealt to you</div>
   <div id="msg"></div>
   <div id="waitingMsg"></div>
-  <!-- Countdown ring for my turn -->
   <div id="myCountdown">
     <svg width="52" height="52" viewBox="0 0 52 52">
       <circle cx="26" cy="26" r="22" fill="rgba(0,0,0,0.7)" stroke="#333" stroke-width="3"/>
@@ -257,7 +250,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="joinReqList"></div>
   </div>
   <div id="turnIndicator"></div>
-  <!-- Chat and activity collapsed by default, top-right -->
   <div id="sideBoxes">
     <div id="chatBox">
       <div id="chatHeader" onclick="toggleChat()">&#128172; CHAT <span id="chatToggle">&#9654; expand</span></div>
@@ -314,11 +306,10 @@ function cardPos(si,cn){
   const off=(cn===0?-0.72:0.72);
   return new BABYLON.Vector3(
     Math.cos(a)*rx+Math.cos(pa)*off,
-    0.40+cn*0.018,  // Well above felt top (0.315), clear Y stagger between cards
+    0.40+cn*0.018,
     Math.sin(a)*rz+Math.sin(pa)*off
   );
 }
-// Other players' cards float above their name label (billboard position)
 function cardPosOther(si,cn){
   const n=numVisualSeats();
   const a=-Math.PI/2-(si/n)*Math.PI*2;
@@ -327,7 +318,7 @@ function cardPosOther(si,cn){
   const off=(cn===0?-0.42:0.42);
   return new BABYLON.Vector3(
     Math.cos(a)*rx+Math.cos(pa)*off,
-    1.72,   // Above the name label (label sits at Y=0.98)
+    1.72,
     Math.sin(a)*rz+Math.sin(pa)*off
   );
 }
@@ -369,9 +360,7 @@ function mkFrontTex(suit,rank){
   const col=isRed?'#cc0000':'#111111';
   const suitNames={'\u2660':'SPADES','\u2665':'HEARTS','\u2666':'DIAMONDS','\u2663':'CLUBS'};
   const suitName=suitNames[suit]||'';
-  // Pure white card face — no rim border
   c.fillStyle='#fafafa';c.fillRect(0,0,W,H);
-  // Very subtle drop-shadow edge (1px grey, no colour tint)
   c.strokeStyle='rgba(80,80,80,0.18)';c.lineWidth=3;c.strokeRect(2,2,W-4,H-4);
   const BX=30,BY=30,BW=W-60,BH=H-60;
   const rnkSz=rank==='10'?88:100;
@@ -418,7 +407,6 @@ function mkFrontTex(suit,rank){
     c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
     c.fillStyle=col;c.fillText(suit,W/2,pipTop+pipH*0.5);
   }else if(['J','Q','K'].includes(rank)){
-    // Draw face letter and suit directly on the white card — no inner box
     c.fillStyle=col;
     c.font='bold 260px Arial';
     c.textAlign='center';c.textBaseline='middle';
@@ -452,7 +440,6 @@ function mkFrontTex(suit,rank){
 }
 let cardFoldedMat=null;
 function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;
-  // Grey washed-out material for folded cards
   cardFoldedMat=new BABYLON.StandardMaterial('folded',scene);
   const fTex=new BABYLON.DynamicTexture('foldedTex',{width:64,height:64},scene,false);
   const fc=fTex.getContext();fc.fillStyle='#555';fc.fillRect(0,0,64,64);fTex.update();
@@ -513,25 +500,19 @@ function positionTokens(dSeat,sbSeat,bbSeat){
 const LW=320,LH=128;
 function buildPlayerLabels(){for(let i=0;i<NP;i++){const tex=new BABYLON.DynamicTexture('plbtex'+i,{width:LW,height:LH},scene,false);tex.hasAlpha=true;const mat=new BABYLON.StandardMaterial('plbm'+i,scene);mat.diffuseTexture=tex;mat.hasAlpha=true;mat.emissiveColor=new BABYLON.Color3(1,1,1);mat.disableLighting=true;mat.backFaceCulling=false;const plane=BABYLON.MeshBuilder.CreatePlane('plbp'+i,{width:2.2,height:0.88},scene);plane.material=mat;const sp=seatPos(i);plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);plane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;plane.isVisible=false;plane.renderingGroupId=2;playerLabels.push({plane,tex});}}
 function updateLabel(seat,name,chips,bet,action,isMe,isDead,isAutoFold,isSpectator,isPendingBuyBack){const vSeat=vs(seat),lb=playerLabels[vSeat];if(!lb)return;const sp=seatPos(vSeat);lb.plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);const ctx=lb.tex.getContext();ctx.clearRect(0,0,LW,LH);if(!name){lb.plane.isVisible=false;lb.tex.update();return;}
-  // Background
   const bgCol=isAutoFold?'rgba(60,10,80,0.92)':isDead?'rgba(80,20,20,0.82)':isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';
   ctx.fillStyle=bgCol;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.fill();
   const borderCol=isAutoFold?'#aa40ff':isMe?'#20c040':isDead?'#802020':'#c8a020';
   ctx.strokeStyle=borderCol;ctx.lineWidth=3;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.stroke();
-  // Name
   ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='top';
   const dispName=(name.length>14?name.slice(0,13)+'\u2026':name).toUpperCase();
   ctx.fillText(dispName,LW/2,6);
-  // Stack
   ctx.fillStyle='#ffd700';ctx.font='bold 18px Arial';
   ctx.fillText('Stack \u00a3'+(chips/100).toFixed(2),LW/2,34);
-  // Bet
   if(bet>0){ctx.fillStyle='#80cfff';ctx.font='15px Arial';ctx.fillText('Bet \u00a3'+(bet/100).toFixed(2),LW/2,58);}
-  // Status badges
   if(isPendingBuyBack){ctx.fillStyle='#ffaa20';ctx.font='bold 15px Arial';ctx.fillText('\uD83D\uDCB8 BUY-BACK?',LW/2,bet>0?82:58);}
   else if(isSpectator){ctx.fillStyle='#8899aa';ctx.font='bold 15px Arial';ctx.fillText('\uD83D\uDC40 SPECTATOR',LW/2,bet>0?82:58);}
   else if(isAutoFold){ctx.fillStyle='#cc44ff';ctx.font='bold 16px Arial';ctx.fillText('\u23f8 AUTO-FOLD ON',LW/2,bet>0?82:58);}
-  // Action
   else if(action){const ac=action.toUpperCase(),acCol=ac.startsWith('FOLD')?'#c04040':ac.startsWith('RAISE')||ac.startsWith('BET')?'#e09020':'#20c040';ctx.fillStyle=acCol;ctx.font='bold 16px Arial';ctx.fillText(ac,LW/2,bet>0?82:58);}
   lb.tex.update();lb.plane.isVisible=true;
 }
@@ -540,22 +521,14 @@ function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABY
 function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
 function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
 cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
-// ── Mobile-safe camera constraints ──────────────────────────────────────────
-// Alpha (horizontal rotation): lock to a narrow 60° arc along the table's long axis
-// Players can glance slightly left/right but can't spin all the way around
-cam.lowerAlphaLimit=-Math.PI/2-0.52;  // ~-120° (-90° centre -30°)
-cam.upperAlphaLimit=-Math.PI/2+0.52;  // ~-60°  (-90° centre +30°)
-// Beta (vertical tilt): allow a gentle tilt range — no flipping under the table
-cam.lowerBetaLimit=0.55;   // ~31° above table — can't go too overhead
-cam.upperBetaLimit=1.18;   // ~68° — can't go below the felt
-// Radius (zoom): keep sensible range
+cam.lowerAlphaLimit=-Math.PI/2-0.52;
+cam.upperAlphaLimit=-Math.PI/2+0.52;
+cam.lowerBetaLimit=0.55;
+cam.upperBetaLimit=1.18;
 cam.lowerRadiusLimit=5;
 cam.upperRadiusLimit=22;
-// Wheel/pinch zoom sensitivity
 cam.wheelPrecision=28;
 cam.pinchPrecision=180;
-// Panning disabled — prevents "lost in space" on mobile
-// Vertical view is controlled by the table pan slider instead
 cam.panningSensibility=0;
 cam.attachControl(canvas,true);
 const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
@@ -605,15 +578,75 @@ ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
 inlay.material=ilm;
 const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
 let seatActions={};
-function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedSeats(st.players);for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false,p.spectator||false,p.pendingBuyBack||false);else updateLabel(i,null,0,0,'',false,false,false,false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;
-        if(p.folded){if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;return;}
-        if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
+
+// FIX #2: applyState only shows cards the server has told us to show.
+// The server sends 'back' for hidden cards, real card data only for the owner.
+// We never flip up a card unless the server explicitly says it's revealed.
+function applyState(st){
+  if(!st)return;
+  lastState=st;
+  if(st.players)updateOccupiedSeats(st.players);
+  for(let i=0;i<NP;i++){
+    const p=st.players[i];
+    if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false,p.spectator||false,p.pendingBuyBack||false);
+    else updateLabel(i,null,0,0,'',false,false,false,false,false);
+  }
+  const comm=st.community||[];
+  for(let ci=0;ci<5;ci++){
+    const mesh=communityCardMeshes[ci];
+    if(ci<comm.length){
+      if(!mesh||!mesh.isVisible){
+        const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();
+        m.material=cardBackMat;m.isVisible=true;
+        animDeal(m,target,()=>{
+          snd_deal();
+          const cd=comm[ci];
+          if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
+        });
+      }
+    }else{
+      if(mesh)mesh.isVisible=false;
+    }
+  }
+  for(let i=0;i<NP;i++){
+    const p=st.players[i],meshes=seatCardMeshes[i];
+    if(!p||!p.cards||p.cards.length===0){
+      for(const m of meshes){if(m)m.isVisible=false;}
+      seatCardMeshes[i]=[null,null];
+      continue;
+    }
+    p.cards.forEach((cd,cn)=>{
+      const m=meshes[cn];
+      if(!m||!m.isVisible)return;
+      if(p.folded){
+        if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;
+        return;
+      }
+      // FIX #2: Only flip to face-up if server sent actual card data (not 'back')
+      if(cd&&cd!=='back'){
+        const fmat=cardFrontMats[cd.r+cd.s];
+        if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());
+      } else {
+        // Ensure other players' cards stay face-down
+        if(m.material!==cardBackMat)m.material=cardBackMat;
+      }
+    });
+  }
+  const p0=st.players[mySeat];
+  if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
+  document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);
+  document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');
+}
+
 function getOrCreateCommunityMesh(idx){
   if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
   const m=nextCardMesh();
   communityCardMeshes[idx]=m;
   return m;
 }
+
+// FIX #2: startDealAnimation only deals cards to players in activeSeats.
+// No card mesh is created for seats not in the active list.
 function startDealAnimation(activeSeats,afterDone){
   dealing=true;
   for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}
@@ -626,15 +659,27 @@ function startDealAnimation(activeSeats,afterDone){
   function next(){
     if(idx>=seq.length){dealing=false;if(afterDone)afterDone();return;}
     const si=seq[idx++],cn=dealt[si]||0;dealt[si]=cn+1;
+    // FIX #2: Guard — only deal to active seats
+    if(!activeSeats.includes(si)){next();return;}
     const isMe=(si===mySeat);
     const target=isMe ? cardPos(vs(si),cn) : cardPosOther(vs(si),cn);
     const m=nextCardMesh();
-    // Other players' cards stand upright above their label; my cards lie flat on the table
     if(!isMe){m.rotation=new BABYLON.Vector3(0,0,0);m.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;}
     seatCardMeshes[si][cn]=m;
-    animDeal(m,target,()=>{snd_deal();if(lastState&&lastState.players[si]){const cd=lastState.players[si].cards[cn];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());}setTimeout(next,80);});
+    animDeal(m,target,()=>{
+      snd_deal();
+      if(lastState&&lastState.players[si]){
+        const cd=lastState.players[si].cards[cn];
+        // FIX #2: Only reveal face if server sent actual card data
+        if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
+        // else: stays face-down (back material)
+      }
+      setTimeout(next,80);
+    });
   }
-  next();}
+  next();
+}
+
 // ── WebSocket with auto-reconnect ────────────────────────────────────────────
 let _reconnectTimer=null, _reconnectAttempts=0, _intentionalClose=false;
 const MAX_RECONNECT_ATTEMPTS=10;
@@ -647,7 +692,6 @@ function connectWS(name,roomId,playerId){
   ws=new WebSocket(proto+'//'+location.host);
   ws.onopen=()=>{
     _reconnectAttempts=0;
-    // Hide any reconnecting banner
     const rb=document.getElementById('reconnectBanner');
     if(rb)rb.style.display='none';
     ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));
@@ -656,7 +700,7 @@ function connectWS(name,roomId,playerId){
   ws.onclose=()=>{
     if(_intentionalClose)return;
     if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){
-      showMsg('\u26a0 Lost connection — please reload',0);
+      showMsg('\u26a0 Lost connection \u2014 please reload',0);
       return;
     }
     const delay=RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
@@ -667,9 +711,7 @@ function connectWS(name,roomId,playerId){
     },delay);
   };
   ws.onerror=()=>{
-    // onclose fires right after onerror, let that handle retry
     if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){
-      // Haven't joined yet — show login error
       document.getElementById('loginErr').textContent='Could not connect to server.';
       document.getElementById('loginOverlay').style.display='flex';
       document.getElementById('waitingOverlay').style.display='none';
@@ -692,7 +734,6 @@ function showReconnectBanner(attempt,delayMs){
 
 function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
 
-// ── Reconnect when page regains focus (back from call / app switch) ───────────
 document.addEventListener('visibilitychange',()=>{
   if(!document.hidden&&myName&&myRoomId&&myId){
     if(!ws||ws.readyState===WebSocket.CLOSED||ws.readyState===WebSocket.CLOSING){
@@ -703,6 +744,7 @@ document.addEventListener('visibilitychange',()=>{
     }
   }
 });
+
 function handleServerMsg(msg){switch(msg.type){
 case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
@@ -714,7 +756,6 @@ case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none'
 case 'newHand':{
   seatActions={};showMsg('');setActions(false);hideTurnIndicator();
   document.getElementById('waitingMsg').style.display='none';
-  // Reset cash-out button styling at start of each hand
   const coBtn=document.getElementById('cashOutBtn');
   coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
   handNumber++;maybeKeepAlive();
@@ -737,15 +778,19 @@ case 'playerAction':{
   let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
   if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';
   seatActions[msg.seat]=ac;
-  const logClass=msg.action==='fold'?'log-action':msg.action==='check'?'':'log-action';
+  const logClass=msg.action==='fold'?'log-action':'log-action';
   addLog('\u27a4 '+pname+': '+ac, logClass);
   if(msg.amount>0)showBet(msg.seat,msg.amount);
   hideTurnIndicator();if(lastState)applyState(lastState);break;}
+// FIX #4: yourTurn — set callBtn label correctly based on callAmt
+// callAmt === 0 means no bet to call → show CHECK, not CALL £0.00
 case 'yourTurn':{
   const ca=msg.callAmt||0;
   if(msg.seat===mySeat){
-    document.getElementById('callBtn').textContent=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';
-    document.getElementById('raiseBtn').textContent=msg.firstBet?'BET':'RAISE';
+    // FIX #4: Check vs Call distinction is correct
+    const callLabel = ca > 0 ? 'CALL \u00a3'+(ca/100).toFixed(2) : 'CHECK';
+    document.getElementById('callBtn').textContent = callLabel;
+    document.getElementById('raiseBtn').textContent = msg.firstBet ? 'BET' : 'RAISE';
     drumSetMin(msg.minRaise||40);
     setActions(true);showMsg('\u2b50 Your turn!',0);
     document.getElementById('waitingMsg').style.display='none';
@@ -769,35 +814,34 @@ case 'playerLeft':
   addChat('\u2b05 '+msg.name+' left');
   seatActions[msg.seat]='';
   if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}
-  // If this was us leaving (immediate cash-out), reload
   if(msg.id===myId){_intentionalClose=true;setTimeout(()=>location.reload(),600);return;}
   if(lastState)applyState(lastState);
   break;
 case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
 case 'gamePaused':handlePaused(true,msg.byName);break;
 case 'gameResumed':handlePaused(false,msg.byName);break;
-// ── Deferred cash-out acknowledged ──────────────────────────────────────────
 case 'cashOutPending':{
   const btn=document.getElementById('cashOutBtn');
   btn.classList.add('pending');
   btn.textContent='CASH OUT \u23f3';
-  addLog('\u{1F4B0} CASH OUT: '+((myName)||'You')+' will cash out after this hand','log-win');
+  addLog('\u{1F4B0} CASH OUT: '+(myName||'You')+' will cash out after this hand','log-win');
   showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);
   break;}
 case 'voluntaryAutoFoldAck':
   addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));
   break;
+// FIX #5: buyBackOffer — shown to any busted player regardless of player count
 case 'buyBackOffer':{
   document.getElementById('buyBackOverlay').style.display='flex';
   addLog('\uD83D\uDCB8 You are out of chips! Choose to buy back in or spectate.','log-hand');
-  // 15-second countdown — default to spectator on expiry
   let _bbSecs=15;
   const _bbEl=document.getElementById('buyBackTimer');
   _bbEl.textContent=_bbSecs;
+  if(window._buyBackInterval)clearInterval(window._buyBackInterval);
   window._buyBackInterval=setInterval(()=>{
     _bbSecs--;
     _bbEl.textContent=_bbSecs;
-    if(_bbSecs<=0){clearInterval(window._buyBackInterval);respondBuyBack(false);}
+    if(_bbSecs<=0){clearInterval(window._buyBackInterval);window._buyBackInterval=null;respondBuyBack(false);}
   },1000);
   break;}
 case 'buyBackAccepted':{
@@ -809,7 +853,7 @@ case 'buyBackAccepted':{
 case 'spectating':{
   document.getElementById('buyBackOverlay').style.display='none';
   document.getElementById('spectatorBanner').style.display='block';
-  addLog('\uD83D\uDC40 You are now spectating — you will not be dealt cards','log-hand');
+  addLog('\uD83D\uDC40 You are now spectating \u2014 you will not be dealt cards','log-hand');
   break;}
 case 'chat':addChat(msg.name+': '+msg.text);break;
 case 'error':addChat('\u26a0 '+msg.msg);break;}}
@@ -828,7 +872,6 @@ function inGameApprove(id,accept){wsSend({type:'approve',id,accept});delete pend
 function showTurnIndicator(txt){document.getElementById('turnIndicator').textContent=txt;document.getElementById('turnIndicator').style.display='block';}
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
 
-// ── Turn countdown timer ──────────────────────────────────────────────────────
 const TURN_SECS=15;
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){
@@ -872,11 +915,6 @@ function setActions(v){
   const dw=document.getElementById('drumWidget');
   if(dw)dw.style.display=v?'flex':'none';
 }
-function confirmRaise(){
-  ensureAudio();
-  setActions(false);showMsg('');
-  wsSend({type:'action',action:'raise',amount:drumGetPence()});
-}
 function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);}
 function addChat(txt){
@@ -898,7 +936,7 @@ function maybeKeepAlive(){
   if(keepAliveHandCount%5===0){
     fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber)
       .then(r=>r.text()).then(txt=>{
-        addLog('\u{1F4E1} Keep-alive sent (hand #'+handNumber+') — server: '+txt,'log-action');
+        addLog('\u{1F4E1} Keep-alive sent (hand #'+handNumber+') \u2014 server: '+txt,'log-action');
       }).catch(()=>{
         addLog('\u26a0 Keep-alive failed at hand #'+handNumber,'log-action');
       });
@@ -952,40 +990,67 @@ function toggleChat(){
   inner.style.display=chatCollapsed?'none':'block';
   toggle.textContent=chatCollapsed?'\u25b6 expand':'\u25bc collapse';
 }
-function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{});}else{document.exitFullscreen();}}
+
+// FIX #1: toggleFullscreen works on Android (and desktop).
+// We also hide the button if the Fullscreen API is genuinely unavailable.
+function toggleFullscreen(){
+  if(!document.fullscreenElement && !document.webkitFullscreenElement){
+    const el=document.documentElement;
+    if(el.requestFullscreen){el.requestFullscreen().catch(()=>{});}
+    else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();}
+  } else {
+    if(document.exitFullscreen){document.exitFullscreen();}
+    else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}
+  }
+}
+
+// FIX #1: Hide fullscreen button if the API is entirely unavailable on this device
+window.addEventListener('load',()=>{
+  const fsBtn=document.getElementById('fsBtn');
+  if(fsBtn){
+    const fsAvailable = !!(
+      document.documentElement.requestFullscreen ||
+      document.documentElement.webkitRequestFullscreen
+    );
+    if(!fsAvailable) fsBtn.style.display='none';
+  }
+});
+
 function doCashOut(){
   if(!confirm('Cash out and leave the table with your remaining chips?'))return;
   _intentionalClose=true;
   wsSend({type:'cashOut'});
 }
-document.addEventListener('fullscreenchange',()=>{document.querySelectorAll('.cbtn-fs').forEach(b=>b.textContent=document.fullscreenElement?'\u29c4':'\u26f6');});
+
+document.addEventListener('fullscreenchange',()=>{
+  const btn=document.getElementById('fsBtn');
+  if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';
+});
+document.addEventListener('webkitfullscreenchange',()=>{
+  const btn=document.getElementById('fsBtn');
+  if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';
+});
+
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
 document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
-
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
 document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
-// ── Table pan slider ──────────────────────────────────────────────────────────
 document.getElementById('tablePan').addEventListener('input', function(){
   if(cam) cam.target.y = parseFloat(this.value);
 });
 
 // ── Raise drum wheels ─────────────────────────────────────────────────────────
 (function(){
-  // State
   let poundsIdx=0, penceIdx=0, minRaisePence=40;
-
-  // Pounds options: 0–99 (will be clamped to what's affordable + min raise)
   const POUNDS=Array.from({length:100},(_,i)=>i);
-  // Pence options: 0,20,40,60,80
   const PENCE=[0,20,40,60,80];
 
   function buildDrum(innerId, items, getIdx){
     const inner=document.getElementById(innerId);
     inner.innerHTML='';
-    // Pad with blank ghost items so selected item centres in the 72px track (3 visible rows of 24px)
     const pad=1;
     for(let p=0;p<pad;p++){const g=document.createElement('div');g.className='drum-item';g.textContent='\u00a0';inner.appendChild(g);}
     items.forEach((v,i)=>{
@@ -1003,7 +1068,6 @@ document.getElementById('tablePan').addEventListener('input', function(){
     const itemH=32,trackH=96;
     const offset=(trackH/2)-(centreRow*itemH)-(itemH/2);
     inner.style.transform=`translateY(${offset}px)`;
-    // Update selected class
     Array.from(inner.children).forEach((el,i)=>{
       el.classList.toggle('sel',i===centreRow);
     });
@@ -1018,7 +1082,6 @@ document.getElementById('tablePan').addEventListener('input', function(){
   function updateDisplay(){
     const total=POUNDS[poundsIdx]*100+PENCE[penceIdx];
     const clamped=Math.max(total,minRaisePence);
-    // Show the actual value that will be sent (clamped to min)
     const p=Math.floor(clamped/100), pn=clamped%100;
     document.getElementById('raiseDisplay').textContent=
       'RAISE \u00a3'+p+'.'+String(pn).padStart(2,'0');
@@ -1039,11 +1102,9 @@ document.getElementById('tablePan').addEventListener('input', function(){
 
   window.drumSetMin=function(minPence){
     minRaisePence=minPence||40;
-    // Set drums to the minimum raise amount
     poundsIdx=Math.min(Math.floor(minRaisePence/100),POUNDS.length-1);
     penceIdx=PENCE.indexOf(minRaisePence%100);
     if(penceIdx===-1){
-      // Round up to next 20p slot
       const nextP=PENCE.find(p=>p>=minRaisePence%100);
       penceIdx=nextP!==undefined?PENCE.indexOf(nextP):0;
       if(penceIdx===-1)penceIdx=0;
@@ -1056,7 +1117,6 @@ document.getElementById('tablePan').addEventListener('input', function(){
     return Math.max(raw,minRaisePence);
   };
 
-  // Touch/swipe on drum tracks
   function attachSwipe(trackId,drum){
     const el=document.getElementById(trackId);
     let startY=0,startIdx=0;
@@ -1078,8 +1138,6 @@ document.getElementById('tablePan').addEventListener('input', function(){
 
   attachSwipe('drumPounds','pounds');
   attachSwipe('drumPence','pence');
-
-  // Init on load
   window.addEventListener('load',()=>rebuildAll());
 })();
 const scn=createScene();
