@@ -68,8 +68,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
 #tablePan::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
 #tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
-#bottomBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.82);padding:6px 10px;border-radius:8px;color:#c8a820;text-align:left;width:100px;z-index:110}
-#myInfo{font-size:11px;font-weight:bold;color:#ffd700;line-height:1.5}
+#bottomBar{position:absolute;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.82);padding:7px 18px;border-radius:8px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:110;white-space:nowrap;pointer-events:none}
+#myInfo{font-size:13px;font-weight:bold;color:#ffd700;line-height:1.8}
+/* ── Persistent bottom-left: auto-fold toggle + fullscreen ── */
+#persistBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));display:flex;flex-direction:row;gap:6px;z-index:112}
+.pbtn{padding:10px 12px;border-radius:8px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+.pbtn-autofold{background:#3a1a5a;border-bottom:2px solid #1a0a3a}
+.pbtn-autofold.active{background:#8a10cc;border-color:#cc44ff;box-shadow:0 0 10px rgba(180,60,255,0.7)}
+.pbtn-fs{background:#1a3a5a;border-bottom:2px solid #0a1a3a}
+/* Fullscreen button — bottom left, always visible for Android */
+#fsCornerBtn{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:110;background:rgba(0,0,0,0.65);border:1px solid #6a5010;border-radius:8px;padding:8px 10px;font-size:16px;color:#c8a060;cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* Auto-fold button — always visible bottom of action panel area */
+#autoFoldPersist{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:111;display:none}
 #controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:6px;align-items:stretch;z-index:110}
 .cbtn-pause{padding:9px 12px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#1a4a7a;white-space:nowrap}
 .cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
@@ -196,13 +206,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     </div>
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET / RAISE</button>
     <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
-    <button class="tbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
   </div>
-  <!-- drumOverlay kept as empty stub so no JS breaks -->
+  <!-- drumOverlay stub -->
   <div id="drumOverlay" style="display:none"></div>
+  <!-- Persistent bottom-left: auto-fold toggle + fullscreen -->
+  <div id="persistBar">
+    <button class="pbtn pbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">⏸ AUTO-FOLD</button>
+    <button class="pbtn pbtn-fs" id="fsBtnPersist" onclick="toggleFullscreen()">⛶ FULLSCREEN</button>
+  </div>
   <!-- Bottom centre: chips/bet info -->
   <div id="bottomBar">
-    <div id="myInfo">CHIPS: &pound;10.00</div>
+    <div id="myInfo">Stack £10.00</div>
   </div>
   <!-- Bottom-right: Pause + Cash Out — always visible, separate from action bar -->
   <!-- Vertical slider: pan table up/down -->
@@ -422,7 +436,7 @@ function mkFrontTex(suit,rank){
 }
 function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
 function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.28,height:1.80},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
-function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.40;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
+function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.40;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.billboardMode=BABYLON.Mesh.BILLBOARDMODE_NONE;m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
 const CHIP_DENOM=[{val:500,col:[0.52,0.06,0.62]},{val:100,col:[0.14,0.20,0.88]},{val:25,col:[0.10,0.60,0.16]},{val:5,col:[0.85,0.10,0.10]},{val:1,col:[0.90,0.88,0.86]}];
 function buildChipPool(){for(const d of CHIP_DENOM){for(let i=0;i<60;i++){const chip=BABYLON.MeshBuilder.CreateCylinder('chip_'+d.val+'_'+i,{height:0.072,diameter:0.34,tessellation:32},scene),m=new BABYLON.StandardMaterial('cmat_'+d.val+'_'+i,scene);m.diffuseColor=new BABYLON.Color3(...d.col);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(...d.col.map(v=>v*0.22));chip.material=m;chip.isVisible=false;chip.renderingGroupId=1;chip._dval=d.val;chipPool.push(chip);}}}
 function acquireChip(forVal){const d=CHIP_DENOM.find(d=>d.val<=forVal)||CHIP_DENOM[CHIP_DENOM.length-1];const ch=chipPool.find(c=>!c.isVisible&&c._dval===d.val)||chipPool.find(c=>!c.isVisible)||null;if(ch)ch.isVisible=true;return ch;}
@@ -474,7 +488,27 @@ function positionTokens(dSeat,sbSeat,bbSeat){
   place(bbToken,bbSeat,0.06);}
 const LW=320,LH=128;
 function buildPlayerLabels(){for(let i=0;i<NP;i++){const tex=new BABYLON.DynamicTexture('plbtex'+i,{width:LW,height:LH},scene,false);tex.hasAlpha=true;const mat=new BABYLON.StandardMaterial('plbm'+i,scene);mat.diffuseTexture=tex;mat.hasAlpha=true;mat.emissiveColor=new BABYLON.Color3(1,1,1);mat.disableLighting=true;mat.backFaceCulling=false;const plane=BABYLON.MeshBuilder.CreatePlane('plbp'+i,{width:2.2,height:0.88},scene);plane.material=mat;const sp=seatPos(i);plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);plane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;plane.isVisible=false;plane.renderingGroupId=2;playerLabels.push({plane,tex});}}
-function updateLabel(seat,name,chips,bet,action,isMe,isDead){const vSeat=vs(seat),lb=playerLabels[vSeat];if(!lb)return;const sp=seatPos(vSeat);lb.plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);const ctx=lb.tex.getContext();ctx.clearRect(0,0,LW,LH);if(!name){lb.plane.isVisible=false;lb.tex.update();return;}const bgCol=isDead?'rgba(80,20,20,0.82)':isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';ctx.fillStyle=bgCol;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.fill();const borderCol=isMe?'#20c040':isDead?'#802020':'#c8a020';ctx.strokeStyle=borderCol;ctx.lineWidth=2;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.stroke();ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='top';const dispName=(name.length>14?name.slice(0,13)+'\u2026':name).toUpperCase();ctx.fillText(dispName,LW/2,8);ctx.fillStyle='#ffd700';ctx.font='19px Arial';ctx.fillText('\u00a3'+(chips/100).toFixed(2),LW/2,38);if(bet>0){ctx.fillStyle='#80cfff';ctx.font='15px Arial';ctx.fillText('STAKE: \u00a3'+(bet/100).toFixed(2),LW/2,64);}if(action){const ac=action.toUpperCase(),acCol=ac.startsWith('FOLD')?'#c04040':ac.startsWith('RAISE')?'#e09020':'#20c040';ctx.fillStyle=acCol;ctx.font='bold 16px Arial';ctx.fillText(ac,LW/2,bet>0?90:68);}lb.tex.update();lb.plane.isVisible=true;}
+function updateLabel(seat,name,chips,bet,action,isMe,isDead,isAutoFold){const vSeat=vs(seat),lb=playerLabels[vSeat];if(!lb)return;const sp=seatPos(vSeat);lb.plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);const ctx=lb.tex.getContext();ctx.clearRect(0,0,LW,LH);if(!name){lb.plane.isVisible=false;lb.tex.update();return;}
+  // Background
+  const bgCol=isAutoFold?'rgba(60,10,80,0.92)':isDead?'rgba(80,20,20,0.82)':isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';
+  ctx.fillStyle=bgCol;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.fill();
+  const borderCol=isAutoFold?'#aa40ff':isMe?'#20c040':isDead?'#802020':'#c8a020';
+  ctx.strokeStyle=borderCol;ctx.lineWidth=3;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.stroke();
+  // Name
+  ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='top';
+  const dispName=(name.length>14?name.slice(0,13)+'\u2026':name).toUpperCase();
+  ctx.fillText(dispName,LW/2,6);
+  // Stack
+  ctx.fillStyle='#ffd700';ctx.font='bold 18px Arial';
+  ctx.fillText('Stack \u00a3'+(chips/100).toFixed(2),LW/2,34);
+  // Bet
+  if(bet>0){ctx.fillStyle='#80cfff';ctx.font='15px Arial';ctx.fillText('Bet \u00a3'+(bet/100).toFixed(2),LW/2,58);}
+  // AUTOFOLD badge
+  if(isAutoFold){ctx.fillStyle='#cc44ff';ctx.font='bold 16px Arial';ctx.fillText('\u23f8 AUTO-FOLD ON',LW/2,bet>0?82:58);}
+  // Action
+  else if(action){const ac=action.toUpperCase(),acCol=ac.startsWith('FOLD')?'#c04040':ac.startsWith('RAISE')||ac.startsWith('BET')?'#e09020':'#20c040';ctx.fillStyle=acCol;ctx.font='bold 16px Arial';ctx.fillText(ac,LW/2,bet>0?82:58);}
+  lb.tex.update();lb.plane.isVisible=true;
+}
 function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);a.setKeys(keys);const ef=ease==='in'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();ef.setEasingMode(ease==='in'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);a.setEasingFunction(ef);return a;}
 function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
 function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
@@ -545,7 +579,7 @@ ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
 inlay.material=ilm;
 const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
 let seatActions={};
-function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedSeats(st.players);for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded);else updateLabel(i,null,0,0,'',false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').innerHTML='\u00a3'+(p0.chips/100).toFixed(2)+'<br><span style="color:#80cfff;font-weight:normal">BET \u00a3'+(p0.bet/100).toFixed(2)+'</span>';document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
+function applyState(st){if(!st)return;lastState=st;if(st.players)updateOccupiedSeats(st.players);for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false);else updateLabel(i,null,0,0,'',false,false,false);}const comm=st.community||[];for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}});}const p0=st.players[mySeat];if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');}
 function getOrCreateCommunityMesh(idx){
   if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
   const m=nextCardMesh();
@@ -672,8 +706,11 @@ case 'newHand':{
 case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;}if(!dealing)applyState(msg);break;
 case 'playerAction':{
   const pname=msg.name||'Player';
-  const ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
-  seatActions[msg.seat]=ac;addLog(pname+': '+ac);
+  let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
+  if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';
+  seatActions[msg.seat]=ac;
+  const logClass=msg.action==='fold'?'log-action':msg.action==='check'?'':'log-action';
+  addLog('\u27a4 '+pname+': '+ac, logClass);
   if(msg.amount>0)showBet(msg.seat,msg.amount);
   hideTurnIndicator();if(lastState)applyState(lastState);break;}
 case 'yourTurn':{
@@ -716,9 +753,12 @@ case 'cashOutPending':{
   const btn=document.getElementById('cashOutBtn');
   btn.classList.add('pending');
   btn.textContent='CASH OUT \u23f3';
+  addLog('\u{1F4B0} CASH OUT: '+((myName)||'You')+' will cash out after this hand','log-win');
   showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);
   break;}
-case 'voluntaryAutoFoldAck':break;
+case 'voluntaryAutoFoldAck':
+  addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));
+  break;
 case 'chat':addChat(msg.name+': '+msg.text);break;
 case 'error':addChat('\u26a0 '+msg.msg);break;}}
 function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(\''+p.id+'\',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(\''+p.id+'\',false)">\u2717 Reject</button></span>';pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
@@ -795,8 +835,8 @@ function toggleAutoFold(){
   myAutoFold=!myAutoFold;
   wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});
   const btn=document.getElementById('autoFoldBtn');
-  if(myAutoFold){btn.classList.add('active');btn.textContent='\u274c AUTO-FOLD ON';showMsg('\u274c Auto-fold ON \u2014 you will fold every hand until you turn it off',3200);}
-  else{btn.classList.remove('active');btn.textContent='\u25b6 AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
+  if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}
+  else{btn.classList.remove('active');btn.textContent='\u23f8 AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
 }
 function showBet(serverSeat,amount){
   if(amount<=0)return;
