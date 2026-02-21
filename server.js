@@ -1,9 +1,10 @@
 'use strict';
-const http = require('http');
+const http   = require('http');
 const { WebSocketServer } = require('ws');
-const fs   = require('fs');
-const path = require('path');
-const ftp  = require('basic-ftp');
+const fs     = require('fs');
+const path   = require('path');
+const ftp    = require('basic-ftp');
+const crypto = require('crypto'); // built-in — no install needed
 
 const PORT  = process.env.PORT || 10000;
 const SUITS = ['\u2660','\u2665','\u2666','\u2663'];
@@ -365,10 +366,13 @@ wss.on('connection', ws => {
         if (msg.accept) {
           p.chips = START_CHIPS;
           p.pendingBuyBack = false;
-          p.sittingOut = false;
           p.spectator = false;
-          writeLog(room, `BUY-BACK: ${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)}`);
-          broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)}!` });
+          // FIX buy-back mid-hand: keep sittingOut=true so they don't
+          // receive action prompts for the current hand in progress.
+          // startNewHand() resets sittingOut to false for everyone at hand start.
+          p.sittingOut = true;
+          writeLog(room, `BUY-BACK: ${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)} — will join next hand`);
+          broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)} — joining next hand!` });
           send(p.ws, { type: 'buyBackAccepted', chips: START_CHIPS });
         } else {
           p.pendingBuyBack = false;
@@ -540,9 +544,13 @@ function mkPlayer(ws, id, name, seat) {
 }
 
 // ─── Game helpers ─────────────────────────────────────────────────────────────
+// Cryptographically secure Fisher-Yates shuffle using Node's crypto.randomInt.
+// crypto.randomInt(min, max) draws from the OS CSPRNG — unpredictable even if
+// the process state is somehow observed, unlike Math.random().
 function shuffle(d) {
   for (let i = d.length - 1; i > 0; i--) {
-    const j = 0 | Math.random() * (i + 1); [d[i], d[j]] = [d[j], d[i]];
+    const j = crypto.randomInt(0, i + 1);
+    [d[i], d[j]] = [d[j], d[i]];
   }
   return d;
 }
@@ -598,9 +606,13 @@ function canActCount(room) {
   ).length;
 }
 
-// Helper: check if round should end due to one or zero players remaining unfolded
+// Helper: check if round should end due to one or zero real players remaining unfolded.
+// autoFold/voluntaryAutoFold players don't count — they'll be folded automatically.
 function checkRoundEnd(room) {
-  const alive = room.seats.filter(s => s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack);
+  const alive = room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+    !s.autoFold && !s.voluntaryAutoFold
+  );
   if (alive.length <= 1) {
     endRound(room);
     return true;
@@ -767,16 +779,44 @@ function promptToAct(room) {
     }
   }
 
-  // FIX #3: Count unfolded players still in the hand (regardless of chips)
-  const unfolded = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
+  // Count players genuinely still in the hand (not folded, not sitting out,
+  // not spectating, not pending buy-back, and NOT on autoFold/voluntaryAutoFold).
+  // autoFold players are effectively gone from this hand — they will fold immediately.
+  const activeInHand = room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+    !s.autoFold && !s.voluntaryAutoFold
   );
 
-  // If 1 or fewer unfolded players, end the round immediately — no action needed
-  if (unfolded.length <= 1) {
+  // If 1 or fewer real players remain, end the round — no point asking anyone
+  if (activeInHand.length <= 1) {
+    // First auto-fold anyone left in toAct who is on autoFold so the fold logs correctly
+    const toAutoFold = room.seats.filter(s =>
+      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+      (s.autoFold || s.voluntaryAutoFold)
+    );
+    if (toAutoFold.length > 0) {
+      // Fold them silently then end
+      for (const af of toAutoFold) {
+        if (!af.folded) {
+          af.folded = true;
+          const label = af.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
+          broadcastAll(room, { type: 'playerAction', seat: af.seat, action: 'fold', amount: 0, name: af.name + ` (${label})` });
+          writeLog(room, `FOLD   | ${af.name.padEnd(18)} | auto-fold — no other active players`);
+          const idx = G.toAct.indexOf(af.seat);
+          if (idx !== -1) G.toAct.splice(idx, 1);
+        }
+      }
+      broadcastState(room);
+    }
     endRound(room);
     return;
   }
+
+  // Count unfolded players still in the hand (regardless of chips) — for all-in detection
+  const unfolded = room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+    !s.autoFold && !s.voluntaryAutoFold
+  );
 
   // FIX #3: Count players who CAN still act (have chips and aren't all-in)
   const canAct = unfolded.filter(s => s.chips > 0);
@@ -787,20 +827,16 @@ function promptToAct(room) {
     return;
   }
 
-  // FIX #3: If only 1 player can still act and the betting is closed (all others
-  // are all-in or have matched the bet), skip asking them — just run the board.
-  // BUT: if that 1 player hasn't yet had a chance to act (or needs to call), they must.
+  // FIX #3: If only 1 player can still act and all others are all-in,
+  // skip asking them if their bet is already matched — just run the board.
   if (canAct.length === 1 && G.toAct.length > 0) {
     const soloSeat = G.toAct[0];
     const solo = room.seats[soloSeat];
     if (solo) {
       const callAmt = Math.min(G.currentBet - solo.bet, solo.chips);
       if (callAmt === 0) {
-        // Only player left who can act; nothing to call; no one to raise against
-        // Check if all others are all-in (no one can call a raise)
         const othersAllIn = unfolded.filter(s => s.seat !== soloSeat && s.chips === 0);
         if (othersAllIn.length === unfolded.length - 1) {
-          // Everyone else is all-in, solo player's bet is already matched — run board
           advPhase(room);
           return;
         }
@@ -813,7 +849,7 @@ function promptToAct(room) {
 
   if (!p) { G.toAct.shift(); setTimeout(() => promptToAct(room), 100); return; }
 
-  // Auto-fold disconnected / auto-fold flagged players
+  // Auto-fold disconnected / auto-fold flagged players immediately
   if (p.disconnected || p.autoFold || p.voluntaryAutoFold) {
     clearActionTimer(room);
     const reason = p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
@@ -969,9 +1005,10 @@ function advPhase(room) {
     const active = activePlaying(room);
 
     // FIX #3: After dealing community cards, check if anyone can actually act.
-    // If ≤1 unfolded player, end round. If all remaining are all-in, run board.
+    // Exclude autoFold/voluntaryAutoFold players — they are effectively out.
     const unfolded = room.seats.filter(s =>
-      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
+      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+      !s.autoFold && !s.voluntaryAutoFold
     );
 
     if (unfolded.length <= 1) {
@@ -1017,18 +1054,18 @@ function advPhase(room) {
 
 function endRound(room) {
   clearActionTimer(room);
+  // Remaining = unfolded players who are genuinely still playing (not autoFold)
   const remaining = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+    !s.autoFold && !s.voluntaryAutoFold
   );
   if (remaining.length === 1) {
     writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
     finish(room, [remaining[0]], 'Last player standing');
   } else if (remaining.length === 0) {
     writeLog(room, `RESULT: No eligible winner found — hand skipped`);
-    // Safety: restart hand anyway
     setTimeout(() => startNewHand(room), 3000);
   }
-  // If remaining.length > 1 we don't call endRound in error — do nothing
 }
 
 function showdown(room) {
