@@ -57,9 +57,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
 .abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
 .abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
+.abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
-#drumWidget{width:100%;display:none;flex-direction:column;gap:5px;align-items:center}
-#raiseDisplay{font-size:13px;font-weight:bold;color:#ffd700;text-align:center;background:rgba(0,0,0,0.5);border-radius:5px;padding:4px 0;width:100%}
+#drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
 .drum-row{display:flex;gap:6px;justify-content:center;width:100%}
 .drum{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
 .drum-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
@@ -249,14 +249,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="roomBadge">ROOM &mdash;</div>
   </div>
   <div id="actionPanel">
-    <!-- FIX #4: callBtn text set dynamically — "CHECK" when no bet to call -->
-    <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
+    <!-- Drum wheels sit at the top, directly above the CHECK button -->
     <div id="drumWidget">
-      <div id="raiseDisplay">£0.40</div>
       <div class="drum-row">
         <div class="drum">
           <div class="drum-label">£</div>
-          <button class="drum-arrow" onclick="drumStep('pounds',-1)">▲</button>
           <div class="drum-track" id="drumPounds">
             <div class="drum-highlight"></div>
             <div class="drum-inner" id="drumPoundsInner"></div>
@@ -265,7 +262,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
         </div>
         <div class="drum">
           <div class="drum-label">20p</div>
-          <button class="drum-arrow" onclick="drumStep('pence',-1)">▲</button>
           <div class="drum-track" id="drumPence">
             <div class="drum-highlight"></div>
             <div class="drum-inner" id="drumPenceInner"></div>
@@ -274,7 +270,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
         </div>
       </div>
     </div>
-    <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET / RAISE</button>
+    <!-- FIX #4: callBtn text set dynamically — "CHECK" when no bet to call -->
+    <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
+    <!-- Raise/Bet label is set dynamically inside the button via updateDisplay() -->
+    <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET £0.40</button>
+    <!-- ALL IN button — always bets the player's entire stack -->
+    <button class="abtn abtn-allin" id="allInBtn" style="display:none">ALL IN</button>
     <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
   </div>
   <div id="drumOverlay" style="display:none"></div>
@@ -913,11 +914,12 @@ case 'playerAction':{
 case 'yourTurn':{
   const ca=msg.callAmt||0;
   if(msg.seat===mySeat){
-    // FIX #4: Check vs Call distinction is correct
     const callLabel = ca > 0 ? 'CALL \u00a3'+(ca/100).toFixed(2) : 'CHECK';
     document.getElementById('callBtn').textContent = callLabel;
-    document.getElementById('raiseBtn').textContent = msg.firstBet ? 'BET' : 'RAISE';
-    drumSetMin(msg.minRaise||40);
+    // Store BET vs RAISE so updateDisplay() can label the button correctly
+    const raiseBtn=document.getElementById('raiseBtn');
+    if(raiseBtn) raiseBtn.dataset.verb = msg.firstBet ? 'BET' : 'RAISE';
+    drumSetMin(msg.minRaise||40); // this calls updateDisplay() which sets button text
     setActions(true);showMsg('\u2b50 Your turn!',0);
     document.getElementById('waitingMsg').style.display='none';
     startCountdown(true,'You');
@@ -1037,7 +1039,7 @@ function stopCountdown(){
 function setActions(v){
   const panel=document.getElementById('actionPanel');
   if(panel)panel.style.display=v?'flex':'none';
-  ['callBtn','raiseBtn','foldBtn'].forEach(id=>{
+  ['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=v?'block':'none';
   });
@@ -1162,6 +1164,14 @@ document.addEventListener('webkitfullscreenchange',()=>{
 
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
 document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
+document.getElementById('allInBtn').onclick=()=>{
+  ensureAudio();
+  // All-in = raise entire stack. Get stack from lastState.
+  const me = lastState && lastState.players && lastState.players[mySeat];
+  const allInAmount = me ? me.chips : drumGetPence();
+  setActions(false);showMsg('');
+  wsSend({type:'action',action:'raise',amount:allInAmount});
+};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
@@ -1212,8 +1222,13 @@ document.getElementById('tablePan').addEventListener('input', function(){
     const total=POUNDS[poundsIdx]*100+PENCE[penceIdx];
     const clamped=Math.max(total,minRaisePence);
     const p=Math.floor(clamped/100), pn=clamped%100;
-    document.getElementById('raiseDisplay').textContent=
-      'RAISE \u00a3'+p+'.'+String(pn).padStart(2,'0');
+    const amtStr='\u00a3'+p+'.'+String(pn).padStart(2,'0');
+    // Write directly into the raise/bet button so there's no separate display
+    const btn=document.getElementById('raiseBtn');
+    if(btn){
+      const verb=btn.dataset.verb||'RAISE';
+      btn.textContent=verb+' '+amtStr;
+    }
   }
 
   window.drumStep=function(drum,dir){
