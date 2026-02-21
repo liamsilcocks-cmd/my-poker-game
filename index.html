@@ -249,7 +249,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="roomBadge">ROOM &mdash;</div>
   </div>
   <div id="actionPanel">
-    <!-- Drum wheels sit at the top, directly above the CHECK button -->
+    <!-- FIX #4: callBtn text set dynamically — "CHECK" when no bet to call -->
+    <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
+    <!-- Drum wheels sit under the CHECK button, above the raise/bet button -->
     <div id="drumWidget">
       <div class="drum-row">
         <div class="drum">
@@ -270,8 +272,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
         </div>
       </div>
     </div>
-    <!-- FIX #4: callBtn text set dynamically — "CHECK" when no bet to call -->
-    <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
     <!-- Raise/Bet label is set dynamically inside the button via updateDisplay() -->
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET £0.40</button>
     <!-- ALL IN button — always bets the player's entire stack -->
