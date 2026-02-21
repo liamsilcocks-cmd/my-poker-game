@@ -38,8 +38,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
-/* ── Left action panel: wide enough for drums ── */
-#actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px 10px 10px calc(10px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
+/* ── Action panel: flush to left edge ── */
+#actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px 10px 10px calc(6px + env(safe-area-inset-left,0px));background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
 .abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
 .abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
 .abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
@@ -71,19 +71,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #bottomBar{position:absolute;top:calc(56px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.80);padding:5px 16px;border-radius:8px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:110;white-space:nowrap;pointer-events:none}
 #myInfo{font-size:12px;font-weight:bold;color:#ffd700;line-height:1.6}
 /* ── Persistent bottom-left: auto-fold toggle only ── */
-#persistBar{position:absolute;bottom:calc(52px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:6px;z-index:112}
-.pbtn{padding:10px 12px;border-radius:8px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;-webkit-tap-highlight-color:transparent;white-space:nowrap}
-.pbtn-autofold{background:#3a1a5a;border-bottom:2px solid #1a0a3a}
-.pbtn-autofold.active{background:#8a10cc;border-color:#cc44ff;box-shadow:0 0 10px rgba(180,60,255,0.7)}
-.pbtn-fs{background:#1a3a5a;border-bottom:2px solid #0a1a3a}
-/* Hide fullscreen button on iOS (Safari doesn't support Fullscreen API) */
-@supports (-webkit-touch-callout: none){.pbtn-fs{display:none!important}}
-#controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:6px;align-items:stretch;z-index:110}
-.cbtn-pause{padding:9px 12px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#1a4a7a;white-space:nowrap}
+/* ── Bottom-right: single row — pause | cashout | autofold | fullscreen ── */
+#controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:112}
+.cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;line-height:1;cursor:pointer;color:#fff;background:#1a4a7a}
 .cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
-.cbtn-cashout{padding:9px 12px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
+.cbtn-cashout{padding:9px 11px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
 .cbtn-cashout.pending{background:#6a1a00;border-color:#ff6040;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.65}}
+.cbtn-autofold{padding:9px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#3a1a5a;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.cbtn-autofold.active{background:#8a10cc;box-shadow:0 0 10px rgba(180,60,255,0.7)}
+.cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent}
+@supports (-webkit-touch-callout:none){.cbtn-fs{display:none!important}}
+/* ── Countdown ring: bottom-left, never overlaps right-side controls ── */
+#myCountdown{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));display:none;z-index:111;pointer-events:none}
+#myCountdown svg{filter:drop-shadow(0 0 4px rgba(0,0,0,0.8))}
+#myCountdownNum{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:bold;color:#ffd700;text-shadow:0 1px 3px rgba(0,0,0,1)}
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
 /* ── Chat & Activity: top-right, collapsed by default ── */
 #sideBoxes{position:absolute;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
@@ -114,10 +116,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .jr-admit{background:#1a6a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
 .jr-reject{background:#6a1a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
 #turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
-/* Countdown ring shown near player's cards when it's their turn */
-#myCountdown{position:absolute;bottom:calc(56px + env(safe-area-inset-bottom,0px));right:calc(14px + env(safe-area-inset-right,0px));display:none;z-index:111;pointer-events:none}
-#myCountdown svg{filter:drop-shadow(0 0 4px rgba(0,0,0,0.8))}
-#myCountdownNum{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:bold;color:#ffd700;text-shadow:0 1px 3px rgba(0,0,0,1)}
 #pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
 #pauseBanner::after{content:'PAUSED \2014 any player can resume';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,0,0.25);font-size:clamp(20px,3.5vw,52px);font-weight:bold;letter-spacing:3px;white-space:nowrap;pointer-events:none}
 </style>
@@ -209,25 +207,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   </div>
   <!-- drumOverlay stub -->
   <div id="drumOverlay" style="display:none"></div>
-  <!-- Persistent bottom-left: auto-fold toggle + fullscreen -->
-  <div id="persistBar">
-    <button class="pbtn pbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">⏸ AUTO-FOLD</button>
-    <button class="pbtn pbtn-fs" id="fsBtnPersist" onclick="toggleFullscreen()">⛶ FULLSCREEN</button>
-  </div>
   <!-- Bottom centre: chips/bet info -->
   <div id="bottomBar">
     <div id="myInfo">Stack £10.00</div>
   </div>
-  <!-- Bottom-right: Pause + Cash Out — always visible, separate from action bar -->
   <!-- Vertical slider: pan table up/down -->
   <div id="tableSlider">
     <label>▲</label>
     <input type="range" id="tablePan" min="-3" max="3" step="0.1" value="0.5">
     <label>▼</label>
   </div>
+  <!-- Single bottom-right row: pause | cashout | autofold | fullscreen -->
   <div id="controlBar">
-    <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">&#9646;&#9646; PAUSE</button>
+    <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">⏸</button>
     <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
+    <button class="cbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
+    <button class="cbtn-fs" onclick="toggleFullscreen()">⛶</button>
   </div>
   <div id="pauseBanner"></div>
   <div id="msg"></div>
@@ -787,7 +782,7 @@ function showTurnIndicator(txt){document.getElementById('turnIndicator').textCon
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
 
 // ── Turn countdown timer ──────────────────────────────────────────────────────
-const TURN_SECS=30;
+const TURN_SECS=15;
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){
   clearInterval(_countdownInterval);
@@ -871,12 +866,12 @@ function handlePaused(isPaused,byName){
   const banner=document.getElementById('pauseBanner');
   if(isPaused){
     btn.classList.add('active');
-    btn.textContent='\u25b6 RESUME';
+    btn.textContent='\u25b6';
     banner.style.display='block';
     addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 any player can resume','log-hand');
   } else {
     btn.classList.remove('active');
-    btn.textContent='\u23ae\u23ae PAUSE';
+    btn.textContent='\u23f8';
     banner.style.display='none';
     addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');
   }
@@ -887,7 +882,7 @@ function toggleAutoFold(){
   wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});
   const btn=document.getElementById('autoFoldBtn');
   if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}
-  else{btn.classList.remove('active');btn.textContent='\u23f8 AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
+  else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
 }
 function showBet(serverSeat,amount){
   if(amount<=0)return;
@@ -916,7 +911,7 @@ function doCashOut(){
   _intentionalClose=true;
   wsSend({type:'cashOut'});
 }
-document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtnPersist');if(btn)btn.textContent=document.fullscreenElement?'\u29c4 EXIT FULL':'\u26f6 FULLSCREEN';});
+document.addEventListener('fullscreenchange',()=>{document.querySelectorAll('.cbtn-fs').forEach(b=>b.textContent=document.fullscreenElement?'\u29c4':'\u26f6');});
 document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
 document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
