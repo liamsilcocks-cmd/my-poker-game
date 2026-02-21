@@ -85,7 +85,6 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  // Keep-alive ping from client (every 5 hands) to prevent Render.com sleep
   if (req.url && req.url.startsWith('/keepalive')) {
     const params = new URL(req.url, 'http://x').searchParams;
     const room = params.get('room') || '?';
@@ -144,7 +143,11 @@ function tableSnapshot(room, forId) {
     sbSeat: G.sbSeat, bbSeat: G.bbSeat, toActSeat: G.toAct[0] ?? null,
     players: room.seats.map(s => {
       if (!s) return null;
-      const showCards = s.id === forId || (G.phase === 'showdown' && !s.folded);
+      // FIX #2: Only show hole cards to the owning player (or everyone at showdown)
+      // Never reveal another player's cards, even during buy-back transitions
+      const isOwner = s.id === forId;
+      const atShowdown = G.phase === 'showdown' && !s.folded;
+      const showCards = isOwner || atShowdown;
       return {
         seat: s.seat, name: s.name, chips: s.chips, bet: s.bet,
         folded: s.folded, disconnected: s.disconnected || false,
@@ -186,7 +189,7 @@ function clearActionTimer(room) {
   }
 }
 
-// ─── Pause / Resume — any seated player can pause or resume ──────────────────
+// ─── Pause / Resume ───────────────────────────────────────────────────────────
 function pauseGame(room, byName) {
   if (room.paused) return;
   room.paused = true;
@@ -199,7 +202,6 @@ function resumeGame(room, byName) {
   if (!room.paused) return;
   room.paused = false;
   broadcastAll(room, { type: 'gameResumed', byName });
-  // Restart action timer for whoever was due to act
   if (room.G && room.actionTimerSeat >= 0 && room.G.toAct[0] === room.actionTimerSeat) {
     startActionTimer(room, room.actionTimerSeat, room.actionTimerRemaining || ACTION_TIMEOUT);
   }
@@ -333,7 +335,6 @@ wss.on('connection', ws => {
         break;
       }
 
-      // ── Pause: any seated player can pause ──────────────────────────────────
       case 'pause': {
         const room = rooms.get(myRoomId);
         if (!room || !room.gameActive) return;
@@ -343,7 +344,6 @@ wss.on('connection', ws => {
         break;
       }
 
-      // ── Resume: any seated player can resume ────────────────────────────────
       case 'resume': {
         const room = rooms.get(myRoomId);
         if (!room || !room.gameActive) return;
@@ -353,13 +353,13 @@ wss.on('connection', ws => {
         break;
       }
 
+      // FIX #5: buyBack works for any number of players (no player-count restriction)
       case 'buyBack': {
         const room = rooms.get(myRoomId);
         if (!room) return;
         const p = room.seats.find(s => s?.id === myId);
         if (!p || !p.pendingBuyBack) return;
 
-        // Clear the auto-spectate timeout
         if (p._buyBackTimer) { clearTimeout(p._buyBackTimer); p._buyBackTimer = null; }
 
         if (msg.accept) {
@@ -393,6 +393,8 @@ wss.on('connection', ws => {
           clearActionTimer(room);
           doFold(room, p.seat, 'auto-fold');
         }
+        // Acknowledge the toggle
+        send(ws, { type: 'voluntaryAutoFoldAck', enabled: p.voluntaryAutoFold });
         break;
       }
 
@@ -406,7 +408,6 @@ wss.on('connection', ws => {
         break;
       }
 
-      // ── Cash Out: deferred if currently in an active hand ──────────────────
       case 'cashOut': {
         const room = rooms.get(myRoomId);
         if (!room) return;
@@ -417,13 +418,10 @@ wss.on('connection', ws => {
           room.G.phase !== 'idle' && s.cards && s.cards.length > 0;
 
         if (inActiveHand) {
-          // Mark for cash-out at end of this hand; fold them out immediately so
-          // the hand can progress, but chips are preserved until hand ends.
           s.pendingCashOut = true;
           send(ws, { type: 'cashOutPending' });
           broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} will cash out after this hand` });
           writeLog(room, `CASH OUT PENDING: ${s.name} (Seat ${s.seat+1}) requested cash-out mid-hand — will be processed at hand end | Stack: £${(s.chips/100).toFixed(2)}`);
-          // Fold them from the current hand
           if (room.G.toAct[0] === s.seat) {
             clearActionTimer(room);
             doFold(room, s.seat, 'cash out');
@@ -434,12 +432,10 @@ wss.on('connection', ws => {
             broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (cashing out)' });
             writeLog(room, `FOLD (cash out): ${s.name}`);
             broadcastState(room);
-            const alive = room.seats.filter(p => p && !p.folded && !p.sittingOut);
-            if (alive.length <= 1) endRound(room);
+            checkRoundEnd(room);
           }
           broadcastState(room);
         } else {
-          // Not in an active hand — cash out immediately
           executeCashOut(room, s);
         }
         break;
@@ -470,7 +466,7 @@ wss.on('connection', ws => {
 
     const s = room.seats.find(s => s?.id === myId);
     if (!s) return;
-    if (s.ws !== ws) return; // stale socket
+    if (s.ws !== ws) return;
 
     s.disconnected = true;
     s.ws = null;
@@ -496,8 +492,7 @@ wss.on('connection', ws => {
         if (idx !== -1) room.G.toAct.splice(idx, 1);
         broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (timed out)' });
         broadcastState(room);
-        const alive = room.seats.filter(p => p && !p.folded && !p.sittingOut);
-        if (alive.length <= 1) endRound(room);
+        checkRoundEnd(room);
       }
 
       if (room.hostId) {
@@ -557,9 +552,18 @@ function buildDeck() {
   return shuffle(d);
 }
 
+// FIX #3 / #2: activePlaying must exclude spectators, pendingBuyBack, and 0-chip players
 function activePlaying(room) {
   return room.seats
-    .map((s, i) => (s && !s.sittingOut && !s.autoFold && !s.spectator && !s.pendingBuyBack && s.chips > 0) ? i : null)
+    .map((s, i) => {
+      if (!s) return null;
+      if (s.sittingOut) return null;
+      if (s.autoFold) return null;
+      if (s.spectator) return null;
+      if (s.pendingBuyBack) return null;
+      if (s.chips <= 0) return null;
+      return i;
+    })
     .filter(i => i !== null);
 }
 
@@ -569,15 +573,39 @@ function nextSeat(from, active) {
   return nxt !== undefined ? nxt : sorted[0];
 }
 
+// FIX #3 & #4: buildActOrder — properly tracks who still needs to act.
+// The "toAct" list should contain every non-folded player with chips who hasn't
+// yet matched the current bet OR has not yet had a chance to act this street.
 function buildActOrder(room, startSeat, active) {
   const sorted = [...active].sort((a, b) => a - b);
   let startIdx = sorted.indexOf(startSeat);
   if (startIdx === -1) startIdx = 0;
+  // Rotate so startSeat is first
   const ordered = [...sorted.slice(startIdx), ...sorted.slice(0, startIdx)];
   return ordered.filter(i => {
     const p = room.seats[i];
-    return p && !p.folded && !p.autoFold && p.chips > 0;
+    return p && !p.folded && !p.autoFold && !p.voluntaryAutoFold && p.chips > 0;
   });
+}
+
+// FIX #3: Count players who can actually make a meaningful decision.
+// A player who is all-in cannot act further but is still "in" the hand.
+function canActCount(room) {
+  if (!room.G) return 0;
+  return room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+    s.chips > 0
+  ).length;
+}
+
+// Helper: check if round should end due to one or zero players remaining unfolded
+function checkRoundEnd(room) {
+  const alive = room.seats.filter(s => s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack);
+  if (alive.length <= 1) {
+    endRound(room);
+    return true;
+  }
+  return false;
 }
 
 // ─── Hand flow ────────────────────────────────────────────────────────────────
@@ -592,11 +620,10 @@ function startNewHand(room) {
   room.actionTimerRemaining = ACTION_TIMEOUT;
   room.actionTimerStarted = 0;
 
-  // ── Process any pending cash-outs from the previous hand ─────────────────
+  // Process any pending cash-outs from the previous hand
   room.seats.forEach((s, i) => {
     if (s && s.pendingCashOut) {
       executeCashOut(room, s);
-      // executeCashOut nulls the seat, so just continue
     }
   });
 
@@ -623,6 +650,7 @@ function startNewHand(room) {
   room.handNum = (room.handNum || 0) + 1;
 
   const isHeadsUp = active.length === 2;
+  // Heads-up: dealer posts SB and acts first preflop; BB acts first postflop
   const sbSeat = isHeadsUp ? room.dealerSeat : nextSeat(room.dealerSeat, active);
   const bbSeat = nextSeat(sbSeat, active);
   const preflopStart = nextSeat(bbSeat, active);
@@ -677,6 +705,7 @@ function startNewHand(room) {
   room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB;
   room.G.pot = SB + BB;
 
+  // FIX #2: Cards are dealt ONLY to active players — no other seat gets cards
   for (let rd = 0; rd < 2; rd++)
     for (const si of dealOrder)
       room.seats[si].cards.push(room.G.deck.shift());
@@ -693,6 +722,9 @@ function startNewHand(room) {
   });
   writeLog(room, '└────────────────────────────────────────────────┘');
 
+  // FIX #4: Pre-flop act order — starts AFTER the BB.
+  // BB player is allowed to raise even if no one else has raised (option).
+  // We build the full rotation; the BB will appear at the END so they get their option.
   room.G.toAct = buildActOrder(room, preflopStart, active);
 
   broadcastAll(room, {
@@ -700,6 +732,7 @@ function startNewHand(room) {
     pot: room.G.pot, activeSeats: dealOrder
   });
 
+  // FIX #2: Send each player ONLY their own cards via individual tableSnapshot
   room.seats.forEach(s => {
     if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id));
   });
@@ -714,24 +747,73 @@ function startNewHand(room) {
   promptToAct(room);
 }
 
+// FIX #3 & #4: promptToAct — the core of the "wrong player asked" and
+// "check after bet" bugs. This function now correctly:
+// 1. Skips auto-fold/disconnected/0-chip players
+// 2. Ends the street when no one is left to act (not by accident)
+// 3. Detects when only 1 player can act and skips to showdown/next street
 function promptToAct(room) {
   const G = room.G;
   if (!G) return;
 
+  // Clean up toAct list: remove players who can no longer act
   while (G.toAct.length) {
     const si = G.toAct[0];
     const p = room.seats[si];
-    if (!p || p.folded || p.autoFold || p.chips === 0) G.toAct.shift();
-    else break;
+    if (!p || p.folded || p.autoFold || p.voluntaryAutoFold || p.chips === 0) {
+      G.toAct.shift();
+    } else {
+      break;
+    }
   }
 
-  const alive = room.seats.filter(s => s && !s.folded && !s.sittingOut);
-  if (alive.length <= 1) { endRound(room); return; }
-  if (!G.toAct.length) { advPhase(room); return; }
+  // FIX #3: Count unfolded players still in the hand (regardless of chips)
+  const unfolded = room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
+  );
+
+  // If 1 or fewer unfolded players, end the round immediately — no action needed
+  if (unfolded.length <= 1) {
+    endRound(room);
+    return;
+  }
+
+  // FIX #3: Count players who CAN still act (have chips and aren't all-in)
+  const canAct = unfolded.filter(s => s.chips > 0);
+
+  // If nobody can act (all remaining are all-in), run the board automatically
+  if (canAct.length === 0 || G.toAct.length === 0) {
+    advPhase(room);
+    return;
+  }
+
+  // FIX #3: If only 1 player can still act and the betting is closed (all others
+  // are all-in or have matched the bet), skip asking them — just run the board.
+  // BUT: if that 1 player hasn't yet had a chance to act (or needs to call), they must.
+  if (canAct.length === 1 && G.toAct.length > 0) {
+    const soloSeat = G.toAct[0];
+    const solo = room.seats[soloSeat];
+    if (solo) {
+      const callAmt = Math.min(G.currentBet - solo.bet, solo.chips);
+      if (callAmt === 0) {
+        // Only player left who can act; nothing to call; no one to raise against
+        // Check if all others are all-in (no one can call a raise)
+        const othersAllIn = unfolded.filter(s => s.seat !== soloSeat && s.chips === 0);
+        if (othersAllIn.length === unfolded.length - 1) {
+          // Everyone else is all-in, solo player's bet is already matched — run board
+          advPhase(room);
+          return;
+        }
+      }
+    }
+  }
 
   const seat = G.toAct[0];
   const p = room.seats[seat];
 
+  if (!p) { G.toAct.shift(); setTimeout(() => promptToAct(room), 100); return; }
+
+  // Auto-fold disconnected / auto-fold flagged players
   if (p.disconnected || p.autoFold || p.voluntaryAutoFold) {
     clearActionTimer(room);
     const reason = p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
@@ -739,11 +821,22 @@ function promptToAct(room) {
     return;
   }
 
+  // FIX #4: Determine if this is a check (no bet to call) or call situation
   const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
   const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
-  const firstBet = G.currentBet === 0; // no bet yet this street = BET not RAISE
 
-  broadcastAll(room, { type: 'yourTurn', seat, callAmt, minRaise, pot: G.pot, currentBet: G.currentBet, firstBet });
+  // firstBet = no one has bet yet this street (so button says BET not RAISE)
+  const firstBet = G.currentBet === 0;
+
+  broadcastAll(room, {
+    type: 'yourTurn',
+    seat,
+    callAmt,         // 0 = check, >0 = amount to call
+    minRaise,
+    pot: G.pot,
+    currentBet: G.currentBet,
+    firstBet        // true = "BET", false = "RAISE"
+  });
   startActionTimer(room, seat);
 }
 
@@ -754,10 +847,24 @@ function doFold(room, seat, reason) {
   const label = reason ? ` (${reason})` : '';
   broadcastAll(room, { type: 'playerAction', seat, action: 'fold', amount: 0, name: p.name + label });
   writeLog(room, `FOLD   | ${p.name.padEnd(18)} | Pot: £${((room.G?.pot||0)/100).toFixed(2)} | Players still in: ${room.seats.filter(s=>s&&!s.folded).length}${label?'  ('+label.trim()+')':''}`);
+  // Remove from toAct
+  if (room.G) {
+    const idx = room.G.toAct.indexOf(seat);
+    if (idx !== -1) room.G.toAct.splice(idx, 1);
+  }
   broadcastState(room);
-  acted(room, seat, false);
+
+  // Check if round should end immediately
+  if (!checkRoundEnd(room)) {
+    // Round continues — but if only one player can still act and toAct has more,
+    // still need to prompt the next player
+    setTimeout(() => promptToAct(room), 200);
+  }
 }
 
+// FIX #4: handleAction — betting logic corrected
+// The key bug was: after a raise, we were not correctly rebuilding toAct
+// to include only players who still need to call the new amount.
 function handleAction(room, seat, action, amount) {
   const p = room.seats[seat];
   const G = room.G;
@@ -767,16 +874,23 @@ function handleAction(room, seat, action, amount) {
     doFold(room, seat, null);
 
   } else if (action === 'check' || action === 'call') {
+    // FIX #4: Correctly handle check vs call
     const ca = Math.min(G.currentBet - p.bet, p.chips);
     p.chips -= ca; p.bet += ca; G.pot += ca;
+
+    // Determine if this was actually a check or call
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
     writeLog(room, `${act==='check'?'CHECK ':'CALL  '} | ${p.name.padEnd(18)} | Amount: ${ca>0?'£'+(ca/100).toFixed(2).padStart(7):'  ---   '} | Stack after: £${(p.chips/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`);
     broadcastState(room);
-    acted(room, seat, false);
+
+    // Remove from toAct and advance
+    G.toAct.shift();
+    setTimeout(() => promptToAct(room), 200);
 
   } else if (action === 'raise') {
-    const callAmount     = G.currentBet - p.bet;
+    // FIX #4: Raise logic — rebuild toAct properly after a raise
+    const callAmount     = G.currentBet - p.bet;           // what they must call first
     const minFromStack   = Math.min(callAmount + G.lastRaiseIncrement, p.chips);
     const raiseFromStack = Math.min(Math.max(amount || minFromStack, minFromStack), p.chips);
 
@@ -784,8 +898,11 @@ function handleAction(room, seat, action, amount) {
     p.chips -= raiseFromStack;
     p.bet   += raiseFromStack;
     G.pot   += raiseFromStack;
+
+    // New street-level bet ceiling
     G.currentBet = Math.max(G.currentBet, p.bet);
 
+    // Track raise increment for min-raise calculation
     if (G.currentBet > prevCurrentBet) {
       G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
     }
@@ -796,29 +913,33 @@ function handleAction(room, seat, action, amount) {
       `New street bet: £${(G.currentBet/100).toFixed(2)} | Stack after: £${(p.chips/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`
     );
     broadcastState(room);
-    acted(room, seat, true);
+
+    // FIX #4: After a raise, rebuild toAct to include ALL remaining active players
+    // who haven't yet matched the new currentBet — rotating from the player AFTER the raiser.
+    const active = activePlaying(room).sort((a, b) => a - b);
+
+    // Build a rotation starting from the seat AFTER the raiser
+    const raiserIdx = active.indexOf(seat);
+    const rotated = raiserIdx >= 0
+      ? [...active.slice(raiserIdx + 1), ...active.slice(0, raiserIdx + 1)]
+      : active;
+
+    // Include every active player who:
+    // - hasn't folded
+    // - has chips
+    // - has NOT yet matched the new currentBet (or is the raiser themselves, excluded since they just acted)
+    G.toAct = rotated.filter(i => {
+      if (i === seat) return false; // raiser doesn't act again unless re-raised
+      const op = room.seats[i];
+      return op && !op.folded && !op.autoFold && !op.voluntaryAutoFold && op.chips > 0 && op.bet < G.currentBet;
+    });
+
+    setTimeout(() => promptToAct(room), 200);
   }
 }
 
 function broadcastState(room) {
   room.seats.forEach(s => { if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id)); });
-}
-
-function acted(room, seat, isRaise) {
-  const G = room.G;
-  G.toAct.shift();
-
-  if (isRaise) {
-    const active = activePlaying(room).sort((a, b) => a - b);
-    const raiserIdx = active.indexOf(seat);
-    const rotated = [...active.slice(raiserIdx + 1), ...active.slice(0, raiserIdx + 1)];
-    G.toAct = rotated.filter(i => {
-      const p = room.seats[i];
-      return p && !p.folded && !p.autoFold && p.chips > 0 && p.bet < G.currentBet;
-    });
-  }
-
-  setTimeout(() => promptToAct(room), 200);
 }
 
 function advPhase(room) {
@@ -847,19 +968,42 @@ function advPhase(room) {
 
     const active = activePlaying(room);
 
-    // Check if any player can still act (has chips and isn't all-in)
+    // FIX #3: After dealing community cards, check if anyone can actually act.
+    // If ≤1 unfolded player, end round. If all remaining are all-in, run board.
+    const unfolded = room.seats.filter(s =>
+      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
+    );
+
+    if (unfolded.length <= 1) {
+      endRound(room);
+      return;
+    }
+
+    // Players who can still bet/call (have chips)
     const canAct = active.filter(i => {
       const p = room.seats[i];
       return p && !p.folded && p.chips > 0;
     });
 
-    if (canAct.length <= 1) {
-      // All (or all but one) players are all-in — run board automatically
-      writeLog(room, `│  All players all-in — running board automatically   │`);
+    if (canAct.length <= 1 && G.phase !== 'river') {
+      // All remaining players are all-in — run board automatically without asking
+      writeLog(room, `│  All players all-in — running board automatically     │`);
       setTimeout(() => advPhase(room), 1200);
       return;
     }
 
+    // FIX #3: If only 1 player can act but others are all-in, still run board
+    // (no meaningful betting can happen with 1 active vs all-in opponents)
+    if (canAct.length <= 1) {
+      // We're at the river with no meaningful action possible
+      setTimeout(() => {
+        G.phase = 'showdown';
+        showdown(room);
+      }, 1200);
+      return;
+    }
+
+    // Post-flop act order: starts left of dealer (SB position in normal play)
     const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
     G.toAct = buildActOrder(room, postStart, active);
     writeLog(room, `Act order: ${G.toAct.map(i => room.seats[i].name).join(' → ')}`);
@@ -873,21 +1017,33 @@ function advPhase(room) {
 
 function endRound(room) {
   clearActionTimer(room);
-  const remaining = room.seats.filter(s => s && !s.folded && !s.sittingOut);
+  const remaining = room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
+  );
   if (remaining.length === 1) {
     writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
     finish(room, [remaining[0]], 'Last player standing');
   } else if (remaining.length === 0) {
     writeLog(room, `RESULT: No eligible winner found — hand skipped`);
+    // Safety: restart hand anyway
+    setTimeout(() => startNewHand(room), 3000);
   }
+  // If remaining.length > 1 we don't call endRound in error — do nothing
 }
 
 function showdown(room) {
   clearActionTimer(room);
-  const active = room.seats.filter(s => s && !s.folded && !s.sittingOut);
+  const active = room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
+  );
   if (active.length === 1) {
     writeLog(room, `RESULT: ${active[0].name} wins at showdown uncontested`);
     finish(room, [active[0]], 'Last player standing');
+    return;
+  }
+  if (active.length === 0) {
+    writeLog(room, `RESULT: No players at showdown — hand skipped`);
+    setTimeout(() => startNewHand(room), 3000);
     return;
   }
 
@@ -901,7 +1057,6 @@ function showdown(room) {
   writeLog(room, `║  Board: ${room.G.community.map(c=>c.r+c.s).join('  ').padEnd(53)}║`);
   writeLog(room, '╠' + '═'.repeat(62) + '╣');
 
-  // Score every active player
   let bestScore = -1;
   const scored = active.map(p => {
     const allCards = [...p.cards, ...room.G.community];
@@ -918,7 +1073,6 @@ function showdown(room) {
     writeLog(room, `║  ${('Seat '+(p.seat+1)+' '+p.name).padEnd(22)} | Hole: ${holeStr.padEnd(10)} | Best: ${bestStr.padEnd(14)} | ${hn.padEnd(16)}║`);
   }
 
-  // Collect ALL players who share the best score (tied winners)
   const winners = scored.filter(({ sc }) => sc === bestScore).map(({ p }) => p);
   const winHandName = handName(bestScore);
 
@@ -934,7 +1088,6 @@ function showdown(room) {
 }
 
 function finish(room, winners, label) {
-  // winners is always an array now (1 = sole winner, 2+ = split)
   if (!winners || winners.length === 0) return;
   clearActionTimer(room);
 
@@ -942,7 +1095,6 @@ function finish(room, winners, label) {
   room.G.pot = 0;
 
   if (winners.length === 1) {
-    // ── Sole winner ────────────────────────────────────────────────────────
     const winner = winners[0];
     winner.chips += pot;
     broadcastAll(room, { type: 'winner', seat: winner.seat, name: winner.name, amount: pot, label });
@@ -951,8 +1103,6 @@ function finish(room, winners, label) {
     writeLog(room, '┌─ HAND RESULT ─────────────────────────────────────────┐');
     writeLog(room, `│  ${winner.name} wins £${(pot/100).toFixed(2)} (${label})`.padEnd(63) + '│');
   } else {
-    // ── Split pot ──────────────────────────────────────────────────────────
-    // Divide as evenly as possible; any odd chip goes to first winner in seat order
     const perPlayer  = Math.floor(pot / winners.length);
     const remainder  = pot - perPlayer * winners.length;
     const sorted     = [...winners].sort((a, b) => a.seat - b.seat);
@@ -965,7 +1115,6 @@ function finish(room, winners, label) {
     const names  = sorted.map(w => w.name).join(' & ');
     const shares = sorted.map(w => `£${(perPlayer/100).toFixed(2)}`).join(' / ');
 
-    // Broadcast one winner event per winner so the client animates chips flying
     sorted.forEach((w, i) => {
       const share = perPlayer + (i === 0 ? remainder : 0);
       broadcastAll(room, {
@@ -1000,7 +1149,7 @@ function finish(room, winners, label) {
   if (logPath) setTimeout(() => ftpUpload(logPath), 500);
 
   setTimeout(() => {
-    // Offer buy-back ONCE to newly busted players (never to existing spectators)
+    // FIX #5: Offer buy-back to any busted player regardless of player count
     room.seats.forEach((s, i) => {
       if (s && s.chips <= 0 && !s.pendingBuyBack && !s.spectator) {
         s.pendingBuyBack = true;
@@ -1009,9 +1158,8 @@ function finish(room, winners, label) {
         broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} is out of chips!` });
         send(s.ws, { type: 'buyBackOffer', chips: START_CHIPS });
 
-        // Auto-default to spectator after 15 seconds if no response
         s._buyBackTimer = setTimeout(() => {
-          if (!s.pendingBuyBack) return; // already decided
+          if (!s.pendingBuyBack) return;
           s.pendingBuyBack = false;
           s.sittingOut = true;
           s.spectator = true;
@@ -1023,7 +1171,6 @@ function finish(room, winners, label) {
       }
     });
 
-    // Start next hand immediately — spectators/pendingBuyBack are excluded by activePlaying()
     startNewHand(room);
   }, 5000);
 }
