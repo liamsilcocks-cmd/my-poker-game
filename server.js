@@ -15,6 +15,10 @@ const SB    = 10, BB = 20;
 const START_CHIPS = 1000;
 const ACTION_TIMEOUT = 15000;
 
+// A room with no connected players is destroyed after this much idle time.
+// This prevents stale zombie rooms persisting across Render cold-starts.
+const ROOM_EMPTY_TTL_MS = 60_000; // 1 minute
+
 // ─── Logging ─────────────────────────────────────────────────────────────────
 const LOGS_DIR = path.join(__dirname, 'logs');
 if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
@@ -105,6 +109,45 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 const rooms = new Map();
 
+// ── Room lifecycle ────────────────────────────────────────────────────────────
+// Tears down every timer in the room and removes it from the map.
+function destroyRoom(room) {
+  console.log(`[ROOM ${room.id}] Destroying empty room — clearing all timers`);
+  clearActionTimer(room);
+  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
+  room.seats.forEach(s => {
+    if (s) {
+      if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
+      if (s._buyBackTimer)    { clearTimeout(s._buyBackTimer);    s._buyBackTimer    = null; }
+    }
+  });
+  room.pendingJoins.forEach(p => {
+    try { if (p.ws?.readyState === 1) p.ws.close(); } catch {}
+  });
+  rooms.delete(room.id);
+}
+
+// Call this any time a player disconnects or a seat is vacated.
+// Starts a TTL that destroys the room if nobody reconnects in time.
+function scheduleRoomCleanup(room) {
+  // Cancel any existing timer first
+  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
+
+  // Are there any connected players (or pending joins) remaining?
+  const hasConnected = room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
+    || room.pendingJoins.some(p => p.ws?.readyState === 1);
+
+  if (!hasConnected) {
+    console.log(`[ROOM ${room.id}] No connected players — scheduling cleanup in ${ROOM_EMPTY_TTL_MS/1000}s`);
+    room._emptyTimer = setTimeout(() => {
+      // Double-check nobody rejoined during the grace window
+      const stillEmpty = !room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
+        && !room.pendingJoins.some(p => p.ws?.readyState === 1);
+      if (stillEmpty) destroyRoom(room);
+    }, ROOM_EMPTY_TTL_MS);
+  }
+}
+
 function getOrCreateRoom(roomId) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
@@ -112,10 +155,14 @@ function getOrCreateRoom(roomId) {
       gameActive: false, pendingJoins: [], G: null, dealerSeat: -1,
       actionTimer: null, handNum: 0,
       paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT,
-      actionTimerStarted: 0
+      actionTimerStarted: 0,
+      _emptyTimer: null   // TTL timer — set by scheduleRoomCleanup
     });
   }
-  return rooms.get(roomId);
+  const room = rooms.get(roomId);
+  // Cancel any pending destruction now that someone is joining
+  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
+  return room;
 }
 
 function send(ws, msg) {
@@ -461,16 +508,18 @@ wss.on('connection', ws => {
     const room = rooms.get(myRoomId);
     if (!room) return;
 
+    // ── Pending join disconnected before being admitted ───────────────────────
     const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
     if (pi !== -1) {
       room.pendingJoins.splice(pi, 1);
       broadcastAll(room, lobbySnapshot(room));
+      scheduleRoomCleanup(room);
       return;
     }
 
     const s = room.seats.find(s => s?.id === myId);
     if (!s) return;
-    if (s.ws !== ws) return;
+    if (s.ws !== ws) return; // stale socket from a previous connection
 
     s.disconnected = true;
     s.ws = null;
@@ -478,31 +527,79 @@ wss.on('connection', ws => {
     writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) left — ${RECONNECT_GRACE_MS/1000}s grace period started | Stack: £${(s.chips/100).toFixed(2)}`);
     broadcastState(room);
 
+    // If they were mid-action, fold them immediately
     if (room.G && room.G.toAct[0] === s.seat) {
       clearActionTimer(room);
       doFold(room, s.seat, 'disconnected');
     }
 
+    // Start room cleanup countdown in case nobody else is connected either
+    scheduleRoomCleanup(room);
+
+    // Track how many times this seat has timed out without reconnecting
+    s._timeoutCount = (s._timeoutCount || 0);
+
     s._disconnectTimer = setTimeout(() => {
-      if (!s.disconnected || s.ws !== null) return;
-      s.autoFold = true;
+      if (!s.disconnected || s.ws !== null) return; // they came back
+      s._timeoutCount++;
       s._disconnectTimer = null;
-      broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out — auto-folding until host re-admits` });
-      writeLog(room, `TIMEOUT: ${s.name} (Seat ${s.seat+1}) failed to reconnect — auto-fold enabled | Stack: £${(s.chips/100).toFixed(2)}`);
 
-      if (room.G && !s.folded) {
-        s.folded = true;
-        const idx = room.G.toAct.indexOf(s.seat);
-        if (idx !== -1) room.G.toAct.splice(idx, 1);
-        broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (timed out)' });
+      writeLog(room, `TIMEOUT #${s._timeoutCount}: ${s.name} (Seat ${s.seat+1}) failed to reconnect | Stack: £${(s.chips/100).toFixed(2)}`);
+
+      if (s._timeoutCount >= 3) {
+        // ── Triple timeout: evict the seat entirely ──────────────────────────
+        // This is the key fix: instead of setting autoFold and leaving the seat
+        // occupied forever, we remove the player from the room so a fresh join
+        // works correctly and the room can be cleaned up properly.
+        console.log(`[ROOM ${room.id}] ${s.name} timed out 3 times — evicting seat ${s.seat+1}`);
+        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} has been removed after 3 timeouts` });
+        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'timeout-eviction' });
+        writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) removed after 3 timeouts`);
+
+        // Fold them out of any active hand first
+        if (room.G && !s.folded) {
+          s.folded = true;
+          const idx = room.G.toAct.indexOf(s.seat);
+          if (idx !== -1) room.G.toAct.splice(idx, 1);
+          broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (evicted)' });
+          broadcastState(room);
+          checkRoundEnd(room);
+        }
+
+        // Re-assign host if needed
+        if (room.hostId === s.id) {
+          const newHost = room.seats.find(h => h && h.id !== s.id && h.ws?.readyState === 1);
+          if (newHost) {
+            room.hostId = newHost.id;
+            send(newHost.ws, { type: 'chat', name: 'System', text: 'You are now the host.' });
+          } else {
+            room.hostId = null;
+          }
+        }
+
+        room.seats[s.seat] = null;
+        broadcastAll(room, lobbySnapshot(room));
         broadcastState(room);
-        checkRoundEnd(room);
-      }
+        scheduleRoomCleanup(room);
 
-      if (room.hostId) {
-        const host = room.seats.find(h => h?.id === room.hostId);
-        if (host?.ws?.readyState === 1) {
-          send(host.ws, { type: 'joinRequest', id: s.id, name: s.name });
+      } else {
+        // ── First / second timeout: autoFold and ask host to re-admit ────────
+        s.autoFold = true;
+        broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} timed out (${s._timeoutCount}/3) — auto-folding until re-admitted` });
+        writeLog(room, `TIMEOUT ${s._timeoutCount}/3: ${s.name} — auto-fold enabled`);
+
+        if (room.G && !s.folded) {
+          s.folded = true;
+          const idx = room.G.toAct.indexOf(s.seat);
+          if (idx !== -1) room.G.toAct.splice(idx, 1);
+          broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (timed out)' });
+          broadcastState(room);
+          checkRoundEnd(room);
+        }
+
+        if (room.hostId) {
+          const host = room.seats.find(h => h?.id === room.hostId && h.ws?.readyState === 1);
+          if (host) send(host.ws, { type: 'joinRequest', id: s.id, name: s.name });
         }
       }
     }, RECONNECT_GRACE_MS);
@@ -533,6 +630,7 @@ function executeCashOut(room, s) {
   }
   broadcastAll(room, lobbySnapshot(room));
   broadcastState(room);
+  scheduleRoomCleanup(room);
 }
 
 function mkPlayer(ws, id, name, seat) {
@@ -1297,3 +1395,39 @@ server.listen(PORT, () => {
   console.log(`   Logs: http://localhost:${PORT}/logs`);
   console.log(`   FTP:  ${process.env.FTP_HOST || '(not configured)'}\n`);
 });
+
+// ─── Graceful shutdown (Render.com sends SIGTERM before killing the process) ──
+// Without this, the process dies dirty leaving sockets half-open.
+// With it, we close all WebSocket connections cleanly first so clients
+// immediately get a "connection closed" event and can show a reconnect UI.
+function gracefulShutdown(signal) {
+  console.log(`\n[SHUTDOWN] ${signal} received — closing ${rooms.size} room(s) and ${wss.clients.size} connection(s)`);
+
+  // Tell every connected client the server is going down so they can show
+  // a "server restarting" message rather than silently hanging.
+  const shutdownMsg = JSON.stringify({ type: 'serverShutdown', reason: 'Server is restarting. Please refresh to reconnect.' });
+  wss.clients.forEach(client => {
+    try { if (client.readyState === 1) client.send(shutdownMsg); } catch {}
+  });
+
+  // Clear all timers in all rooms
+  rooms.forEach(room => destroyRoom(room));
+
+  // Close the WebSocket server (stops accepting new connections)
+  wss.close(() => {
+    // Then close the HTTP server
+    server.close(() => {
+      console.log('[SHUTDOWN] Clean exit');
+      process.exit(0);
+    });
+  });
+
+  // Safety net — force exit after 5s if something hangs
+  setTimeout(() => {
+    console.error('[SHUTDOWN] Force exit after timeout');
+    process.exit(1);
+  }, 5000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
