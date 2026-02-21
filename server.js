@@ -23,11 +23,21 @@ const ROOM_EMPTY_TTL_MS = 60_000; // 1 minute
 const LOGS_DIR = path.join(__dirname, 'logs');
 if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
 
+// Server event log — one file for the whole process lifetime (not per hand)
+const SERVER_LOG = path.join(LOGS_DIR, `server_${new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)}.txt`);
+function svrLog(line) {
+  const ts = new Date().toISOString().slice(11,23);
+  const entry = `[${ts}] ${line}\n`;
+  try { fs.appendFileSync(SERVER_LOG, entry); } catch {}
+  console.log(`[SVR] ${line}`);
+}
+
 function handLogPath(roomId, handNum) {
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   return path.join(LOGS_DIR, `room${roomId}_hand${String(handNum).padStart(4,'0')}_${ts}.txt`);
 }
 
+// Write a timestamped line to the current hand's log file
 function writeLog(room, line) {
   if (!room.G || !room.G.logPath) return;
   const ts = new Date().toTimeString().slice(0, 8);
@@ -41,24 +51,37 @@ function logEvent(room, text) {
   broadcastAll(room, { type: 'logEvent', text });
 }
 
+// Write to both the hand log and the in-browser activity log in one call
+function logBoth(room, text) {
+  writeLog(room, text);
+  logEvent(room, text);
+}
+
 // FTP upload after hand finishes
 async function ftpUpload(localPath) {
   const host = process.env.FTP_HOST;
   const user = process.env.FTP_USER;
   const pass = process.env.FTP_PASS;
   const dir  = process.env.FTP_DIR || '/poker-logs';
-  if (!host || !user || !pass) { console.log('FTP: env vars not set, skipping'); return; }
+  if (!host || !user || !pass) {
+    svrLog('FTP: env vars not set — upload skipped');
+    return;
+  }
   const client = new ftp.Client();
   client.ftp.verbose = false;
+  const fname = path.basename(localPath);
+  svrLog(`FTP: connecting to ${host} to upload ${fname}`);
   try {
     await client.access({ host, user, password: pass, secure: false });
     try { await client.ensureDir(dir); } catch {}
-    await client.uploadFrom(localPath, `${dir}/${path.basename(localPath)}`);
-    console.log('FTP: uploaded', path.basename(localPath));
+    await client.uploadFrom(localPath, `${dir}/${fname}`);
+    svrLog(`FTP: ✅ uploaded ${fname} → ${host}${dir}/${fname}`);
   } catch (err) {
+    svrLog(`FTP: ❌ upload FAILED for ${fname} — ${err.message}`);
     console.error('FTP upload failed:', err.message);
   } finally {
     client.close();
+    svrLog(`FTP: connection closed`);
   }
 }
 
@@ -102,9 +125,9 @@ const server = http.createServer((req, res) => {
     const room = params.get('room') || '?';
     const hand = params.get('hand') || '?';
     const ts = new Date().toISOString();
-    console.log(`[KEEPALIVE] ${ts} | Room: ${room} | Hand: ${hand}`);
+    svrLog(`KEEPALIVE | Room: ${room} | Hand: ${hand}`);
     const r = rooms.get(room);
-    if (r && r.G) writeLog(r, `KEEPALIVE sent by client at hand #${hand} — server alive at ${ts}`);
+    if (r && r.G) writeLog(r, `KEEPALIVE: client ping at hand #${hand} — server alive | rooms active: ${rooms.size} | ws connections: ${wss.clients.size}`);
     res.writeHead(200, {'Content-Type':'text/plain','Access-Control-Allow-Origin':'*'});
     res.end('alive:'+ts);
     return;
@@ -119,38 +142,46 @@ const rooms = new Map();
 // ── Room lifecycle ────────────────────────────────────────────────────────────
 // Tears down every timer in the room and removes it from the map.
 function destroyRoom(room) {
-  console.log(`[ROOM ${room.id}] Destroying empty room — clearing all timers`);
+  const connectedCount = room.seats.filter(s => s?.ws?.readyState === 1).length;
+  svrLog(`ROOM ${room.id} DESTROY — ${room.seats.filter(Boolean).length} seats occupied, ${connectedCount} connected, ${room.pendingJoins.length} pending, hand #${room.handNum}`);
   clearActionTimer(room);
   if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
+  let closedSockets = 0;
   room.seats.forEach(s => {
     if (s) {
       if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
       if (s._buyBackTimer)    { clearTimeout(s._buyBackTimer);    s._buyBackTimer    = null; }
+      if (s.ws?.readyState === 1) {
+        try { s.ws.close(); closedSockets++; } catch {}
+      }
     }
   });
   room.pendingJoins.forEach(p => {
-    try { if (p.ws?.readyState === 1) p.ws.close(); } catch {}
+    try { if (p.ws?.readyState === 1) { p.ws.close(); closedSockets++; } } catch {}
   });
+  svrLog(`ROOM ${room.id} DESTROY — closed ${closedSockets} open socket(s), removed from map`);
   rooms.delete(room.id);
 }
 
 // Call this any time a player disconnects or a seat is vacated.
 // Starts a TTL that destroys the room if nobody reconnects in time.
 function scheduleRoomCleanup(room) {
-  // Cancel any existing timer first
   if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
 
-  // Are there any connected players (or pending joins) remaining?
   const hasConnected = room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
     || room.pendingJoins.some(p => p.ws?.readyState === 1);
 
   if (!hasConnected) {
-    console.log(`[ROOM ${room.id}] No connected players — scheduling cleanup in ${ROOM_EMPTY_TTL_MS/1000}s`);
+    svrLog(`ROOM ${room.id} EMPTY — no connected players, scheduling cleanup in ${ROOM_EMPTY_TTL_MS/1000}s`);
     room._emptyTimer = setTimeout(() => {
-      // Double-check nobody rejoined during the grace window
       const stillEmpty = !room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
         && !room.pendingJoins.some(p => p.ws?.readyState === 1);
-      if (stillEmpty) destroyRoom(room);
+      if (stillEmpty) {
+        svrLog(`ROOM ${room.id} CLEANUP — TTL expired with no reconnects, destroying`);
+        destroyRoom(room);
+      } else {
+        svrLog(`ROOM ${room.id} CLEANUP — cancelled, player reconnected during TTL window`);
+      }
     }, ROOM_EMPTY_TTL_MS);
   }
 }
@@ -222,15 +253,18 @@ function startActionTimer(room, seat, remainingMs) {
   if (room.paused) {
     room.actionTimerSeat = seat;
     room.actionTimerRemaining = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
+    writeLog(room, `ACTION TIMER: paused — seat ${seat+1} (${room.seats[seat]?.name}) timer held at ${((remainingMs??ACTION_TIMEOUT)/1000).toFixed(1)}s`);
     return;
   }
   const duration = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
   room.actionTimerSeat = seat;
   room.actionTimerRemaining = duration;
   room.actionTimerStarted = Date.now();
+  writeLog(room, `ACTION TIMER: started — seat ${seat+1} (${room.seats[seat]?.name}) has ${(duration/1000).toFixed(1)}s to act`);
   room.actionTimer = setTimeout(() => {
     const p = room.seats[seat];
     if (!p || p.folded || !room.G || room.G.toAct[0] !== seat) return;
+    writeLog(room, `ACTION TIMER: EXPIRED — seat ${seat+1} (${p.name}) ran out of time, auto-folding`);
     doFold(room, seat, 'timeout');
   }, duration);
 }
@@ -248,26 +282,37 @@ function clearActionTimer(room) {
 function pauseGame(room, byName) {
   if (room.paused) return;
   room.paused = true;
+  room._pausedAt = Date.now();
   clearActionTimer(room);
   broadcastAll(room, { type: 'gamePaused', byName });
-  console.log(`Room ${room.id} PAUSED by ${byName}`);
+  writeLog(room, `GAME PAUSED by ${byName} | Hand #${room.handNum} | Phase: ${room.G?.phase||'idle'} | Pot: £${((room.G?.pot||0)/100).toFixed(2)}`);
+  svrLog(`ROOM ${room.id} PAUSED by ${byName}`);
 }
 
 function resumeGame(room, byName) {
   if (!room.paused) return;
+  const pausedForMs = room._pausedAt ? Date.now() - room._pausedAt : 0;
   room.paused = false;
+  room._pausedAt = null;
   broadcastAll(room, { type: 'gameResumed', byName });
+  writeLog(room, `GAME RESUMED by ${byName} | Was paused for ${(pausedForMs/1000).toFixed(1)}s`);
+  svrLog(`ROOM ${room.id} RESUMED by ${byName} after ${(pausedForMs/1000).toFixed(1)}s`);
   if (room.G && room.actionTimerSeat >= 0 && room.G.toAct[0] === room.actionTimerSeat) {
     startActionTimer(room, room.actionTimerSeat, room.actionTimerRemaining || ACTION_TIMEOUT);
   }
-  console.log(`Room ${room.id} RESUMED by ${byName}`);
 }
 
 // ─── Connections ──────────────────────────────────────────────────────────────
-const RECONNECT_GRACE_MS = 8000;
+// ─── Connections ──────────────────────────────────────────────────────────────
+// Players are auto-folded immediately on disconnect. If they miss ABSENT_HAND_LIMIT
+// consecutive hands (defined in startNewHand) they are evicted. If they reconnect
+// before the next hand starts they rejoin seamlessly with no host approval needed.
 
 wss.on('connection', ws => {
   let myId = null, myRoomId = null;
+  const connectedAt = Date.now();
+  const remoteIp = ws._socket?.remoteAddress || 'unknown';
+  svrLog(`WS OPEN — new connection from ${remoteIp} (total open: ${wss.clients.size})`);
 
   ws.on('message', raw => {
     let msg;
@@ -281,32 +326,49 @@ wss.on('connection', ws => {
         myId = msg.id || ('p_' + Math.random().toString(36).slice(2, 8));
         const name = (msg.name || 'Player').slice(0, 18).trim() || 'Player';
         const room = getOrCreateRoom(myRoomId);
+        const isNewRoom = room.handNum === 0 && !room.seats.some(Boolean);
+        svrLog(`JOIN — room ${myRoomId} | id=${myId} | name="${name}" | ip=${remoteIp} | roomIsNew=${isNewRoom}`);
 
         // ── Reconnect ─────────────────────────────────────────────────────────
         const existing = room.seats.find(s => s?.id === myId);
         if (existing) {
+          const wasDisconnectedMs = existing.disconnected ? Date.now() - (existing._disconnectedAt||0) : 0;
           if (existing._disconnectTimer) {
             clearTimeout(existing._disconnectTimer);
             existing._disconnectTimer = null;
           }
-          if (existing.autoFold) {
+
+          // If they missed 1+ hands they need host re-admission.
+          // If they reconnect before the next hand starts (missedHands still 0),
+          // let them back in immediately — no host approval needed.
+          const needsHostApproval = existing.autoFold && (existing._missedHands || 0) >= 1;
+
+          if (needsHostApproval) {
+            svrLog(`RECONNECT — ${name} (room ${myRoomId}) missed ${existing._missedHands} hand(s), queuing for host re-admission`);
+            writeLog(room, `RECONNECT (pending): ${name} returned after missing ${existing._missedHands} hand(s) — host must re-admit | Was disconnected ~${(wasDisconnectedMs/1000).toFixed(1)}s`);
             if (!room.pendingJoins.find(p => p.id === myId)) {
               room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
             } else {
               const pj = room.pendingJoins.find(p => p.id === myId);
               if (pj) pj.ws = ws;
             }
-            send(ws, { type: 'waiting', id: myId, reason: 'Waiting for host to re-admit you.' });
+            send(ws, { type: 'waiting', id: myId, reason: `You missed ${existing._missedHands} hand(s). Waiting for host to re-admit you.` });
             const host = room.seats.find(s => s?.id === room.hostId);
             if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
             broadcastAll(room, lobbySnapshot(room));
           } else {
+            // Reconnected before missing any hands — let them straight back in
             existing.ws = ws;
             existing.disconnected = false;
+            existing.autoFold = false;
+            existing._disconnectedAt = null;
+            existing._missedHands = 0;
             send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
             send(ws, lobbySnapshot(room));
             if (room.G) send(ws, tableSnapshot(room, myId));
-            logEvent(room, `🔄 ${existing.name} reconnected`);
+            writeLog(room, `RECONNECT: ${name} (Seat ${existing.seat+1}) back online | Was disconnected ~${(wasDisconnectedMs/1000).toFixed(1)}s | Stack: £${(existing.chips/100).toFixed(2)}`);
+            logEvent(room, `\uD83D\uDD04 ${existing.name} reconnected`);
+            svrLog(`RECONNECT OK — ${name} seat ${existing.seat+1} room ${myRoomId}`);
           }
           return;
         }
@@ -316,6 +378,8 @@ wss.on('connection', ws => {
         if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
           room.seats[0] = mkPlayer(ws, myId, name, 0);
           room.hostId = myId;
+          svrLog(`NEW ROOM — ${name} created room ${myRoomId} as host, assigned seat 0`);
+          writeLog(room, `HOST JOINED: ${name} created room ${myRoomId} | ${buyInTag(room.seats[0])}`);
           send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
           broadcastAll(room, lobbySnapshot(room));
           return;
@@ -325,9 +389,12 @@ wss.on('connection', ws => {
           const pj = room.pendingJoins.find(p => p.id === myId);
           pj.ws = ws;
           send(ws, { type: 'waiting', id: myId });
+          svrLog(`JOIN — ${name} (room ${myRoomId}) refreshed pending socket`);
           return;
         }
 
+        svrLog(`JOIN PENDING — ${name} (room ${myRoomId}) waiting for host approval`);
+        writeLog(room, `JOIN REQUEST: ${name} (id: ${myId}) requesting entry to room ${myRoomId}`);
         room.pendingJoins.push({ ws, id: myId, name });
         send(ws, { type: 'waiting', id: myId });
         const host = room.seats.find(s => s?.id === room.hostId);
@@ -352,27 +419,38 @@ wss.on('connection', ws => {
             existSeat.ws = p.ws;
             existSeat.disconnected = false;
             existSeat.autoFold = false;
+            existSeat._missedHands = 0;
+            existSeat._disconnectedAt = null;
             send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
             send(p.ws, lobbySnapshot(room));
             if (room.G) send(p.ws, tableSnapshot(room, p.id));
+            writeLog(room, `RE-ADMITTED: ${existSeat.name} (Seat ${existSeat.seat+1}) re-admitted by host | Stack: £${(existSeat.chips/100).toFixed(2)} | ${buyInTag(existSeat)}`);
             logEvent(room, `✅ ${existSeat.name} re-admitted to the table`);
+            svrLog(`APPROVE — ${existSeat.name} re-admitted to room ${myRoomId} seat ${existSeat.seat+1}`);
           } else {
             const seat = room.seats.findIndex(s => s === null);
             if (seat === -1) {
               send(p.ws, { type: 'rejected', reason: 'Table is full' });
+              writeLog(room, `REJECTED: ${p.name} — table is full (${NP} seats)`);
+              svrLog(`REJECT — ${p.name} room ${myRoomId}: table full`);
               broadcastAll(room, lobbySnapshot(room));
               return;
             }
             room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat);
             send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
+            writeLog(room, `SEATED: ${p.name} assigned Seat ${seat+1} | ${buyInTag(room.seats[seat])}`);
+            svrLog(`APPROVE — ${p.name} seated in room ${myRoomId} seat ${seat+1}`);
             if (room.gameActive) {
               room.seats[seat].sittingOut = true;
+              writeLog(room, `SITTING OUT: ${p.name} (Seat ${seat+1}) — hand in progress, joins next hand`);
               send(p.ws, { type: 'sittingOut', reason: 'Hand in progress - you will join next hand.' });
               send(p.ws, tableSnapshot(room, p.id));
             }
           }
         } else {
           send(p.ws, { type: 'rejected', reason: 'Host declined your request' });
+          writeLog(room, `REJECTED: ${p.name} — declined by host`);
+          svrLog(`REJECT — ${p.name} room ${myRoomId}: declined by host`);
         }
         broadcastAll(room, lobbySnapshot(room));
         break;
@@ -383,6 +461,8 @@ wss.on('connection', ws => {
         if (!room || myId !== room.hostId) return;
         const playable = room.seats.filter(s => s && !s.autoFold);
         if (playable.length < 2) { send(ws, { type: 'error', msg: 'Need at least 2 players' }); return; }
+        svrLog(`GAME START — room ${myRoomId} | ${playable.length} players | host: ${room.seats.find(s=>s?.id===myId)?.name}`);
+        writeLog(room, `GAME STARTED by host | ${playable.length} players seated | ${playable.map(s=>`${s.name}(£${(s.chips/100).toFixed(2)})`).join(', ')}`);
         room.gameActive = true;
         broadcastAll(room, { type: 'gameStarting' });
         broadcastAll(room, lobbySnapshot(room));
@@ -450,12 +530,15 @@ wss.on('connection', ws => {
         const p = room.seats.find(s => s?.id === myId);
         if (!p) return;
         p.voluntaryAutoFold = msg.enabled === true;
-        writeLog(room, `AUTO-FOLD ${p.voluntaryAutoFold ? 'ON' : 'OFF'}: ${p.name} ${p.voluntaryAutoFold ? 'has enabled auto-fold — will fold every hand' : 'has turned auto-fold OFF and is back in the game'}`);
+        const afStatus = p.voluntaryAutoFold ? 'ENABLED' : 'DISABLED';
+        writeLog(room, `AUTO-FOLD ${afStatus}: ${p.name} (Seat ${p.seat+1}) | Stack: £${(p.chips/100).toFixed(2)} | ${buyInTag(p)}`);
+        logEvent(room, `\uD83D\uDD01 AUTO-FOLD ${afStatus}: ${p.name}`);
+        svrLog(`AUTO-FOLD ${afStatus} — ${p.name} room ${myRoomId}`);
         if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
+          writeLog(room, `AUTO-FOLD: ${p.name} is current actor — folding immediately`);
           clearActionTimer(room);
           doFold(room, p.seat, 'auto-fold');
         }
-        // Acknowledge the toggle
         send(ws, { type: 'voluntaryAutoFoldAck', enabled: p.voluntaryAutoFold });
         break;
       }
@@ -482,9 +565,11 @@ wss.on('connection', ws => {
         if (inActiveHand) {
           s.pendingCashOut = true;
           send(ws, { type: 'cashOutPending' });
-          logEvent(room, `💰 ${s.name} will cash out after this hand`);
-          writeLog(room, `CASH OUT PENDING: ${s.name} (Seat ${s.seat+1}) requested cash-out mid-hand — will be processed at hand end | Stack: £${(s.chips/100).toFixed(2)}`);
+          logEvent(room, `\uD83D\uDCB0 ${s.name} will cash out after this hand`);
+          writeLog(room, `CASH OUT PENDING: ${s.name} (Seat ${s.seat+1}) | Stack: £${(s.chips/100).toFixed(2)} | Phase: ${room.G.phase} | ${buyInTag(s)}`);
+          svrLog(`CASH OUT PENDING — ${s.name} room ${myRoomId} mid-hand`);
           if (room.G.toAct[0] === s.seat) {
+            writeLog(room, `CASH OUT: ${s.name} is current actor — folding to process cash out`);
             clearActionTimer(room);
             doFold(room, s.seat, 'cash out');
           } else if (!s.folded) {
@@ -492,12 +577,13 @@ wss.on('connection', ws => {
             const idx = room.G.toAct.indexOf(s.seat);
             if (idx !== -1) room.G.toAct.splice(idx, 1);
             broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (cashing out)' });
-            writeLog(room, `FOLD (cash out): ${s.name}`);
+            writeLog(room, `FOLD (cash out): ${s.name} (Seat ${s.seat+1}) folded to exit hand`);
             broadcastState(room);
             checkRoundEnd(room);
           }
           broadcastState(room);
         } else {
+          writeLog(room, `CASH OUT: ${s.name} (Seat ${s.seat+1}) cashing out immediately — not in active hand`);
           executeCashOut(room, s);
         }
         break;
@@ -508,6 +594,7 @@ wss.on('connection', ws => {
         if (!room) return;
         const s = room.seats.find(s => s?.id === myId);
         if (!s) return;
+        writeLog(room, `CHAT: ${s.name}: ${(msg.text||'').slice(0,120)}`);
         broadcastAll(room, { type: 'chat', name: s.name, text: (msg.text || '').slice(0, 120) });
         break;
       }
@@ -515,14 +602,18 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
+    const openDurationMs = Date.now() - connectedAt;
+    svrLog(`WS CLOSE — id=${myId||'(pre-join)'} room=${myRoomId||'none'} | open ${(openDurationMs/1000).toFixed(1)}s | remaining: ${wss.clients.size}`);
     if (!myId || !myRoomId) return;
     const room = rooms.get(myRoomId);
     if (!room) return;
 
-    // ── Pending join disconnected before being admitted ───────────────────────
     const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
     if (pi !== -1) {
+      const pj = room.pendingJoins[pi];
       room.pendingJoins.splice(pi, 1);
+      writeLog(room, `PENDING JOIN LEFT: ${pj.name} disconnected before being admitted`);
+      svrLog(`PENDING JOIN LEFT — ${pj.name} room ${myRoomId}`);
       broadcastAll(room, lobbySnapshot(room));
       scheduleRoomCleanup(room);
       return;
@@ -530,93 +621,49 @@ wss.on('connection', ws => {
 
     const s = room.seats.find(s => s?.id === myId);
     if (!s) return;
-    if (s.ws !== ws) return; // stale socket from a previous connection
+    if (s.ws !== ws) {
+      svrLog(`WS CLOSE — stale socket for ${s.name} room ${myRoomId}, ignoring`);
+      return;
+    }
 
     s.disconnected = true;
     s.ws = null;
-    logEvent(room, `⚠ ${s.name} disconnected — reconnecting...`);
-    writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) left — ${RECONNECT_GRACE_MS/1000}s grace period started | Stack: £${(s.chips/100).toFixed(2)} | ${buyInTag(s)}`);
+    s._disconnectedAt = Date.now();
+    s._missedHands = s._missedHands || 0; // hand-based absence counter
+    logEvent(room, `\u26A0 ${s.name} disconnected \u2014 will be removed after 3 missed hands`);
+    writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) | Stack: \u00a3${(s.chips/100).toFixed(2)} | Phase: ${room.G?.phase||'idle'} | Missed hands so far: ${s._missedHands} | ${buyInTag(s)}`);
+    svrLog(`DISCONNECT — ${s.name} seat ${s.seat+1} room ${myRoomId} | missedHands: ${s._missedHands}`);
+
+    // Mark autoFold immediately so they are skipped in promptToAct going forward
+    s.autoFold = true;
     broadcastState(room);
 
-    // If they were mid-action, fold them immediately
+    // If they were mid-action right now, fold them out of this hand immediately
     if (room.G && room.G.toAct[0] === s.seat) {
+      writeLog(room, `DISCONNECT: ${s.name} was current actor \u2014 folding immediately`);
       clearActionTimer(room);
       doFold(room, s.seat, 'disconnected');
+    } else if (room.G && !s.folded) {
+      // Not their turn yet but still in the hand — fold them out silently
+      s.folded = true;
+      const idx = room.G.toAct.indexOf(s.seat);
+      if (idx !== -1) room.G.toAct.splice(idx, 1);
+      broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (disconnected)' });
+      writeLog(room, `FOLD (disconnect): ${s.name} (Seat ${s.seat+1}) folded out of current hand`);
+      broadcastState(room);
+      checkRoundEnd(room);
     }
 
-    // Start room cleanup countdown in case nobody else is connected either
     scheduleRoomCleanup(room);
-
-    // Track how many times this seat has timed out without reconnecting
-    s._timeoutCount = (s._timeoutCount || 0);
-
-    s._disconnectTimer = setTimeout(() => {
-      if (!s.disconnected || s.ws !== null) return; // they came back
-      s._timeoutCount++;
-      s._disconnectTimer = null;
-
-      writeLog(room, `TIMEOUT #${s._timeoutCount}: ${s.name} (Seat ${s.seat+1}) failed to reconnect | Stack: £${(s.chips/100).toFixed(2)} | ${buyInTag(s)}`);
-
-      if (s._timeoutCount >= 3) {
-        // ── Triple timeout: evict the seat entirely ──────────────────────────
-        // This is the key fix: instead of setting autoFold and leaving the seat
-        // occupied forever, we remove the player from the room so a fresh join
-        // works correctly and the room can be cleaned up properly.
-        console.log(`[ROOM ${room.id}] ${s.name} timed out 3 times — evicting seat ${s.seat+1}`);
-        logEvent(room, `❌ ${s.name} removed after 3 timeouts`);
-        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'timeout-eviction' });
-        writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) removed after 3 timeouts`);
-
-        // Fold them out of any active hand first
-        if (room.G && !s.folded) {
-          s.folded = true;
-          const idx = room.G.toAct.indexOf(s.seat);
-          if (idx !== -1) room.G.toAct.splice(idx, 1);
-          broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (evicted)' });
-          broadcastState(room);
-          checkRoundEnd(room);
-        }
-
-        // Re-assign host if needed
-        if (room.hostId === s.id) {
-          const newHost = room.seats.find(h => h && h.id !== s.id && h.ws?.readyState === 1);
-          if (newHost) {
-            room.hostId = newHost.id;
-            send(newHost.ws, { type: 'logEvent', text: '👑 You are now the host.' });
-          } else {
-            room.hostId = null;
-          }
-        }
-
-        room.seats[s.seat] = null;
-        broadcastAll(room, lobbySnapshot(room));
-        broadcastState(room);
-        scheduleRoomCleanup(room);
-
-      } else {
-        // ── First / second timeout: autoFold and ask host to re-admit ────────
-        s.autoFold = true;
-        logEvent(room, `⏱ ${s.name} timed out (${s._timeoutCount}/3) — auto-folding until re-admitted`);
-        writeLog(room, `TIMEOUT ${s._timeoutCount}/3: ${s.name} — auto-fold enabled`);
-
-        if (room.G && !s.folded) {
-          s.folded = true;
-          const idx = room.G.toAct.indexOf(s.seat);
-          if (idx !== -1) room.G.toAct.splice(idx, 1);
-          broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (timed out)' });
-          broadcastState(room);
-          checkRoundEnd(room);
-        }
-
-        if (room.hostId) {
-          const host = room.seats.find(h => h?.id === room.hostId && h.ws?.readyState === 1);
-          if (host) send(host.ws, { type: 'joinRequest', id: s.id, name: s.name });
-        }
-      }
-    }, RECONNECT_GRACE_MS);
+    // NOTE: No _disconnectTimer here. Eviction is now hand-based — see
+    // startNewHand() where _missedHands is incremented each hand the player
+    // misses while still disconnected. After 3 missed hands they are evicted.
   });
 
-  ws.on('error', err => console.error('WS error:', err.message));
+  ws.on('error', err => {
+    svrLog(`WS ERROR \u2014 id=${myId||'(pre-join)'} room=${myRoomId||'none'}: ${err.message}`);
+    console.error('WS error:', err.message);
+  });
 });
 
 // ─── Execute an immediate cash-out for a player ───────────────────────────────
@@ -624,7 +671,7 @@ function executeCashOut(room, s) {
   const chips = s.chips;
   const seatIdx = s.seat;
   const logMsg = `CASH OUT: ${s.name} (Seat ${seatIdx+1}) leaves with £${(chips/100).toFixed(2)} | ${buyInTag(s)}`;
-  console.log(logMsg);
+  svrLog(`CASH OUT — ${s.name} room ${room.id} £${(chips/100).toFixed(2)}`);
   if (room.G) writeLog(room, logMsg);
 
   logEvent(room, `💰 ${s.name} cashed out with £${(chips/100).toFixed(2)} | ${buyInTag(s)}`);
@@ -755,16 +802,58 @@ function startNewHand(room) {
     }
   });
 
-  room.seats.forEach(s => {
-    if (s) {
+  // ── Hand-based absence tracking ───────────────────────────────────────────
+  // For every disconnected player, count this as one missed hand.
+  // After ABSENT_HAND_LIMIT consecutive missed hands → evict the seat.
+  // This replaces the old timer-based approach which was unreliable because
+  // startNewHand was clearing the disconnect timer before it could fire.
+  const ABSENT_HAND_LIMIT = 3;
+  room.seats.forEach((s, idx) => {
+    if (!s) return;
+    if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
+
+    if (s.disconnected && s.autoFold) {
+      s._missedHands = (s._missedHands || 0) + 1;
+      writeLog(room, `ABSENT: ${s.name} (Seat ${s.seat+1}) missed hand — absent ${s._missedHands}/${ABSENT_HAND_LIMIT} | ${buyInTag(s)}`);
+      logEvent(room, `\uD83D\uDCA4 ${s.name} absent — missed ${s._missedHands}/${ABSENT_HAND_LIMIT} hand${s._missedHands>1?'s':''}`);
+      svrLog(`ABSENT — ${s.name} room ${room.id} missedHands=${s._missedHands}/${ABSENT_HAND_LIMIT}`);
+
+      if (s._missedHands >= ABSENT_HAND_LIMIT) {
+        // Evict
+        svrLog(`EVICT — ${s.name} room ${room.id} seat ${s.seat+1} after ${ABSENT_HAND_LIMIT} missed hands`);
+        logEvent(room, `\u274C ${s.name} removed after ${ABSENT_HAND_LIMIT} missed hands`);
+        writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) removed after ${ABSENT_HAND_LIMIT} consecutive missed hands | ${buyInTag(s)}`);
+        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'absent-eviction' });
+
+        if (room.hostId === s.id) {
+          const newHost = room.seats.find(h => h && h.id !== s.id && h.ws?.readyState === 1);
+          if (newHost) {
+            room.hostId = newHost.id;
+            writeLog(room, `HOST TRANSFER: ${s.name} evicted \u2192 ${newHost.name} is new host`);
+            svrLog(`HOST TRANSFER — room ${room.id}: ${s.name} \u2192 ${newHost.name}`);
+            send(newHost.ws, { type: 'logEvent', text: '\uD83D\uDC51 You are now the host.' });
+          } else {
+            room.hostId = null;
+          }
+        }
+
+        room.seats[idx] = null;
+        broadcastAll(room, lobbySnapshot(room));
+        scheduleRoomCleanup(room);
+      }
+    } else {
+      // Connected player — reset their absence counter
+      s._missedHands = 0;
       s.sittingOut = false;
-      if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
     }
   });
 
   const active = activePlaying(room);
 
   if (active.length < 2) {
+    const seated = room.seats.filter(Boolean).map(s=>`${s.name}(chips:£${(s.chips/100).toFixed(2)},sittingOut:${!!s.sittingOut},spectator:${!!s.spectator},pendingBB:${!!s.pendingBuyBack})`).join(', ');
+    writeLog(room, `WAITING: not enough active players to start hand | active=${active.length} | all seats: ${seated}`);
+    svrLog(`ROOM ${room.id} — waiting for players (active: ${active.length})`);
     broadcastAll(room, { type: 'waitingForPlayers' });
     room.gameActive = false;
     broadcastAll(room, lobbySnapshot(room));
@@ -970,6 +1059,7 @@ function promptToAct(room) {
   if (p.disconnected || p.autoFold || p.voluntaryAutoFold) {
     clearActionTimer(room);
     const reason = p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
+    writeLog(room, `PROMPT: ${p.name} (Seat ${seat+1}) — auto-folding (${reason})`);
     doFold(room, seat, reason);
     return;
   }
@@ -977,9 +1067,9 @@ function promptToAct(room) {
   // FIX #4: Determine if this is a check (no bet to call) or call situation
   const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
   const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
-
-  // firstBet = no one has bet yet this street (so button says BET not RAISE)
   const firstBet = G.currentBet === 0;
+
+  writeLog(room, `PROMPT: ${p.name.padEnd(18)} (Seat ${seat+1}) | Phase: ${G.phase} | Stack: £${(p.chips/100).toFixed(2)} | ${callAmt===0?'can CHECK':'must CALL £'+(callAmt/100).toFixed(2)} | min${firstBet?'BET':'RAISE'}: £${(minRaise/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)} | toAct: ${G.toAct.map(i=>room.seats[i]?.name||'?').join('→')}`);
 
   broadcastAll(room, {
     type: 'yourTurn',
@@ -998,19 +1088,16 @@ function doFold(room, seat, reason) {
   if (!p) return;
   p.folded = true;
   const label = reason ? ` (${reason})` : '';
+  const playersLeft = room.seats.filter(s => s && !s.folded && !s.autoFold && !s.voluntaryAutoFold).length;
+  const reasonTag = reason ? `reason=${reason}` : 'voluntary';
   broadcastAll(room, { type: 'playerAction', seat, action: 'fold', amount: 0, name: p.name + label });
-  writeLog(room, `FOLD   | ${p.name.padEnd(18)} | Pot: £${((room.G?.pot||0)/100).toFixed(2)} | Players still in: ${room.seats.filter(s=>s&&!s.folded).length}${label?'  ('+label.trim()+')':''}`);
-  // Remove from toAct
+  writeLog(room, `FOLD   | ${p.name.padEnd(18)} | ${reasonTag.padEnd(22)} | Stack: £${(p.chips/100).toFixed(2).padStart(7)} | Pot: £${((room.G?.pot||0)/100).toFixed(2)} | Players left: ${playersLeft}`);
   if (room.G) {
     const idx = room.G.toAct.indexOf(seat);
     if (idx !== -1) room.G.toAct.splice(idx, 1);
   }
   broadcastState(room);
-
-  // Check if round should end immediately
   if (!checkRoundEnd(room)) {
-    // Round continues — but if only one player can still act and toAct has more,
-    // still need to prompt the next player
     setTimeout(() => promptToAct(room), 200);
   }
 }
@@ -1022,71 +1109,55 @@ function handleAction(room, seat, action, amount) {
   const p = room.seats[seat];
   const G = room.G;
   if (!p || !G) return;
+  const stackBefore = p.chips;
 
   if (action === 'fold') {
     doFold(room, seat, null);
 
   } else if (action === 'check' || action === 'call') {
-    // FIX #4: Correctly handle check vs call
     const ca = Math.min(G.currentBet - p.bet, p.chips);
     p.chips -= ca; p.bet += ca; G.pot += ca;
-
-    // Determine if this was actually a check or call
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    writeLog(room, `${act==='check'?'CHECK ':'CALL  '} | ${p.name.padEnd(18)} | Amount: ${ca>0?'£'+(ca/100).toFixed(2).padStart(7):'  ---   '} | Stack after: £${(p.chips/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`);
+    writeLog(room,
+      `${act==='check'?'CHECK ':'CALL  '} | ${p.name.padEnd(18)} | Stack: £${(stackBefore/100).toFixed(2)} → £${(p.chips/100).toFixed(2)}` +
+      ` | ${ca>0?'Paid: £'+(ca/100).toFixed(2):'(no payment)'} | Pot: £${(G.pot/100).toFixed(2)} | toAct remaining: ${G.toAct.length-1}`
+    );
     broadcastState(room);
-
-    // Remove from toAct and advance
     G.toAct.shift();
     setTimeout(() => promptToAct(room), 200);
 
   } else if (action === 'raise') {
-    // FIX #4: Raise logic — rebuild toAct properly after a raise
-    const callAmount     = G.currentBet - p.bet;           // what they must call first
+    const callAmount     = G.currentBet - p.bet;
     const minFromStack   = Math.min(callAmount + G.lastRaiseIncrement, p.chips);
     const raiseFromStack = Math.min(Math.max(amount || minFromStack, minFromStack), p.chips);
-
     const prevCurrentBet = G.currentBet;
     p.chips -= raiseFromStack;
     p.bet   += raiseFromStack;
     G.pot   += raiseFromStack;
-
-    // New street-level bet ceiling
     G.currentBet = Math.max(G.currentBet, p.bet);
-
-    // Track raise increment for min-raise calculation
-    if (G.currentBet > prevCurrentBet) {
-      G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
-    }
+    if (G.currentBet > prevCurrentBet) G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
 
     broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
     writeLog(room,
-      `RAISE  | ${p.name.padEnd(18)} | Amount: £${(raiseFromStack/100).toFixed(2).padStart(7)} | Total bet: £${(p.bet/100).toFixed(2)} | ` +
-      `New street bet: £${(G.currentBet/100).toFixed(2)} | Stack after: £${(p.chips/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`
+      `${p.bet===p.chips+raiseFromStack&&stackBefore===raiseFromStack?'ALL-IN':'RAISE '} | ${p.name.padEnd(18)}` +
+      ` | Stack: £${(stackBefore/100).toFixed(2)} → £${(p.chips/100).toFixed(2)}` +
+      ` | Raised: £${(raiseFromStack/100).toFixed(2)} | Total bet this street: £${(p.bet/100).toFixed(2)}` +
+      ` | New street ceiling: £${(G.currentBet/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`
     );
     broadcastState(room);
 
-    // FIX #4: After a raise, rebuild toAct to include ALL remaining active players
-    // who haven't yet matched the new currentBet — rotating from the player AFTER the raiser.
     const active = activePlaying(room).sort((a, b) => a - b);
-
-    // Build a rotation starting from the seat AFTER the raiser
     const raiserIdx = active.indexOf(seat);
     const rotated = raiserIdx >= 0
       ? [...active.slice(raiserIdx + 1), ...active.slice(0, raiserIdx + 1)]
       : active;
-
-    // Include every active player who:
-    // - hasn't folded
-    // - has chips
-    // - has NOT yet matched the new currentBet (or is the raiser themselves, excluded since they just acted)
     G.toAct = rotated.filter(i => {
-      if (i === seat) return false; // raiser doesn't act again unless re-raised
+      if (i === seat) return false;
       const op = room.seats[i];
       return op && !op.folded && !op.autoFold && !op.voluntaryAutoFold && op.chips > 0 && op.bet < G.currentBet;
     });
-
+    writeLog(room, `RAISE  | New toAct order: ${G.toAct.map(i=>room.seats[i]?.name||'?').join(' → ')} (${G.toAct.length} to act)`);
     setTimeout(() => promptToAct(room), 200);
   }
 }
@@ -1105,11 +1176,13 @@ function advPhase(room) {
   const next = { preflop: 'flop', flop: 'turn', turn: 'river' };
 
   if (G.phase in next) {
+    const prevPhase = G.phase;
     G.phase = next[G.phase];
     const count = G.phase === 'flop' ? 3 : 1;
     const newCards = [];
     for (let i = 0; i < count; i++) { const c = G.deck.shift(); G.community.push(c); newCards.push(c); }
 
+    writeLog(room, `PHASE: ${prevPhase.toUpperCase()} → ${G.phase.toUpperCase()} | New card(s): ${newCards.map(c=>c.r+c.s).join(' ')} | Board: ${G.community.map(c=>c.r+c.s).join(' ')} | Pot: £${(G.pot/100).toFixed(2)}`);
     broadcastAll(room, { type: 'communityDealt', phase: G.phase, cards: G.community, newCards });
     writeLog(room, '');
     writeLog(room, '┌─ ' + G.phase.toUpperCase().padEnd(10) + '──────────────────────────────────────────┐');
@@ -1431,10 +1504,12 @@ function handName(s) {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
-  console.log(`\n♣ SYFM Poker running on port ${PORT}`);
-  console.log(`   Game: http://localhost:${PORT}`);
-  console.log(`   Logs: http://localhost:${PORT}/logs`);
-  console.log(`   FTP:  ${process.env.FTP_HOST || '(not configured)'}\n`);
+  const startMsg = `SYFM Poker server started | port=${PORT} | pid=${process.pid} | node=${process.version}`;
+  console.log(`\n♣ ${startMsg}`);
+  svrLog(startMsg);
+  svrLog(`HTTP: http://localhost:${PORT}`);
+  svrLog(`Logs: http://localhost:${PORT}/logs`);
+  svrLog(`FTP:  ${process.env.FTP_HOST || '(not configured)'}`);
 });
 
 // ─── Graceful shutdown (Render.com sends SIGTERM before killing the process) ──
@@ -1442,30 +1517,33 @@ server.listen(PORT, () => {
 // With it, we close all WebSocket connections cleanly first so clients
 // immediately get a "connection closed" event and can show a reconnect UI.
 function gracefulShutdown(signal) {
-  console.log(`\n[SHUTDOWN] ${signal} received — closing ${rooms.size} room(s) and ${wss.clients.size} connection(s)`);
-
-  // Tell every connected client the server is going down so they can show
-  // a "server restarting" message rather than silently hanging.
-  const shutdownMsg = JSON.stringify({ type: 'serverShutdown', reason: 'Server is restarting. Please refresh to reconnect.' });
-  wss.clients.forEach(client => {
-    try { if (client.readyState === 1) client.send(shutdownMsg); } catch {}
+  const ts = new Date().toISOString();
+  svrLog(`SHUTDOWN: ${signal} received at ${ts} | rooms=${rooms.size} | wsConnections=${wss.clients.size}`);
+  rooms.forEach(room => {
+    const players = room.seats.filter(Boolean).map(s=>`${s.name}(£${(s.chips/100).toFixed(2)})`).join(', ');
+    svrLog(`SHUTDOWN: closing room ${room.id} | hand #${room.handNum} | players: ${players||'none'}`);
+    writeLog(room, `SERVER SHUTDOWN: ${signal} received — server closing | All sessions terminated`);
   });
 
-  // Clear all timers in all rooms
+  const shutdownMsg = JSON.stringify({ type: 'serverShutdown', reason: 'Server is restarting. Please refresh to reconnect.' });
+  let notified = 0;
+  wss.clients.forEach(client => {
+    try { if (client.readyState === 1) { client.send(shutdownMsg); notified++; } } catch {}
+  });
+  svrLog(`SHUTDOWN: notified ${notified} client(s) via serverShutdown message`);
+
   rooms.forEach(room => destroyRoom(room));
 
-  // Close the WebSocket server (stops accepting new connections)
   wss.close(() => {
-    // Then close the HTTP server
+    svrLog('SHUTDOWN: WebSocket server closed');
     server.close(() => {
-      console.log('[SHUTDOWN] Clean exit');
+      svrLog('SHUTDOWN: HTTP server closed — clean exit');
       process.exit(0);
     });
   });
 
-  // Safety net — force exit after 5s if something hangs
   setTimeout(() => {
-    console.error('[SHUTDOWN] Force exit after timeout');
+    svrLog('SHUTDOWN: force exit after 5s timeout');
     process.exit(1);
   }, 5000).unref();
 }
