@@ -359,8 +359,10 @@ wss.on('connection', ws => {
         const p = room.seats.find(s => s?.id === myId);
         if (!p || !p.pendingBuyBack) return;
 
+        // Clear the auto-spectate timeout
+        if (p._buyBackTimer) { clearTimeout(p._buyBackTimer); p._buyBackTimer = null; }
+
         if (msg.accept) {
-          // Buy back in — add a fresh stack
           p.chips = START_CHIPS;
           p.pendingBuyBack = false;
           p.sittingOut = false;
@@ -369,7 +371,6 @@ wss.on('connection', ws => {
           broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} has bought back in for £${(START_CHIPS/100).toFixed(2)}!` });
           send(p.ws, { type: 'buyBackAccepted', chips: START_CHIPS });
         } else {
-          // Decline — become a spectator
           p.pendingBuyBack = false;
           p.sittingOut = true;
           p.spectator = true;
@@ -377,21 +378,7 @@ wss.on('connection', ws => {
           broadcastAll(room, { type: 'chat', name: 'System', text: `${p.name} is now spectating.` });
           send(p.ws, { type: 'spectating' });
         }
-
-        // Check if we now have enough players to start (or can't continue)
-        const stillDeciding = room.seats.filter(s => s?.pendingBuyBack).length;
-        if (stillDeciding === 0) {
-          // All decisions in — check if enough active players
-          const playable = room.seats.filter(s => s && !s.sittingOut && !s.spectator && !s.autoFold && s.chips > 0);
-          if (playable.length < 2) {
-            writeLog(room, 'Not enough players to continue — returning to lobby');
-            broadcastAll(room, { type: 'waitingForPlayers' });
-            room.gameActive = false;
-            broadcastAll(room, lobbySnapshot(room));
-          } else {
-            startNewHand(room);
-          }
-        }
+        broadcastState(room);
         break;
       }
 
@@ -1013,30 +1000,31 @@ function finish(room, winners, label) {
   if (logPath) setTimeout(() => ftpUpload(logPath), 500);
 
   setTimeout(() => {
-    // Check for busted players — offer buy-back instead of ejecting
-    let anyBusted = false;
+    // Offer buy-back ONCE to newly busted players (never to existing spectators)
     room.seats.forEach((s, i) => {
-      if (s && s.chips <= 0 && !s.pendingBuyBack) {
-        anyBusted = true;
+      if (s && s.chips <= 0 && !s.pendingBuyBack && !s.spectator) {
         s.pendingBuyBack = true;
         s.sittingOut = true;
-        writeLog(room, `BUST: ${s.name} (Seat ${i+1}) is out of chips — offering buy-back`);
+        writeLog(room, `BUST: ${s.name} (Seat ${i+1}) is out of chips — offering buy-back (15s)`);
         broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} is out of chips!` });
         send(s.ws, { type: 'buyBackOffer', chips: START_CHIPS });
+
+        // Auto-default to spectator after 15 seconds if no response
+        s._buyBackTimer = setTimeout(() => {
+          if (!s.pendingBuyBack) return; // already decided
+          s.pendingBuyBack = false;
+          s.sittingOut = true;
+          s.spectator = true;
+          writeLog(room, `SPECTATOR (timeout): ${s.name} did not respond — now spectating`);
+          broadcastAll(room, { type: 'chat', name: 'System', text: `${s.name} is now spectating.` });
+          send(s.ws, { type: 'spectating' });
+          broadcastState(room);
+        }, 15000);
       }
     });
 
-    // Check if game can continue (need 2+ players with chips or pending buy-back decision)
-    const canPlay = room.seats.filter(s => s && (s.chips > 0 || s.pendingBuyBack) && !s.spectator).length;
-    if (canPlay < 2 && !anyBusted) {
-      startNewHand(room);
-    } else if (!anyBusted) {
-      startNewHand(room);
-    } else {
-      // Wait for buy-back decisions before starting next hand
-      // startNewHand will be called after all decisions come in
-      broadcastState(room);
-    }
+    // Start next hand immediately — spectators/pendingBuyBack are excluded by activePlaying()
+    startNewHand(room);
   }, 5000);
 }
 
