@@ -358,7 +358,7 @@ const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true);
 window.addEventListener('resize',()=>engine.resize());
 canvas.addEventListener('click',()=>ensureAudio(),{once:true});
-let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
+let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null,highlightLayer=null,_cardPulseTimer=null;
 const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
 function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
@@ -640,7 +640,11 @@ const ilm=new BABYLON.StandardMaterial('ilm',scene);
 ilm.diffuseColor=new BABYLON.Color3(0.08,0.32,0.14);
 ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
 inlay.material=ilm;
-const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();return scene;}
+const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();
+highlightLayer=new BABYLON.HighlightLayer('hl',scene);
+highlightLayer.innerGlow=false;
+highlightLayer.outerGlow=true;
+return scene;}
 let seatActions={};
 
 // FIX #2: applyState only shows cards the server has told us to show.
@@ -1004,6 +1008,46 @@ function showTurnIndicator(txt){document.getElementById('turnIndicator').textCon
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
 
 const TURN_SECS=15;
+// ── Card outline pulse helpers ────────────────────────────────────────────────
+function startCardPulse(secs, totalSecs) {
+  stopCardPulse();
+  if (!highlightLayer) return;
+  const meshes = (seatCardMeshes[mySeat] || []).filter(Boolean);
+  if (!meshes.length) return;
+
+  // Pulse interval gets shorter as time runs out:
+  // >10s → 1000ms, 5-10s → 600ms, ≤5s → 250ms (frantic)
+  const interval = secs > 10 ? 1000 : secs > 5 ? 600 : 250;
+  // Colour: gold → orange → red
+  const r = secs > 10 ? 0.8 : 1.0;
+  const g = secs > 10 ? 0.78 : secs > 5 ? 0.45 : 0.0;
+  const b = 0.0;
+  const col = new BABYLON.Color3(r, g, b);
+
+  let on = true;
+  // Add initial highlight
+  meshes.forEach(m => { try { highlightLayer.addMesh(m, col); } catch(e){} });
+
+  _cardPulseTimer = setInterval(() => {
+    on = !on;
+    meshes.forEach(m => {
+      try {
+        if (on) highlightLayer.addMesh(m, col);
+        else highlightLayer.removeMesh(m);
+      } catch(e) {}
+    });
+  }, interval);
+}
+
+function stopCardPulse() {
+  if (_cardPulseTimer) { clearInterval(_cardPulseTimer); _cardPulseTimer = null; }
+  if (highlightLayer) {
+    const meshes = (seatCardMeshes[mySeat] || []).filter(Boolean);
+    meshes.forEach(m => { try { highlightLayer.removeMesh(m); } catch(e){} });
+  }
+}
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){
   clearInterval(_countdownInterval);
@@ -1011,6 +1055,7 @@ function startCountdown(isMe,playerName){
   const ring=document.getElementById('myCountdownRing');
   const num=document.getElementById('myCountdownNum');
   const myBox=document.getElementById('myCountdown');
+  const foldBtn=document.getElementById('foldBtn');
   const circumference=138.2;
   function tick(){
     const frac=secs/TURN_SECS;
@@ -1022,6 +1067,14 @@ function startCountdown(isMe,playerName){
       num.textContent=secs;
       num.style.color=colour;
       showTurnIndicator('\u23f3 Your turn! ('+secs+'s)');
+      // Timer inside fold button
+      if(foldBtn){
+        foldBtn.textContent='FOLD '+secs+'s';
+        foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';
+        foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-secs)*4)+'px rgba(220,40,40,0.8)':'none';
+      }
+      // Card pulse — restart each second so interval adjusts as time changes
+      startCardPulse(secs, TURN_SECS);
     } else {
       myBox.style.display='none';
       showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');
@@ -1035,6 +1088,14 @@ function startCountdown(isMe,playerName){
 function stopCountdown(){
   clearInterval(_countdownInterval);
   document.getElementById('myCountdown').style.display='none';
+  // Reset fold button text and style
+  const foldBtn=document.getElementById('foldBtn');
+  if(foldBtn){
+    foldBtn.textContent='FOLD';
+    foldBtn.style.background='';
+    foldBtn.style.boxShadow='';
+  }
+  stopCardPulse();
 }
 function setActions(v){
   const panel=document.getElementById('actionPanel');
@@ -1045,6 +1106,12 @@ function setActions(v){
   });
   const dw=document.getElementById('drumWidget');
   if(dw)dw.style.display=v?'flex':'none';
+  if(!v){
+    // Turn ended — reset fold button and stop card pulse
+    const foldBtn=document.getElementById('foldBtn');
+    if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}
+    stopCardPulse();
+  }
 }
 function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);}
