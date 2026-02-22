@@ -346,7 +346,7 @@ const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true);
 window.addEventListener('resize',()=>engine.resize());
 canvas.addEventListener('click',()=>ensureAudio(),{once:true});
-let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null,_cardPulseTimer=null;
+let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
 const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
 function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
@@ -993,63 +993,6 @@ function showTurnIndicator(txt){document.getElementById('turnIndicator').textCon
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
 
 const TURN_SECS=15;
-// ── Card border pulse ─────────────────────────────────────────────────────────
-// ── Card emissive pulse ───────────────────────────────────────────────────────
-// Clones the material on each of my two card meshes so we can animate
-// ── Card emissive pulse ───────────────────────────────────────────────────────
-let _pulseMeshes=[], _pulseOrigMats=[], _pulseCloneMats=[];
-function startCardPulse(secs){
-  // If already pulsing, just update the colour — don't restart
-  if(_cardPulseTimer&&_pulseCloneMats.length){
-    const g=secs>10?0.55:secs>5?0.28:0.0;
-    const newInterval=secs>10?900:secs>5?500:200;
-    _pulseCloneMats.forEach(c=>{ c.emissiveColor=new BABYLON.Color3(0.9,g,0); });
-    // Restart interval only if speed bracket changed
-    if((_lastPulseInterval||0)!==newInterval){
-      _lastPulseInterval=newInterval;
-      clearInterval(_cardPulseTimer);
-      let bright=true;
-      const glowCol=()=>new BABYLON.Color3(0.9,secs>10?0.55:secs>5?0.28:0.0,0);
-      _cardPulseTimer=setInterval(()=>{
-        bright=!bright;
-        _pulseCloneMats.forEach(c=>{ c.emissiveColor=bright?glowCol():new BABYLON.Color3(0,0,0); });
-      },newInterval);
-    }
-    return;
-  }
-  // First call — set up clone materials
-  stopCardPulse();
-  if(!scene)return;
-  _pulseMeshes=(seatCardMeshes[mySeat]||[]).filter(m=>m&&m.isVisible);
-  if(!_pulseMeshes.length)return;
-  const g=secs>10?0.55:secs>5?0.28:0.0;
-  const glowCol=new BABYLON.Color3(0.9,g,0);
-  _pulseOrigMats=_pulseMeshes.map(m=>m.material);
-  _pulseCloneMats=_pulseMeshes.map((m,i)=>{
-    const c=_pulseOrigMats[i].clone('_pulse_'+m.name);
-    c.emissiveColor=glowCol.clone();
-    m.material=c;
-    return c;
-  });
-  let bright=true;
-  const interval=secs>10?900:secs>5?500:200;
-  _lastPulseInterval=interval;
-  _cardPulseTimer=setInterval(()=>{
-    bright=!bright;
-    _pulseCloneMats.forEach(c=>{ c.emissiveColor=bright?glowCol.clone():new BABYLON.Color3(0,0,0); });
-  },interval);
-}
-let _lastPulseInterval=0;
-function stopCardPulse(){
-  if(_cardPulseTimer){clearInterval(_cardPulseTimer);_cardPulseTimer=null;}
-  _lastPulseInterval=0;
-  _pulseMeshes.forEach((m,i)=>{
-    if(_pulseOrigMats[i])m.material=_pulseOrigMats[i];
-    if(_pulseCloneMats[i])try{_pulseCloneMats[i].dispose();}catch(e){}
-  });
-  _pulseMeshes=[];_pulseOrigMats=[];_pulseCloneMats=[];
-}
-
 // ── Countdown ─────────────────────────────────────────────────────────────────
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){
@@ -1058,13 +1001,11 @@ function startCountdown(isMe,playerName){
   const foldBtn=document.getElementById('foldBtn');
   function tick(){
     if(isMe){
-      // No separate indicator — timer is inside the fold button only
       if(foldBtn){
         foldBtn.textContent='FOLD '+secs+'s';
         foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';
         foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';
       }
-      startCardPulse(secs);
     }else{
       showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');
     }
@@ -1078,7 +1019,6 @@ function stopCountdown(){
   clearInterval(_countdownInterval);
   const foldBtn=document.getElementById('foldBtn');
   if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}
-  stopCardPulse();
 }
 function setActions(v){
   const panel=document.getElementById('actionPanel');
@@ -1090,10 +1030,8 @@ function setActions(v){
   const dw=document.getElementById('drumWidget');
   if(dw)dw.style.display=v?'flex':'none';
   if(!v){
-    // Turn ended — reset fold button and stop card pulse
     const foldBtn=document.getElementById('foldBtn');
     if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}
-    stopCardPulse();
   }
 }
 function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
