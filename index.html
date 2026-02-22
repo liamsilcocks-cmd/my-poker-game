@@ -99,9 +99,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   .cbtn-fs{display:none!important}
 }
 
-#myCountdown{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));display:none;z-index:111;pointer-events:none}
-#myCountdown svg{filter:drop-shadow(0 0 4px rgba(0,0,0,0.8))}
-#myCountdownNum{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:bold;color:#ffd700;text-shadow:0 1px 3px rgba(0,0,0,1)}
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
 #sideBoxes{position:absolute;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
 #chatBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #3a2a10;overflow:hidden}
@@ -300,15 +297,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <div id="spectatorBanner">👀 You are spectating — no cards will be dealt to you</div>
   <div id="msg"></div>
   <div id="waitingMsg"></div>
-  <div id="myCountdown">
-    <svg width="52" height="52" viewBox="0 0 52 52">
-      <circle cx="26" cy="26" r="22" fill="rgba(0,0,0,0.7)" stroke="#333" stroke-width="3"/>
-      <circle id="myCountdownRing" cx="26" cy="26" r="22" fill="none" stroke="#c8a020" stroke-width="4"
-        stroke-dasharray="138.2" stroke-dashoffset="0" stroke-linecap="round"
-        transform="rotate(-90 26 26)"/>
-    </svg>
-    <div id="myCountdownNum">30</div>
-  </div>
   <div id="joinRequestNotif">
     <h4>&#9203; Players want to join</h4>
     <div id="joinReqList"></div>
@@ -358,7 +346,7 @@ const canvas=document.getElementById('c');
 const engine=new BABYLON.Engine(canvas,true);
 window.addEventListener('resize',()=>engine.resize());
 canvas.addEventListener('click',()=>ensureAudio(),{once:true});
-let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null,highlightLayer=null,_cardPulseTimer=null;
+let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null,_cardPulseTimer=null;
 const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
 function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
 function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
@@ -641,9 +629,6 @@ ilm.diffuseColor=new BABYLON.Color3(0.08,0.32,0.14);
 ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
 inlay.material=ilm;
 const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();
-highlightLayer=new BABYLON.HighlightLayer('hl',scene);
-highlightLayer.innerGlow=false;
-highlightLayer.outerGlow=true;
 return scene;}
 let seatActions={};
 
@@ -1008,43 +993,45 @@ function showTurnIndicator(txt){document.getElementById('turnIndicator').textCon
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
 
 const TURN_SECS=15;
-// ── Card outline pulse helpers ────────────────────────────────────────────────
-function startCardPulse(secs, totalSecs) {
+// ── Card border pulse ─────────────────────────────────────────────────────────
+// ── Card emissive pulse ───────────────────────────────────────────────────────
+// Clones the material on each of my two card meshes so we can animate
+// emissiveColor independently without affecting other cards that share the same mat.
+let _pulseMats=[], _pulseOrigMats=[];
+function startCardPulse(secs){
   stopCardPulse();
-  if (!highlightLayer) return;
-  const meshes = (seatCardMeshes[mySeat] || []).filter(Boolean);
-  if (!meshes.length) return;
-
-  // Pulse interval gets shorter as time runs out:
-  // >10s → 1000ms, 5-10s → 600ms, ≤5s → 250ms (frantic)
-  const interval = secs > 10 ? 1000 : secs > 5 ? 600 : 250;
-  // Colour: gold → orange → red
-  const r = secs > 10 ? 0.8 : 1.0;
-  const g = secs > 10 ? 0.78 : secs > 5 ? 0.45 : 0.0;
-  const b = 0.0;
-  const col = new BABYLON.Color3(r, g, b);
-
-  let on = true;
-  // Add initial highlight
-  meshes.forEach(m => { try { highlightLayer.addMesh(m, col); } catch(e){} });
-
-  _cardPulseTimer = setInterval(() => {
-    on = !on;
-    meshes.forEach(m => {
-      try {
-        if (on) highlightLayer.addMesh(m, col);
-        else highlightLayer.removeMesh(m);
-      } catch(e) {}
+  if(!scene)return;
+  const myMeshes=(seatCardMeshes[mySeat]||[]).filter(m=>m&&m.isVisible);
+  if(!myMeshes.length)return;
+  // Clone materials so we don't affect shared mats
+  _pulseMats=myMeshes.map(m=>{
+    _pulseOrigMats.push(m.material);
+    const clone=m.material.clone('pulsemat_'+m.name);
+    m.material=clone;
+    return clone;
+  });
+  // Colour ramps: gold → orange → red
+  const r=1.0, g=secs>10?0.65:secs>5?0.35:0.0, b=0.0;
+  // Pulse interval speeds up as time runs out
+  const interval=secs>10?900:secs>5?500:200;
+  let bright=true;
+  function applyEmissive(on){
+    _pulseMats.forEach(mat=>{
+      mat.emissiveColor=on?new BABYLON.Color3(r,g,b):new BABYLON.Color3(0,0,0);
     });
-  }, interval);
-}
-
-function stopCardPulse() {
-  if (_cardPulseTimer) { clearInterval(_cardPulseTimer); _cardPulseTimer = null; }
-  if (highlightLayer) {
-    const meshes = (seatCardMeshes[mySeat] || []).filter(Boolean);
-    meshes.forEach(m => { try { highlightLayer.removeMesh(m); } catch(e){} });
   }
+  applyEmissive(true);
+  _cardPulseTimer=setInterval(()=>{ bright=!bright; applyEmissive(bright); },interval);
+}
+function stopCardPulse(){
+  if(_cardPulseTimer){clearInterval(_cardPulseTimer);_cardPulseTimer=null;}
+  // Restore original materials and dispose clones
+  const myMeshes=(seatCardMeshes[mySeat]||[]).filter(m=>m&&m.isVisible);
+  myMeshes.forEach((m,i)=>{
+    if(_pulseOrigMats[i])m.material=_pulseOrigMats[i];
+    if(_pulseMats[i])try{_pulseMats[i].dispose();}catch(e){}
+  });
+  _pulseMats=[];_pulseOrigMats=[];
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────
@@ -1052,31 +1039,17 @@ let _countdownInterval=null;
 function startCountdown(isMe,playerName){
   clearInterval(_countdownInterval);
   let secs=TURN_SECS;
-  const ring=document.getElementById('myCountdownRing');
-  const num=document.getElementById('myCountdownNum');
-  const myBox=document.getElementById('myCountdown');
   const foldBtn=document.getElementById('foldBtn');
-  const circumference=138.2;
   function tick(){
-    const frac=secs/TURN_SECS;
-    const colour=secs>10?'#c8a020':secs>5?'#e07020':'#e03030';
     if(isMe){
-      myBox.style.display='block';
-      ring.style.stroke=colour;
-      ring.style.strokeDashoffset=String(circumference*(1-frac));
-      num.textContent=secs;
-      num.style.color=colour;
-      showTurnIndicator('\u23f3 Your turn! ('+secs+'s)');
-      // Timer inside fold button
+      // No separate indicator — timer is inside the fold button only
       if(foldBtn){
         foldBtn.textContent='FOLD '+secs+'s';
         foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';
-        foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-secs)*4)+'px rgba(220,40,40,0.8)':'none';
+        foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';
       }
-      // Card pulse — restart each second so interval adjusts as time changes
-      startCardPulse(secs, TURN_SECS);
-    } else {
-      myBox.style.display='none';
+      startCardPulse(secs);
+    }else{
       showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');
     }
     if(secs<=0){clearInterval(_countdownInterval);return;}
@@ -1087,14 +1060,8 @@ function startCountdown(isMe,playerName){
 }
 function stopCountdown(){
   clearInterval(_countdownInterval);
-  document.getElementById('myCountdown').style.display='none';
-  // Reset fold button text and style
   const foldBtn=document.getElementById('foldBtn');
-  if(foldBtn){
-    foldBtn.textContent='FOLD';
-    foldBtn.style.background='';
-    foldBtn.style.boxShadow='';
-  }
+  if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}
   stopCardPulse();
 }
 function setActions(v){
