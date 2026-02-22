@@ -996,42 +996,58 @@ const TURN_SECS=15;
 // ── Card border pulse ─────────────────────────────────────────────────────────
 // ── Card emissive pulse ───────────────────────────────────────────────────────
 // Clones the material on each of my two card meshes so we can animate
-// emissiveColor independently without affecting other cards that share the same mat.
-let _pulseMats=[], _pulseOrigMats=[];
+// ── Card emissive pulse ───────────────────────────────────────────────────────
+let _pulseMeshes=[], _pulseOrigMats=[], _pulseCloneMats=[];
 function startCardPulse(secs){
+  // If already pulsing, just update the colour — don't restart
+  if(_cardPulseTimer&&_pulseCloneMats.length){
+    const g=secs>10?0.55:secs>5?0.28:0.0;
+    const newInterval=secs>10?900:secs>5?500:200;
+    _pulseCloneMats.forEach(c=>{ c.emissiveColor=new BABYLON.Color3(0.9,g,0); });
+    // Restart interval only if speed bracket changed
+    if((_lastPulseInterval||0)!==newInterval){
+      _lastPulseInterval=newInterval;
+      clearInterval(_cardPulseTimer);
+      let bright=true;
+      const glowCol=()=>new BABYLON.Color3(0.9,secs>10?0.55:secs>5?0.28:0.0,0);
+      _cardPulseTimer=setInterval(()=>{
+        bright=!bright;
+        _pulseCloneMats.forEach(c=>{ c.emissiveColor=bright?glowCol():new BABYLON.Color3(0,0,0); });
+      },newInterval);
+    }
+    return;
+  }
+  // First call — set up clone materials
   stopCardPulse();
   if(!scene)return;
-  const myMeshes=(seatCardMeshes[mySeat]||[]).filter(m=>m&&m.isVisible);
-  if(!myMeshes.length)return;
-  // Clone materials so we don't affect shared mats
-  _pulseMats=myMeshes.map(m=>{
-    _pulseOrigMats.push(m.material);
-    const clone=m.material.clone('pulsemat_'+m.name);
-    m.material=clone;
-    return clone;
+  _pulseMeshes=(seatCardMeshes[mySeat]||[]).filter(m=>m&&m.isVisible);
+  if(!_pulseMeshes.length)return;
+  const g=secs>10?0.55:secs>5?0.28:0.0;
+  const glowCol=new BABYLON.Color3(0.9,g,0);
+  _pulseOrigMats=_pulseMeshes.map(m=>m.material);
+  _pulseCloneMats=_pulseMeshes.map((m,i)=>{
+    const c=_pulseOrigMats[i].clone('_pulse_'+m.name);
+    c.emissiveColor=glowCol.clone();
+    m.material=c;
+    return c;
   });
-  // Colour ramps: gold → orange → red
-  const r=1.0, g=secs>10?0.65:secs>5?0.35:0.0, b=0.0;
-  // Pulse interval speeds up as time runs out
-  const interval=secs>10?900:secs>5?500:200;
   let bright=true;
-  function applyEmissive(on){
-    _pulseMats.forEach(mat=>{
-      mat.emissiveColor=on?new BABYLON.Color3(r,g,b):new BABYLON.Color3(0,0,0);
-    });
-  }
-  applyEmissive(true);
-  _cardPulseTimer=setInterval(()=>{ bright=!bright; applyEmissive(bright); },interval);
+  const interval=secs>10?900:secs>5?500:200;
+  _lastPulseInterval=interval;
+  _cardPulseTimer=setInterval(()=>{
+    bright=!bright;
+    _pulseCloneMats.forEach(c=>{ c.emissiveColor=bright?glowCol.clone():new BABYLON.Color3(0,0,0); });
+  },interval);
 }
+let _lastPulseInterval=0;
 function stopCardPulse(){
   if(_cardPulseTimer){clearInterval(_cardPulseTimer);_cardPulseTimer=null;}
-  // Restore original materials and dispose clones
-  const myMeshes=(seatCardMeshes[mySeat]||[]).filter(m=>m&&m.isVisible);
-  myMeshes.forEach((m,i)=>{
+  _lastPulseInterval=0;
+  _pulseMeshes.forEach((m,i)=>{
     if(_pulseOrigMats[i])m.material=_pulseOrigMats[i];
-    if(_pulseMats[i])try{_pulseMats[i].dispose();}catch(e){}
+    if(_pulseCloneMats[i])try{_pulseCloneMats[i].dispose();}catch(e){}
   });
-  _pulseMats=[];_pulseOrigMats=[];
+  _pulseMeshes=[];_pulseOrigMats=[];_pulseCloneMats=[];
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────
