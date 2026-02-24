@@ -1356,22 +1356,31 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     renderAll();
   }
 
+  // Tracks whether the user has dragged the wheels since the last yourTurn.
+  // If they haven't, drumSetMin always snaps to the new minimum (handles
+  // new betting rounds where minRaise drops back to BB after a flop/turn/river).
+  // If they have dragged, we respect their choice unless it's below the minimum.
+  let _userDraggedSinceLastMin = false;
+
   // ── drumReset — called at NEW HAND start. Always resets dials to the minimum.
   window.drumReset = function(minPence){
     minRaisePence = Math.max(minPence || 40, 20);
+    _userDraggedSinceLastMin = false;
     snapToValue(minRaisePence);
     updateDisplay();
   };
 
   // ── drumSetMin — called each yourTurn during a hand.
-  // Only snaps the dials UP if the user has somehow gone below the minimum;
-  // otherwise leaves whatever value the user already chose alone.
+  // If the user hasn't touched the dials yet this turn, snap to new minimum.
+  // This correctly resets to BB at the start of each new betting round (flop etc).
+  // If the user already dragged, only bump up if they went below the minimum.
   window.drumSetMin = function(minPence){
     minRaisePence = Math.max(minPence || 40, 20);
     const currentVal = POUNDS[poundsIdx] * 100 + PENCE[penceIdx];
-    if(currentVal < minRaisePence){
+    if(!_userDraggedSinceLastMin || currentVal < minRaisePence){
       snapToValue(minRaisePence);
     }
+    _userDraggedSinceLastMin = false; // reset — next drag will re-enable preservation
     updateDisplay();
   };
 
@@ -1413,6 +1422,7 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
       active = true;
       startY = y;
       startIdx = getIdx();
+      _userDraggedSinceLastMin = true; // user is actively choosing — preserve their value
     }
 
     function onMove(y){
