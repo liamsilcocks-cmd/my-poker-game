@@ -296,7 +296,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
        CSS now only hides it on iOS Safari (which lacks the Fullscreen API).
        Android Chrome supports fullscreen fine and will show the button.       -->
   <div id="stackEditor">
-    <h4>🔧 Set Player Stacks</h4>
+    <h4>🔧 Host Controls</h4>
+    <div class="se-row" style="margin-bottom:10px;border-bottom:1px solid #4a3a10;padding-bottom:10px">
+      <span class="se-name" style="color:#ffd700">Buy-in £</span>
+      <input class="se-input" id="buyInInput" type="number" min="1" step="1" value="10.00" style="width:72px">
+      <button class="se-btn" id="buyInBtn" onclick="applyBuyIn()" style="background:#1a3a6a">SET</button>
+    </div>
+    <div style="color:#888;font-size:10px;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Player stacks</div>
     <div id="stackEditorRows"></div>
   </div>
   <div id="controlBar">
@@ -855,7 +861,10 @@ case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem
   break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
-case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
+case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}
+  // Keep buy-in input in sync with server value
+  if(isHost&&msg.buyIn){const bi=document.getElementById('buyInInput');if(bi&&document.activeElement!==bi)bi.value=(msg.buyIn/100).toFixed(2);}
+  break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
 case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');
@@ -1081,6 +1090,18 @@ let gamePaused=false;
 function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
 
 // ── Host stack editor ─────────────────────────────────────────────────────────
+function applyBuyIn(){
+  const inp=document.getElementById('buyInInput');
+  const btn=document.getElementById('buyInBtn');
+  if(!inp)return;
+  const pounds=parseFloat(inp.value);
+  if(isNaN(pounds)||pounds<0.20){inp.style.borderColor='#cc0000';return;}
+  const pence=Math.round(pounds*100);
+  wsSend({type:'setBuyIn',buyIn:pence});
+  if(btn){btn.textContent='✓';btn.style.background='#1a6a1a';setTimeout(()=>{btn.textContent='SET';btn.style.background='#1a3a6a';},1500);}
+  inp.style.borderColor='#c8a020';
+  setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);
+}
 function toggleStackEditor(){
   const panel=document.getElementById('stackEditor');
   const open=panel.style.display==='block';
