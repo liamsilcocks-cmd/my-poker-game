@@ -222,7 +222,19 @@ function lobbySnapshot(room) {
 
 function tableSnapshot(room, forId) {
   const G = room.G;
-  if (!G) return { type: 'state', phase: 'idle', players: room.seats.map(() => null) };
+  if (!G) return {
+    type: 'state', phase: 'idle',
+    players: room.seats.map(s => {
+      if (!s) return null;
+      return { seat: s.seat, name: s.name, chips: s.chips, bet: 0,
+               folded: false, disconnected: s.disconnected || false,
+               pendingCashOut: s.pendingCashOut || false,
+               voluntaryAutoFold: s.voluntaryAutoFold || false,
+               spectator: s.spectator || false,
+               pendingBuyBack: s.pendingBuyBack || false,
+               cards: [], active: !s.sittingOut };
+    })
+  };
   return {
     type: 'state', phase: G.phase, pot: G.pot, currentBet: G.currentBet,
     community: G.community, dealerSeat: room.dealerSeat,
