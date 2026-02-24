@@ -19,8 +19,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .panel p{color:#c8a060;margin-bottom:14px;line-height:1.5}
 .panel input[type=text],.panel input[type=number]{width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;background:#0d0704;border:1px solid #6a5010;color:#ffd700;font-size:1.1rem;outline:none;text-align:center}
 .btn-gold{width:100%;padding:14px;margin-top:14px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:1.1rem;font-weight:bold;cursor:pointer;transition:opacity .2s}
+.btn-gold:disabled{opacity:.4;cursor:not-allowed}
 .btn-sm{padding:8px 18px;border-radius:6px;border:none;font-size:.9rem;font-weight:bold;cursor:pointer;color:#fff;margin:4px}
 .btn-approve{background:#1a6a1a}
+.btn-reject{background:#6a1a1a}
 .player-row{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 14px;margin:6px 0;color:#e0c060}
 .player-row .chips{color:#ffd700;font-weight:bold}
 .host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
@@ -41,11 +43,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-raise{background:#7a5800}
 .abtn-allin{background:#8a7a00}
 .abtn-fold{background:#7a1a1a}
-#drumWidget{width:100%;display:flex;flex-direction:column;gap:5px;align-items:center;padding:10px 0}
+#drumWidget{width:100%;display:none;flex-direction:column;gap:5px;align-items:center;padding:10px 0}
 .dial-row{display:flex;gap:4px;justify-content:center;align-items:center}
 .dial-wrap{display:flex;flex-direction:column;align-items:center}
 .dial-label{font-size:9px;color:#c8a060;margin-bottom:2px}
-.dial-cog{width:70px;height:70px;cursor:grab;touch-action:none;background:#0d0704;border-radius:50%}
+.dial-cog{width:70px;height:70px;cursor:grab;touch-action:none}
 .dial-sep{font-size:24px;font-weight:bold;color:#c8a060;margin-bottom:15px}
 #bottomBar{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#ffd700}
 #myInfo{font-size:14px;font-weight:bold;color:#ffd700}
@@ -59,17 +61,26 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <div class="panel">
     <h2>🍪 Cookie Notice</h2>
     <span class="cookie-subtitle">Please read before continuing</span>
-    <p>Whilst no cookies are deliberately created to track you, your data is stored for gameplay.</p>
+    <p style="color:#c8a060;font-size:.9rem;line-height:1.6;margin-bottom:4px">
+      Whilst no cookies are deliberately created to track you or your behaviour, the following data is stored locally and on our server for the purposes of playing this game online:
+    </p>
     <table class="cookie-table">
-      <thead><tr><th>Feature</th><th>Handling</th></tr></thead>
+      <thead>
+        <tr><th>Feature</th><th>How it's handled</th></tr>
+      </thead>
       <tbody>
-        <tr><td>User Identity</td><td>Local Storage ID</td></tr>
-        <tr><td>Session Tracking</td><td>Persistent WebSocket</td></tr>
+        <tr><td>User Identity</td><td>Generated as a random string and saved in Local Storage.</td></tr>
+        <tr><td>Session Tracking</td><td>Handled by a persistent WebSocket connection (ws).</td></tr>
+        <tr><td>Game History</td><td>Written to text files on the server disk and uploaded via FTP. This is used during development for debug purposes.</td></tr>
+        <tr><td>Reconnection</td><td>The client reads the ID from Local Storage and sends it to the server to “resume” their seat.</td></tr>
       </tbody>
     </table>
-    <div class="cookie-uat">⚠️ Development & UAT: Never bet real money.</div>
+    <div class="cookie-uat">
+      ⚠️ <strong>Development & UAT Notice</strong><br>
+      This game is in development and UAT. You should <strong>never</strong> bet any real money using this game.
+    </div>
     <div class="cookie-btns" style="display:flex;gap:10px;margin-top:20px">
-      <button class="btn-gold" onclick="cookieAccept()" style="flex:1">✅ Accept</button>
+      <button class="btn-gold" onclick="cookieAccept()" style="flex:1">✅ Accept & Continue</button>
       <button class="btn-gold" onclick="location.href='https://google.com'" style="flex:1;background:#4a1a1a;color:#c06060">✖ Deny</button>
     </div>
   </div>
@@ -89,7 +100,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <h2>Room <span id="lobbyRoomId"></span></h2>
     <div id="playerList"></div>
     <div id="pendingSection" style="display:none">
-      <h3>Requesting:</h3>
+      <h3>Requesting to join:</h3>
       <div id="pendingItems"></div>
     </div>
     <button class="btn-gold" id="startBtn" style="display:none">START GAME</button>
@@ -97,21 +108,32 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 </div>
 
 <div id="gameUI">
-  <div id="topBar"><div id="phase">PRE-FLOP</div><div id="pot">POT: £0.00</div></div>
+  <div id="topBar">
+    <div id="phase">PRE-FLOP</div>
+    <div id="pot">POT: £0.00</div>
+  </div>
   <div id="actionPanel">
     <button class="abtn abtn-call" id="callBtn">CHECK</button>
     <div id="drumWidget">
       <div class="dial-row">
-        <div class="dial-wrap"><div class="dial-label">POUNDS</div><canvas class="dial-cog" id="dialPounds" width="70" height="70"></canvas></div>
+        <div class="dial-wrap">
+          <div class="dial-label">POUNDS</div>
+          <canvas class="dial-cog" id="dialPounds" width="70" height="70"></canvas>
+        </div>
         <div class="dial-sep">.</div>
-        <div class="dial-wrap"><div class="dial-label">PENCE</div><canvas class="dial-cog" id="dialPence" width="70" height="70"></canvas></div>
+        <div class="dial-wrap">
+          <div class="dial-label">PENCE</div>
+          <canvas class="dial-cog" id="dialPence" width="70" height="70"></canvas>
+        </div>
       </div>
     </div>
     <button class="abtn abtn-raise" id="raiseBtn">BET £0.40</button>
     <button class="abtn abtn-allin" id="allInBtn">ALL IN</button>
     <button class="abtn abtn-fold" id="foldBtn">FOLD</button>
   </div>
-  <div id="bottomBar"><div id="myInfo">Stack £10.00</div></div>
+  <div id="bottomBar">
+    <div id="myInfo">Stack £10.00</div>
+  </div>
   <div id="msg"></div>
 </div>
 
@@ -119,7 +141,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <script>
 let myId = localStorage.getItem('syfm_id') || Math.random().toString(36).substr(2,9);
 localStorage.setItem('syfm_id', myId);
-let ws, myName, roomNum, gameState, isHost, currentBetAmount = 0.40;
+let ws, myName, roomNum, gameState, isHost, currentBetAmount = 0.40, myBet = 0, myStack = 0;
 
 class WheelDial {
     constructor(id, onChange) {
@@ -152,18 +174,34 @@ class WheelDial {
     draw() {
         const c = this.ctx, w = 70, h = 70;
         c.clearRect(0,0,w,h);
-        c.beginPath(); c.arc(35,35,30,0,7); c.fillStyle='#2a1408'; c.fill();
+        c.beginPath(); c.arc(35,35,32,0,7); c.fillStyle='#2a1408'; c.fill();
         c.strokeStyle='#c8a020'; c.lineWidth=2; c.stroke();
         c.save(); c.translate(35,35); c.rotate(this.rot);
         c.strokeStyle='rgba(200,160,32,0.6)'; c.lineWidth=4;
         for(let i=0; i<10; i++) {
-            c.beginPath(); c.moveTo(0,-28); c.lineTo(0,-20); c.stroke();
+            c.beginPath(); c.moveTo(0,-30); c.lineTo(0,-22); c.stroke();
             c.rotate(Math.PI*2/10);
         }
         c.restore();
-        c.beginPath(); c.arc(35,35,6,0,7); c.fillStyle='#c8a020'; c.fill();
+        c.beginPath(); c.arc(35,35,8,0,7); c.fillStyle='#c8a020'; c.fill();
     }
 }
+
+window.onload = () => {
+    new WheelDial('dialPounds', (dir) => adjustBet(dir, 1.0));
+    new WheelDial('dialPence', (dir) => adjustBet(dir, 0.2));
+    
+    document.getElementById('joinBtn').onclick = () => {
+        myName = document.getElementById('nameInput').value;
+        roomNum = document.getElementById('roomInput').value;
+        if(myName && roomNum) connect();
+    };
+    document.getElementById('startBtn').onclick = () => send({type:'start_game'});
+    document.getElementById('callBtn').onclick = () => send({type:'action', action:'call'});
+    document.getElementById('raiseBtn').onclick = () => send({type:'action', action:'raise', amount: currentBetAmount});
+    document.getElementById('allInBtn').onclick = () => send({type:'action', action:'allin'});
+    document.getElementById('foldBtn').onclick = () => send({type:'action', action:'fold'});
+};
 
 function cookieAccept(){
     document.getElementById('cookieOverlay').style.display = 'none';
@@ -224,10 +262,13 @@ function adjustBet(dir, amt) {
 function updateUI() {
     const me = gameState.players.find(p => p.id === myId);
     if(!me) return;
+    myStack = me.stack;
+    myBet = me.bet;
     document.getElementById('pot').innerText = `POT: £${gameState.pot.toFixed(2)}`;
-    document.getElementById('myInfo').innerText = `Stack £${me.stack.toFixed(2)}`;
+    document.getElementById('myInfo').innerText = `Stack £${myStack.toFixed(2)}`;
     let isTurn = gameState.turnIndex === gameState.players.indexOf(me);
     document.getElementById('actionPanel').style.display = isTurn ? 'flex' : 'none';
+    document.getElementById('drumWidget').style.display = isTurn ? 'flex' : 'none';
 }
 
 function init3D() {
@@ -241,21 +282,6 @@ function init3D() {
     BABYLON.MeshBuilder.CreateCylinder("table", {diameter: 8, height: 0.2}, scene);
     engine.runRenderLoop(() => scene.render());
 }
-
-// Global scope button assignments to prevent window.onload issues
-document.getElementById('joinBtn').onclick = () => {
-    myName = document.getElementById('nameInput').value;
-    roomNum = document.getElementById('roomInput').value;
-    if(myName && roomNum) connect();
-};
-document.getElementById('startBtn').onclick = () => send({type:'start_game'});
-document.getElementById('callBtn').onclick = () => send({type:'action', action:'call'});
-document.getElementById('raiseBtn').onclick = () => send({type:'action', action:'raise', amount: currentBetAmount});
-document.getElementById('allInBtn').onclick = () => send({type:'action', action:'allin'});
-document.getElementById('foldBtn').onclick = () => send({type:'action', action:'fold'});
-
-new WheelDial('dialPounds', (dir) => adjustBet(dir, 1.0));
-new WheelDial('dialPence', (dir) => adjustBet(dir, 0.2));
 </script>
 </body>
 </html>
