@@ -60,16 +60,30 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
 #drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
-/* ── Flat top-down cog dials ── */
-.dial-row{display:flex;gap:4px;justify-content:center;align-items:flex-end;width:100%;padding:2px 0}
-.dial-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+/* ── Scroll wheel dials ── */
+.dial-row{display:flex;gap:6px;justify-content:center;align-items:center;width:100%;padding:2px 0}
+.dial-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1}
 .dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
-/* Flat cog canvas — round border to hint at circular shape */
-.dial-cog{width:80px;height:80px;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;display:block;border-radius:50%;}
-.dial-cog:active{cursor:grabbing}
-/* Hint label below each cog */
-.dial-hint{font-size:8px;color:rgba(200,160,32,0.5);text-align:center;letter-spacing:0.5px;margin-top:1px;}
-.dial-sep{font-size:20px;font-weight:bold;color:#c8a060;line-height:1;padding-bottom:28px}
+.dial-wheel{
+  width:72px;height:96px;
+  overflow:hidden;position:relative;
+  border-radius:10px;
+  background:linear-gradient(180deg,#0a0600 0%,#1a1000 30%,#1a1000 70%,#0a0600 100%);
+  border:2px solid #c8a020;
+  cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;
+  box-shadow:inset 0 0 18px rgba(0,0,0,0.8),0 0 8px rgba(200,160,32,0.2);
+}
+.dial-wheel:active{cursor:grabbing}
+/* The centre selection bar */
+.dial-wheel::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:32px;background:rgba(200,160,32,0.12);border-top:1px solid rgba(200,160,32,0.5);border-bottom:1px solid rgba(200,160,32,0.5);pointer-events:none;z-index:2}
+/* Fade top & bottom */
+.dial-wheel::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,6,0,0.85) 0%,transparent 35%,transparent 65%,rgba(10,6,0,0.85) 100%);pointer-events:none;z-index:3}
+.dial-inner{position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;align-items:center;will-change:transform}
+.dial-item{height:32px;line-height:32px;text-align:center;font-weight:bold;width:100%;flex-shrink:0}
+.dial-item.selected{font-size:22px;color:#ffd700}
+.dial-item.adj1{font-size:16px;color:rgba(200,160,32,0.55)}
+.dial-item.adj2{font-size:13px;color:rgba(200,160,32,0.25)}
+.dial-sep{font-size:22px;font-weight:bold;color:#c8a060;line-height:1;align-self:center;margin-top:18px}
 #tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
 #tableSlider label{font-size:11px;color:#c8a060}
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
@@ -387,15 +401,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="drumWidget">
       <div class="dial-row">
         <div class="dial-wrap">
-          <div class="dial-label">£ pounds</div>
-          <canvas class="dial-cog" id="dialPounds" width="80" height="80"></canvas>
-          <div class="dial-hint">◄ slide ►</div>
+          <div class="dial-label">pounds £</div>
+          <div class="dial-wheel" id="dialPounds"><div class="dial-inner" id="dialPoundsInner"></div></div>
         </div>
         <div class="dial-sep">.</div>
         <div class="dial-wrap">
-          <div class="dial-label">20p steps</div>
-          <canvas class="dial-cog" id="dialPence" width="80" height="80"></canvas>
-          <div class="dial-hint">◄ slide ►</div>
+          <div class="dial-label">pence</div>
+          <div class="dial-wheel" id="dialPence"><div class="dial-inner" id="dialPenceInner"></div></div>
         </div>
       </div>
     </div>
@@ -1183,242 +1195,125 @@ document.getElementById('joinBtn').onclick=()=>{const name=document.getElementBy
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
 document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
-// ── Flat top-down cog dials ────────────────────────────────────────────────────
+// ── Simple scroll wheel dials ──────────────────────────────────────────────────
 (function(){
-  let poundsIdx=0, penceIdx=0, minRaisePence=40;
-  const POUNDS=Array.from({length:100},(_,i)=>i);
-  const PENCE=[0,20,40,60,80];
+  const POUNDS = Array.from({length:100},(_,i)=>i);   // 0–99
+  const PENCE  = [0,20,40,60,80];                       // 20p steps
 
-  // Rotation state per dial (in radians)
-  let poundsRot=0, penceRot=0;
+  let poundsIdx = 0, penceIdx = 0, minRaisePence = 40;
 
-  // ── Draw a flat top-down cog onto a canvas ──────────────────────────────────
-  // Designed to look like you're looking straight down at a metal gear.
-  // Drag LEFT = decrease (rotates anticlockwise), RIGHT = increase (clockwise).
-  function drawDial(canvasEl, valueStr, rotation){
-    const W=80, cx=40, cy=40;
-    const ctx=canvasEl.getContext('2d');
-    ctx.clearRect(0,0,W,W);
-
-    const teeth=18, baseR=30, toothH=6, outerR=baseR+toothH;
-    const toothFrac=0.42; // fraction of tooth arc that's raised
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(rotation);
-
-    // ── Outer cog silhouette (teeth) ──
-    ctx.beginPath();
-    for(let i=0;i<teeth;i++){
-      const a1 = (i / teeth) * Math.PI * 2;
-      const a2 = ((i + toothFrac) / teeth) * Math.PI * 2;
-      const a3 = ((i + 1 - toothFrac) / teeth) * Math.PI * 2;
-      const a4 = ((i + 1) / teeth) * Math.PI * 2;
-      if(i===0) ctx.moveTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
-      else       ctx.lineTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
-      ctx.lineTo(Math.cos(a2)*outerR, Math.sin(a2)*outerR);
-      ctx.lineTo(Math.cos(a3)*outerR, Math.sin(a3)*outerR);
-      ctx.lineTo(Math.cos(a4)*baseR,  Math.sin(a4)*baseR);
+  // Render a dial: shows 3 items above + selected + 3 below in the scroll window
+  function renderDial(innerId, list, idx){
+    const inner = document.getElementById(innerId);
+    if(!inner) return;
+    inner.innerHTML = '';
+    // We show indices from idx-3 to idx+3 (7 items), clamped
+    for(let offset = -3; offset <= 3; offset++){
+      const i = idx + offset;
+      const div = document.createElement('div');
+      div.className = 'dial-item' + (offset===0?' selected':Math.abs(offset)===1?' adj1':' adj2');
+      div.textContent = i>=0 && i<list.length ? String(list[i]).padStart(list===PENCE?2:2,'0') : '';
+      inner.appendChild(div);
     }
-    ctx.closePath();
-
-    // Body gradient: gold/bronze look from top-left light source
-    const bodyGrad = ctx.createRadialGradient(-8, -8, 2, 0, 0, outerR);
-    bodyGrad.addColorStop(0,   '#b08820');
-    bodyGrad.addColorStop(0.4, '#7a5c08');
-    bodyGrad.addColorStop(1,   '#2e1e00');
-    ctx.fillStyle = bodyGrad;
-    ctx.fill();
-
-    // Outline
-    ctx.strokeStyle = '#c8a020';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Highlight top edge of each tooth (simulates flat-lit metal)
-    for(let i=0;i<teeth;i++){
-      const a2 = ((i + toothFrac) / teeth) * Math.PI * 2;
-      const a3 = ((i + 1 - toothFrac) / teeth) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a2)*outerR, Math.sin(a2)*outerR);
-      ctx.lineTo(Math.cos(a3)*outerR, Math.sin(a3)*outerR);
-      ctx.strokeStyle = 'rgba(255,220,80,0.6)';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-    }
-
-    // ── Central hub hole ──
-    ctx.beginPath();
-    ctx.arc(0, 0, 9, 0, Math.PI * 2);
-    const hubGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 9);
-    hubGrad.addColorStop(0, '#1a1000');
-    hubGrad.addColorStop(1, '#050300');
-    ctx.fillStyle = hubGrad;
-    ctx.fill();
-    ctx.strokeStyle = '#c8a020';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // ── Spokes (6 evenly spaced) ──
-    const spokeCount = 6;
-    ctx.lineWidth = 1.8;
-    ctx.strokeStyle = 'rgba(200,160,32,0.55)';
-    for(let i=0;i<spokeCount;i++){
-      const a = (i / spokeCount) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * 10, Math.sin(a) * 10);
-      ctx.lineTo(Math.cos(a) * (baseR - 2), Math.sin(a) * (baseR - 2));
-      ctx.stroke();
-    }
-
-    ctx.restore();
-
-    // ── Directional arrows outside the cog (fixed, not rotating) ──
-    ctx.fillStyle = 'rgba(200,160,32,0.5)';
-    ctx.font = 'bold 11px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('◄', 6, cy);
-    ctx.fillText('►', W - 6, cy);
-
-    // ── Value label centred in hub ──
-    ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 15px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 4;
-    ctx.fillText(valueStr, cx, cy);
-    ctx.shadowBlur = 0;
+    // Position so the selected item (index 3 in the 7-item list) sits at vertical centre
+    // Each item is 32px tall; centre of wheel is 48px from top (96/2)
+    // Selected item centre should be at 48px → top of inner = 48 - 3*32 - 16 = -64
+    inner.style.top = (48 - 3*32 - 16) + 'px';
   }
 
-  function redrawPounds(){
-    const el=document.getElementById('dialPounds');
-    if(el) drawDial(el, String(POUNDS[poundsIdx]).padStart(2,'0'), poundsRot);
+  function renderAll(){
+    renderDial('dialPoundsInner', POUNDS, poundsIdx);
+    renderDial('dialPenceInner',  PENCE,  penceIdx);
   }
-  function redrawPence(){
-    const el=document.getElementById('dialPence');
-    if(el) drawDial(el, String(PENCE[penceIdx]).padStart(2,'0'), penceRot);
-  }
-  function redrawAll(){ redrawPounds(); redrawPence(); }
 
   function updateDisplay(){
-    const total=POUNDS[poundsIdx]*100+PENCE[penceIdx];
-    const clamped=Math.max(total,minRaisePence);
-    const p=Math.floor(clamped/100), pn=clamped%100;
-    const amtStr='\u00a3'+p+'.'+String(pn).padStart(2,'0');
-    const btn=document.getElementById('raiseBtn');
-    if(btn){ const verb=btn.dataset.verb||'RAISE'; btn.textContent=verb+' '+amtStr; }
+    const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
+    const val = Math.max(raw, minRaisePence);
+    const btn = document.getElementById('raiseBtn');
+    if(btn){ const verb=btn.dataset.verb||'RAISE'; btn.textContent=verb+' £'+Math.floor(val/100)+'.'+String(val%100).padStart(2,'0'); }
   }
 
-  // Step: dir +1 = increase (rightward drag), -1 = decrease (leftward drag)
-  // BOTH dials respond identically to left/right — no asymmetry.
-  window.drumStep=function(drum,dir){
+  window.drumSetMin = function(minPence){
+    minRaisePence = minPence || 40;
+    poundsIdx = Math.min(Math.floor(minRaisePence/100), POUNDS.length-1);
+    const pi = PENCE.indexOf(minRaisePence%100);
+    penceIdx = pi>=0 ? pi : PENCE.findIndex(p=>p>=minRaisePence%100)||0;
+    if(penceIdx<0) penceIdx=0;
+    renderAll(); updateDisplay();
+  };
+
+  window.drumGetPence = function(){
+    return Math.max(POUNDS[poundsIdx]*100 + PENCE[penceIdx], minRaisePence);
+  };
+
+  // Legacy step (used for momentum flick)
+  window.drumStep = function(drum, dir){
     ensureAudio(); snd_chip();
     if(drum==='pounds'){
-      poundsIdx=Math.max(0,Math.min(POUNDS.length-1,poundsIdx+dir));
-      poundsRot+=(dir*Math.PI*2)/POUNDS.length;
-      redrawPounds();
-    }else{
-      penceIdx=Math.max(0,Math.min(PENCE.length-1,penceIdx+dir));
-      penceRot+=(dir*Math.PI*2)/PENCE.length;
-      redrawPence();
+      poundsIdx = Math.max(0, Math.min(POUNDS.length-1, poundsIdx+dir));
+      renderDial('dialPoundsInner', POUNDS, poundsIdx);
+    } else {
+      penceIdx = Math.max(0, Math.min(PENCE.length-1, penceIdx+dir));
+      renderDial('dialPenceInner', PENCE, penceIdx);
     }
     updateDisplay();
   };
 
-  window.drumSetMin=function(minPence){
-    minRaisePence=minPence||40;
-    poundsIdx=Math.min(Math.floor(minRaisePence/100),POUNDS.length-1);
-    penceIdx=PENCE.indexOf(minRaisePence%100);
-    if(penceIdx===-1){const nextP=PENCE.find(p=>p>=minRaisePence%100);penceIdx=nextP!==undefined?PENCE.indexOf(nextP):0;if(penceIdx===-1)penceIdx=0;}
-    redrawAll(); updateDisplay();
-  };
+  // Attach drag to a scroll wheel div
+  // Drag UP   → value increases (wheel rolls forward/away)
+  // Drag DOWN → value decreases (wheel rolls back/toward you)
+  function attachWheel(wheelId, drum){
+    const el = document.getElementById(wheelId);
+    if(!el) return;
 
-  window.drumGetPence=function(){
-    const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];
-    return Math.max(raw,minRaisePence);
-  };
-
-  // ── Attach horizontal drag interaction to one cog canvas ─────────────────────
-  // RIGHT drag → increase (cog rotates clockwise)
-  // LEFT  drag → decrease (cog rotates anticlockwise)
-  // Identical behaviour for BOTH dials — no confusion about direction.
-  function attachDial(canvasId, drum){
-    const el=document.getElementById(canvasId);
-    if(!el)return;
-
-    const PX_PER_STEP=24; // pixels of horizontal drag per one value step
-    let active=false, startX=0, startIdx=0, lastX=0, vel=0;
+    const PX_PER_STEP = 28;
+    let active=false, startY=0, startIdx=0, lastY=0, vel=0;
 
     function getIdx(){ return drum==='pounds'?poundsIdx:penceIdx; }
     function getList(){ return drum==='pounds'?POUNDS:PENCE; }
     function setIdx(i){ if(drum==='pounds') poundsIdx=i; else penceIdx=i; }
-    function getRot(){ return drum==='pounds'?poundsRot:penceRot; }
-    function setRot(r){ if(drum==='pounds') poundsRot=r; else penceRot=r; }
 
-    function onStart(x){
-      active=true; startX=x; lastX=x;
-      startIdx=getIdx(); vel=0;
-      el.style.cursor='grabbing';
+    function onStart(y){
+      active=true; startY=y; lastY=y; startIdx=getIdx(); vel=0;
     }
-
-    function onMove(x){
-      if(!active)return;
-      const dx = x - startX;   // positive = rightward = increase
-      vel = x - lastX; lastX = x;
-      const steps = Math.round(dx / PX_PER_STEP);
+    function onMove(y){
+      if(!active) return;
+      vel = lastY - y; lastY = y;
+      // Drag UP (negative dy from start) = increase
+      const dy = startY - y;
+      const steps = Math.round(dy / PX_PER_STEP);
       const list = getList();
       const ni = Math.max(0, Math.min(list.length-1, startIdx+steps));
-      const prev = getIdx();
-      if(ni !== prev){
-        const delta = ni - prev;
+      if(ni !== getIdx()){
         snd_chip();
         setIdx(ni);
-        // Clockwise for increase (positive delta), anticlockwise for decrease
-        setRot(getRot() + (delta * Math.PI * 2) / list.length);
-        if(drum==='pounds') redrawPounds(); else redrawPence();
+        if(drum==='pounds') renderDial('dialPoundsInner',POUNDS,poundsIdx);
+        else                 renderDial('dialPenceInner', PENCE, penceIdx);
         updateDisplay();
       }
     }
-
     function onEnd(){
       active=false;
-      el.style.cursor='grab';
-      // Momentum flick — one extra step if swipe was fast enough
-      if(Math.abs(vel) > 5){
-        const dir = vel > 0 ? 1 : -1;
-        window.drumStep(drum, dir);
-      }
+      if(Math.abs(vel)>6) window.drumStep(drum, vel>0?1:-1);
     }
 
-    // ── Touch events (finger drag on mobile) ──
-    el.addEventListener('touchstart', e=>{
-      e.preventDefault();
-      onStart(e.touches[0].clientX);
-    }, {passive:false});
-    el.addEventListener('touchmove', e=>{
-      e.preventDefault();
-      onMove(e.touches[0].clientX);
-    }, {passive:false});
-    el.addEventListener('touchend', e=>{
-      e.preventDefault();
-      onEnd();
-    }, {passive:false});
-
-    // ── Mouse events (desktop) ──
-    el.addEventListener('mousedown', e=>{ onStart(e.clientX); });
-    window.addEventListener('mousemove', e=>{ if(active) onMove(e.clientX); });
-    window.addEventListener('mouseup', ()=>{ if(active) onEnd(); });
+    el.addEventListener('touchstart', e=>{ e.preventDefault(); onStart(e.touches[0].clientY); }, {passive:false});
+    el.addEventListener('touchmove',  e=>{ e.preventDefault(); onMove(e.touches[0].clientY);  }, {passive:false});
+    el.addEventListener('touchend',   e=>{ e.preventDefault(); onEnd(); }, {passive:false});
+    el.addEventListener('mousedown',  e=>{ onStart(e.clientY); });
+    window.addEventListener('mousemove', e=>{ if(active) onMove(e.clientY); });
+    window.addEventListener('mouseup',   ()=>{ if(active) onEnd(); });
   }
 
   window.addEventListener('load',()=>{
-    redrawAll();
+    renderAll();
     updateDisplay();
-    attachDial('dialPounds','pounds');
-    attachDial('dialPence','pence');
+    attachWheel('dialPounds','pounds');
+    attachWheel('dialPence', 'pence');
   });
 })();
+
+
 
 // ── Cookie notice gate ─────────────────────────────────────────────────────────
 function cookieAccept(){document.getElementById('cookieOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';}
