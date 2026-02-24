@@ -1094,65 +1094,63 @@ function applyBuyIn(){
   const inp=document.getElementById('buyInInput');
   const btn=document.getElementById('buyInBtn');
   if(!inp)return;
-  const pounds=parseFloat(inp.value);
-  if(isNaN(pounds)||pounds<0.20){inp.style.borderColor='#cc0000';return;}
-  const pence=Math.round(pounds*100);
-  wsSend({type:'setBuyIn',buyIn:pence});
+  const val=parseFloat(inp.value);
+  if(isNaN(val)||val<0.20){inp.style.borderColor='#cc0000';return;}
+  wsSend({type:'setBuyIn',buyIn:Math.round(val*100)});
   if(btn){btn.textContent='✓';btn.style.background='#1a6a1a';setTimeout(()=>{btn.textContent='SET';btn.style.background='#1a3a6a';},1500);}
   inp.style.borderColor='#c8a020';
   setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);
 }
+
 function toggleStackEditor(){
   const panel=document.getElementById('stackEditor');
-  const open=panel.style.display==='block';
-  panel.style.display=open?'none':'block';
-  if(!open) renderStackEditor();
-}
-function renderStackEditor(){
-  // Build player list from best available source:
-  // lastState.players if a game is active, otherwise lastLobbyMsg.seats (pre-game lobby)
-  let players = null;
-  if(lastState && lastState.players && lastState.players.some(p=>p)){
-    // Map state players — they have id, name, chips, seat
-    players = lastState.players;
-  } else if(lastLobbyMsg && lastLobbyMsg.seats){
-    // Lobby format: array of seat objects with id, name, chips
-    // Normalise to same shape as state players, indexed by seat number
-    players = Array(9).fill(null);
-    lastLobbyMsg.seats.forEach(s=>{ if(s) players[s.seat]=s; });
+  if(panel.style.display==='block'){
+    panel.style.display='none';
+    return;
   }
-  if(!players || !players.some(p=>p)) return;
-
+  // Build player list fresh every time panel opens
+  // Pull from every possible source
+  const seated = [];
+  // Try lastState first (mid-game)
+  if(lastState && lastState.players){
+    lastState.players.forEach(p=>{ if(p && p.id && p.name) seated.push({id:p.id, name:p.name, chips:p.chips}); });
+  }
+  // Fall back to lastLobbyMsg (pre-game)
+  if(seated.length===0 && lastLobbyMsg && lastLobbyMsg.seats){
+    lastLobbyMsg.seats.forEach(s=>{ if(s && s.id && s.name) seated.push({id:s.id, name:s.name, chips:s.chips}); });
+  }
   const rows=document.getElementById('stackEditorRows');
   rows.innerHTML='';
-  players.forEach((p,i)=>{
-    if(!p)return;
-    const row=document.createElement('div');
-    row.className='se-row';
-    const pounds=(p.chips/100).toFixed(2);
-    row.innerHTML=
-      '<span class="se-name">'+p.name+'</span>'+
-      '<span style="color:#888;font-size:10px">£</span>'+
-      '<input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="0.20" value="'+pounds+'">'+
-      '<button class="se-btn" id="se-btn-'+i+'" onclick="applyStack('+i+',\''+p.id+'\')">SET</button>';
-    rows.appendChild(row);
-  });
+  if(seated.length===0){
+    rows.innerHTML='<div style="color:#888;font-size:12px">No players found</div>';
+  } else {
+    seated.forEach((p,i)=>{
+      const row=document.createElement('div');
+      row.className='se-row';
+      row.innerHTML=
+        '<span class="se-name">'+p.name+'</span>'+
+        '<span style="color:#888;font-size:10px">£</span>'+
+        '<input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="0.01" value="'+(p.chips/100).toFixed(2)+'">'+
+        '<button class="se-btn" id="se-btn-'+i+'" onclick="doSetStack('+i+',\''+p.id+'\')">SET</button>';
+      rows.appendChild(row);
+    });
+  }
+  panel.style.display='block';
 }
-function applyStack(seatIdx, playerId){
-  const inp=document.getElementById('se-inp-'+seatIdx);
-  const btn=document.getElementById('se-btn-'+seatIdx);
+
+function doSetStack(idx, playerId){
+  const inp=document.getElementById('se-inp-'+idx);
+  const btn=document.getElementById('se-btn-'+idx);
   if(!inp)return;
-  const pounds=parseFloat(inp.value);
-  if(isNaN(pounds)||pounds<0){inp.style.borderColor='#cc0000';return;}
-  const pence=Math.round(pounds*100);
-  wsSend({type:'setStack',playerId,chips:pence});
-  // Show confirmation — green tick, then revert button text
-  if(btn){btn.textContent='✓';btn.style.background='#1a6a1a';setTimeout(()=>{btn.textContent='SET';btn.style.background='';},1500);}
+  const val=parseFloat(inp.value);
+  if(isNaN(val)||val<0){ inp.style.borderColor='#cc0000'; return; }
+  const pence=Math.round(val*100);
+  console.log('setStack →', playerId, pence);
+  wsSend({type:'setStack', playerId:playerId, chips:pence});
+  btn.textContent='✓';
+  btn.style.background='#1a6a1a';
   inp.style.borderColor='#c8a020';
-  setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);
-}
-function maybeRefreshStackEditor(){
-  // No-op — panel is self-contained and not auto-refreshed from state
+  setTimeout(()=>{ btn.textContent='SET'; btn.style.background=''; inp.style.borderColor=''; }, 2000);
 }
 function handlePaused(isPaused,byName){
   gamePaused=isPaused;
