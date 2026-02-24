@@ -1085,17 +1085,35 @@ function toggleStackEditor(){
   const panel=document.getElementById('stackEditor');
   const open=panel.style.display==='block';
   panel.style.display=open?'none':'block';
-  if(!open)renderStackEditor();
+  if(open){
+    // Clear rows so next open gets fresh build with current values
+    document.getElementById('stackEditorRows').innerHTML='';
+  } else {
+    renderStackEditor();
+  }
 }
 function renderStackEditor(){
   if(!lastState||!lastState.players)return;
   const rows=document.getElementById('stackEditorRows');
+  // Check if rows already exist — if so, only update values for unfocused inputs
+  const existing=rows.querySelectorAll('.se-row');
+  if(existing.length){
+    lastState.players.forEach((p,i)=>{
+      if(!p)return;
+      const inp=document.getElementById('se-inp-'+i);
+      // Only overwrite if not currently focused (user might be typing)
+      if(inp&&document.activeElement!==inp){
+        inp.value=(p.chips/100).toFixed(2);
+      }
+    });
+    return;
+  }
+  // First render — build all rows
   rows.innerHTML='';
   lastState.players.forEach((p,i)=>{
     if(!p)return;
     const row=document.createElement('div');
     row.className='se-row';
-    // Input holds pounds with 2 dp
     const pounds=(p.chips/100).toFixed(2);
     row.innerHTML=
       '<span class="se-name">'+p.name+'</span>'+
@@ -1112,11 +1130,10 @@ function applyStack(seatIdx, playerId){
   if(isNaN(pounds)||pounds<0)return;
   const pence=Math.round(pounds*100);
   wsSend({type:'setStack',playerId,chips:pence});
-  // Visual feedback
   inp.style.borderColor='#c8a020';
   setTimeout(()=>{ if(inp)inp.style.borderColor=''; },800);
 }
-// Re-render stack editor when state updates (keeps values fresh if panel is open)
+// On state update only refresh values — never rebuild rows so typed values survive
 function maybeRefreshStackEditor(){
   if(document.getElementById('stackEditor').style.display==='block')renderStackEditor();
 }
