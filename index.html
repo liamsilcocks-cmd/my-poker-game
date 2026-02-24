@@ -298,17 +298,23 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   /* Force above any canvas overlap */
   isolation:isolate;
 }
-/* On very small screens push toggle btn away from top chrome */
+/* On small screens: move 2D/3D toggle to bottom-left so Safari address bar
+   can't hide it. topBar goes back to top as normal. */
 @media screen and (max-width: 500px) {
   #toggleViewBtn{
-    top:calc(8px + env(safe-area-inset-top,0px)) !important;
-    right:calc(8px + env(safe-area-inset-right,0px)) !important;
+    /* Move to bottom-left — always visible, thumb-reachable, avoids Safari chrome */
+    top:auto !important;
+    bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;
+    right:auto !important;
+    left:calc(4px + env(safe-area-inset-left,0px)) !important;
     font-size:11px !important;
     padding:0 10px !important;
-    height:38px !important;
+    height:36px !important;
+    border-radius:18px !important;
+    z-index:1001 !important;
   }
   #topBar{
-    top:calc(56px + env(safe-area-inset-top,0px)) !important;
+    top:calc(8px + env(safe-area-inset-top,0px)) !important;
     font-size:11px;
   }
   #phase{font-size:11px !important;}
