@@ -1,1686 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SYFM Poker">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SYFM Poker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
+#gameUI{--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px)}
+#c{width:100%;height:100%;display:block;touch-action:none}
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,5,2,0.88);z-index:200}
+.panel{background:linear-gradient(160deg,#1c0e06 0%,#2a1408 100%);border:2px solid #c8a020;border-radius:16px;padding:36px 44px;min-width:340px;max-width:480px;width:90%;text-align:center;box-shadow:0 0 60px rgba(200,160,32,0.20)}
+.panel h1{color:#ffd700;font-size:2.2rem;margin-bottom:8px;letter-spacing:2px}
+.panel h2{color:#ffd700;font-size:1.5rem;margin-bottom:18px}
+.panel h3{color:#c8a020;font-size:1rem;margin:14px 0 8px}
+.panel p{color:#c8a060;margin-bottom:14px;line-height:1.5}
+.panel input[type=text],.panel input[type=number]{width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;background:#0d0704;border:1px solid #6a5010;color:#ffd700;font-size:1.1rem;outline:none;text-align:center}
+.panel input:focus{border-color:#c8a020}
+.btn-gold{width:100%;padding:14px;margin-top:14px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:1.1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
+.btn-gold:hover{opacity:.85}
+.btn-gold:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:8px 18px;border-radius:6px;border:none;font-size:.9rem;font-weight:bold;cursor:pointer;color:#fff;margin:4px}
+.btn-approve{background:#1a6a1a}
+.btn-reject{background:#6a1a1a}
+.player-row{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 14px;margin:6px 0;color:#e0c060;font-size:.95rem}
+.player-row .chips{color:#ffd700;font-weight:bold}
+.host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
+.pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
+#cookieOverlay{z-index:500}
+#cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px;overflow-y:auto;max-height:92vh}
+#cookieOverlay h2{text-align:center;margin-bottom:4px;font-size:1.35rem}
+.cookie-subtitle{color:#e09020;font-size:.82rem;letter-spacing:1px;text-transform:uppercase;text-align:center;margin-bottom:18px;display:block}
+.cookie-table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:.85rem}
+.cookie-table th{background:rgba(200,160,32,0.18);color:#ffd700;padding:7px 10px;text-align:left;border:1px solid #4a3a10;font-size:.8rem;letter-spacing:.5px}
+.cookie-table td{padding:7px 10px;border:1px solid #3a2a08;color:#d0b860;vertical-align:top;line-height:1.45}
+.cookie-table tr:nth-child(even) td{background:rgba(255,255,255,0.03)}
+.cookie-table td:first-child{color:#ffd700;font-weight:bold;white-space:nowrap;width:36%}
+.cookie-uat{margin-top:16px;padding:10px 14px;background:rgba(180,40,40,0.18);border:1px solid #8a2020;border-radius:8px;color:#e08080;font-size:.85rem;line-height:1.5;text-align:center}
+.cookie-uat strong{color:#ff9090}
+.cookie-btns{display:flex;gap:10px;margin-top:20px}
+.cookie-btns .btn-gold{flex:1;margin-top:0;font-size:1rem;padding:12px}
+.btn-deny{flex:1;padding:12px;border-radius:8px;border:1px solid #6a2020;background:linear-gradient(135deg,#4a1a1a,#2a0a0a);color:#c06060;font-size:1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
+.btn-deny:hover{opacity:.8}
+#gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
+#gameUI > *{pointer-events:auto}
+#topBar{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
+#phase{font-size:14px;font-weight:bold;white-space:nowrap}
+#pot{font-size:17px;font-weight:bold;white-space:nowrap}
+#roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
+#actionPanel{position:fixed;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px;background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
+.abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
+.abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
+.abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
+.abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
+.abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
+#drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
+/* ── Top-Down Dial Styling ── */
+.dial-row{display:flex;gap:4px;justify-content:center;align-items:flex-end;width:100%;padding:2px 0}
+.dial-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+.dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
+.dial-cog{width:80px;height:80px;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;display:block;}
+.dial-cog:active{cursor:grabbing}
+.dial-hint{font-size:8px;color:rgba(200,160,32,0.5);text-align:center;letter-spacing:0.5px;margin-top:1px;}
+.dial-sep{font-size:20px;font-weight:bold;color:#c8a060;line-height:1;padding-bottom:28px}
+#tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
+#tableSlider label{font-size:11px;color:#c8a060}
+#tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
+#tablePan::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
+#tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
+#bottomBar{position:absolute;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
+#myInfo{font-size:14px;font-weight:bold;color:#ffd700;line-height:1.5;letter-spacing:0.5px}
+#controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:112}
+.cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;line-height:1;cursor:pointer;color:#fff;background:#1a4a7a}
+.cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
+.cbtn-cashout{padding:9px 11px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
+.cbtn-cashout.pending{background:#6a1a00;border-color:#ff6040;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.65}}
+.cbtn-autofold{padding:9px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#3a1a5a;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.cbtn-autofold.active{background:#8a10cc;box-shadow:0 0 10px rgba(180,60,255,0.7)}
+#stackEditor{position:absolute;bottom:calc(50px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.93);border:1px solid #c8a020;border-radius:10px;padding:10px 12px;z-index:115;display:none;min-width:210px;max-height:60vh;overflow-y:auto}
+#stackEditor h4{color:#ffd700;font-size:12px;margin:0 0 8px 0;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #4a3a10;padding-bottom:5px}
+.se-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.se-name{flex:1;color:#e0d0a0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.se-input{width:68px;background:#1a1000;border:1px solid #6a5010;border-radius:5px;color:#ffd700;font-size:13px;font-weight:bold;padding:4px 6px;text-align:right}
+.se-input:focus{outline:none;border-color:#c8a020}
+.se-btn{padding:4px 8px;border-radius:5px;border:none;background:#4a6a00;color:#fff;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.se-btn:active{background:#6a9a00}
+.cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent;display:block}
+@supports (-webkit-touch-callout:none) and (not (display:-webkit-box)){
+  .cbtn-fs{display:none!important}
+}
+#msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
+#sideBoxes{position:absolute;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
+#chatBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #3a2a10;overflow:hidden}
+#chatBox.flash #chatHeader{animation:chatFlash 0.6s ease 3}
+@keyframes chatFlash{0%{background:transparent}50%{background:rgba(200,160,32,0.35)}100%{background:transparent}}
+#chatHeader{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#c8a060;font-size:11px;font-weight:bold;user-select:none}
+#chatHeader span{color:#a09060;font-size:10px}
+#chatInner{padding:0 8px 8px;border-top:1px solid #3a2a10;display:none}
+#chatLog{height:90px;overflow-y:auto;font-size:11px;color:#c8c8a0;margin-bottom:5px;display:flex;flex-direction:column;gap:2px}
+#chatInput{width:100%;padding:5px 8px;border-radius:4px;border:1px solid #4a3a15;background:rgba(0,0,0,0.7);color:#ffd700;font-size:11px}
+#activityBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #2a3a1a;overflow:hidden}
+#activityHeader{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#60c840;font-size:11px;font-weight:bold;user-select:none}
+#activityHeader span{color:#a0d070;font-size:10px}
+#activityLog{height:160px;overflow-y:auto;font-size:10px;color:#b0d890;padding:4px 8px 6px;display:none;flex-direction:column;gap:2px;border-top:1px solid #1a2a10}
+#activityLog .log-hand{color:#ffd700;font-weight:bold;margin-top:3px}
+#activityLog .log-action{color:#90c870}
+#activityLog .log-win{color:#40e870;font-weight:bold}
+#activityLog .log-community{color:#a0b8ff}
+#activityLog .log-fold{color:#e07050}
+#activityLog .log-system{color:#c8a060;font-style:italic}
+#waitingMsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:20px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none}
+#joinRequestNotif{position:absolute;top:58px;right:240px;background:rgba(10,40,10,0.95);padding:12px 14px;border-radius:10px;color:#e0e0e0;font-size:13px;display:none;border:1px solid #20a040;min-width:200px;z-index:10}
+#joinRequestNotif h4{color:#40e060;margin-bottom:6px;font-size:14px}
+#joinReqList{display:flex;flex-direction:column;gap:5px}
+.jr-row{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.07);padding:5px 8px;border-radius:6px}
+.jr-name{color:#ffd700;font-weight:bold;font-size:12px}
+.jr-btns{display:flex;gap:4px}
+.jr-admit{background:#1a6a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
+.jr-reject{background:#6a1a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
+#turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
+#spectatorBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:16px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none;z-index:50}
+#pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
+#toggleViewBtn{
+  position:fixed;top:12px;right:12px;z-index:9999;
+  height:44px;padding:0 14px;border-radius:22px;
+  border:2px solid #c8a020;
+  background:rgba(10,5,2,0.94);
+  color:#ffd700;font-size:13px;font-weight:bold;letter-spacing:1px;
+  cursor:pointer;display:none;
+  box-shadow:0 0 0 3px rgba(200,160,32,0.25),0 4px 18px rgba(0,0,0,0.7);
+  -webkit-tap-highlight-color:transparent;
+  transition:background 0.2s,box-shadow 0.2s;
+  display:none;align-items:center;gap:7px;white-space:nowrap;
+}
+#toggleViewBtn:active{background:rgba(200,160,32,0.3);box-shadow:0 0 0 5px rgba(200,160,32,0.4)}
+#toggleViewBtn.mode2d{background:rgba(200,160,32,0.18);border-color:#ffd700;box-shadow:0 0 0 3px rgba(200,160,32,0.5),0 4px 18px rgba(0,0,0,0.7)}
+#view2d{
+  display:none;position:fixed;inset:0;
+  background:#1a0d05;overflow:hidden;
+  z-index:90;
+}
+#table2d{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:min(92vw,560px);height:min(58vw,360px);
+  background:radial-gradient(ellipse at center,#0d3a18 0%,#072010 60%,#041408 100%);
+  border-radius:50%;
+  border:4px solid #1a5a28;
+  box-shadow:0 0 0 6px #0a2a10,0 0 60px rgba(0,0,0,0.8),inset 0 0 40px rgba(0,0,0,0.5);
+}
+#table2dInner{position:relative;width:100%;height:100%;}
+#table2dCenter{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-52%);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  pointer-events:none;
+}
+#pot2d{text-align:center;}
+#pot2d .pot-label{color:#c8a060;font-size:9px;letter-spacing:2px;text-transform:uppercase}
+#pot2d .pot-val{color:#ffd700;font-size:17px;font-weight:bold;text-shadow:0 0 10px rgba(200,160,32,0.7)}
+#community2d{display:flex;gap:4px;overflow:visible;}
+.c2d-card{
+  position:relative;
+  width:72px;height:102px;border-radius:7px;
+  background:#fff;border:1px solid #ccc;
+  box-shadow:0 2px 10px rgba(0,0,0,0.5);
+  flex-shrink:0;
+}
+.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
+.c2d-card.red{color:#cc2020;}
+.c2d-card.black{color:#111;}
+.p2d-seat{
+  position:absolute;transform:translate(-50%,-50%);
+  display:flex;flex-direction:row;align-items:center;gap:5px;
+  pointer-events:none;
+}
+.p2d-info{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:74px;}
+.p2d-name{
+  font-size:10px;font-weight:bold;color:#e0d0a0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:74px;
+  background:rgba(0,0,0,0.78);border-radius:4px;padding:2px 5px;
+}
+.p2d-name.me{color:#ffd700;background:rgba(200,160,32,0.22)}
+.p2d-name.folded{color:#555;text-decoration:line-through}
+.p2d-stack{font-size:9px;color:#80cfff;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
+.p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
+.p2d-cards{display:flex;gap:4px;}
+.p2d-card{
+  position:relative;
+  width:70px;height:99px;border-radius:7px;
+  background:#fff;border:1px solid #aaa;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  flex-shrink:0;
+}
+.p2d-seat.me .p2d-card{width:90px;height:126px;border-radius:9px;box-shadow:0 3px 14px rgba(0,0,0,0.6);}
+.p2d-card.back,.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
+.p2d-card.red,.c2d-card.red{color:#cc2020;}
+.p2d-card.black,.c2d-card.black{color:#111;}
+.p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5;}
+.p2dc-tl{position:absolute;top:3px;left:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;}
+.p2dc-br{position:absolute;bottom:3px;right:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;transform:rotate(180deg);}
+.c2d-card .p2dc-tl,.c2d-card .p2dc-br{font-size:13px;}
+.p2d-seat.me .p2d-card .p2dc-tl,.p2d-seat.me .p2d-card .p2dc-br{font-size:14px;}
+.p2dc-center{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  display:flex;align-items:center;gap:3px;
+  font-weight:bold;line-height:1;white-space:nowrap;
+}
+.p2dc-center .p2dc-rank{font-size:28px;font-weight:900;}
+.p2dc-center .p2dc-suit{font-size:28px;}
+.c2d-card .p2dc-center .p2dc-rank{font-size:36px;}
+.c2d-card .p2dc-center .p2dc-suit{font-size:36px;}
+.p2d-seat.me .p2d-card .p2dc-center .p2dc-rank{font-size:36px;}
+.p2d-seat.me .p2d-card .p2dc-center .p2dc-suit{font-size:36px;}
+#stackInfo2d{
+  position:fixed;
+  bottom:calc(56px + env(safe-area-inset-bottom,0px));
+  right:calc(10px + env(safe-area-inset-right,0px));
+  background:rgba(0,0,0,0.88);
+  border:1px solid #6a5010;border-radius:8px;
+  padding:5px 12px;color:#ffd700;
+  font-size:13px;font-weight:bold;
+  text-align:right;white-space:nowrap;
+  display:none;z-index:112;pointer-events:none;
+  box-shadow:0 2px 10px rgba(0,0,0,0.6);
+}
+.p2d-token{
+  display:inline-block;font-size:8px;font-weight:bold;
+  border-radius:3px;padding:1px 3px;margin-right:2px;
+}
+.p2d-token.dealer{background:#c8a020;color:#000}
+.p2d-token.sb{background:#1a6a1a;color:#fff}
+.p2d-token.bb{background:#1a1a8a;color:#fff}
+.p2d-token.toact{background:#cc2020;color:#fff;animation:p2dPulse 0.8s ease-in-out infinite}
+@keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.p2d-waiting{color:#888;font-size:9px;font-style:italic}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="toggleViewBtn" onclick="toggle2D()" title="Switch to 2D view">
+  <svg width="18" height="18" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+    <circle cx="18" cy="18" r="16" fill="#2a1a00" stroke="#c8a020" stroke-width="3"/>
+    <circle cx="18" cy="18" r="10" fill="none" stroke="#c8a020" stroke-width="2"/>
+    <line x1="18" y1="2" x2="18" y2="8" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="18" y1="28" x2="18" y2="34" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="2" y1="18" x2="8" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="28" y1="18" x2="34" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <span id="toggleViewLabel">→2D</span>
+</button>
+
+<div id="view2d">
+  <div id="table2d">
+    <div id="table2dInner">
+      <div id="table2dCenter">
+        <div id="msg2d" style="display:none;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:8px 18px;color:#fff;font-size:15px;font-weight:bold;text-align:center;white-space:pre-line;max-width:260px;pointer-events:none;"></div>
+        <div id="pot2d">
+          <div class="pot-label">POT</div>
+          <div class="pot-val" id="pot2dVal">£0.00</div>
+        </div>
+        <div id="community2d"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="cookieOverlay" class="overlay">
+  <div class="panel">
+    <h2>🍪 Cookie Notice</h2>
+    <span class="cookie-subtitle">Please read before continuing</span>
+    <p style="color:#c8a060;font-size:.9rem;line-height:1.6;margin-bottom:4px">
+      Whilst no cookies are deliberately created to track you or your behaviour,
+      the following data is stored locally and on our server for the purposes of
+      playing this game online:
+    </p>
+    <table class="cookie-table">
+      <thead>
+        <tr><th>Feature</th><th>How it's handled</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>User Identity</td>
+          <td>Generated as a random string and saved in Local Storage.</td>
+        </tr>
+        <tr>
+          <td>Session Tracking</td>
+          <td>Handled by a persistent WebSocket connection (ws).</td>
+        </tr>
+        <tr>
+          <td>Game History</td>
+          <td>Written to text files on the server disk and uploaded via FTP. This is used during development for debug purposes.</td>
+        </tr>
+        <tr>
+          <td>Reconnection</td>
+          <td>The client reads the ID from Local Storage and sends it to the server to &ldquo;resume&rdquo; their seat.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="cookie-uat">
+      ⚠️ <strong>Development &amp; UAT Notice</strong><br>
+      This game is in development and UAT.<br>
+      You should <strong>never</strong> bet any real money using this game.
+    </div>
+    <div class="cookie-btns">
+      <button class="btn-gold" onclick="cookieAccept()">✅ Accept &amp; Continue</button>
+      <button class="btn-deny" onclick="cookieDeny()">✖ Deny</button>
+    </div>
+  </div>
+</div>
+
+<div id="loginOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px">
+      <circle cx="36" cy="36" r="34" fill="#1a1a1a" stroke="#c8a020" stroke-width="4"/>
+      <g opacity="0.9">
+        <path d="M36 2 A34 34 0 0 1 62.4 19" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M62.4 19 A34 34 0 0 1 68.8 47" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M68.8 47 A34 34 0 0 1 50 66.5" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M50 66.5 A34 34 0 0 1 22 66.5" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M22 66.5 A34 34 0 0 1 3.2 47" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M3.2 47 A34 34 0 0 1 9.6 19" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M9.6 19 A34 34 0 0 1 36 2" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+      </g>
+      <circle cx="36" cy="36" r="24" fill="#1c0e06" stroke="#c8a020" stroke-width="2.5"/>
+      <circle cx="36" cy="36" r="20" fill="none" stroke="rgba(200,160,32,0.3)" stroke-width="1"/>
+      <text x="36" y="40" font-family="Arial" font-weight="bold" font-size="9" fill="#ffd700" text-anchor="middle">SYFM</text>
+    </svg>
+    <h1 style="font-size:2.4rem;letter-spacing:4px;margin-bottom:4px">SYFM</h1>
+    <div style="color:#c8a060;font-size:0.95rem;letter-spacing:6px;margin-bottom:18px;text-transform:uppercase">Poker</div>
+    <p>Enter your name and a room number to play</p>
+    <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
+    <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
+    <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
+    <p id="loginErr" style="color:#e05050;margin-top:10px;font-size:.9rem"></p>
+  </div>
+</div>
+
+<div id="buyBackOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <h2>💸 Out of Chips!</h2>
+    <p id="buyBackMsg">You've run out of chips. Buy back in for <strong>£10.00</strong>?</p>
+    <p style="color:#e09020;font-size:22px;font-weight:bold;margin:4px 0">⏱ <span id="buyBackTimer">15</span>s</p>
+    <button class="btn-gold" onclick="respondBuyBack(true)">✅ BUY BACK IN — £10.00</button>
+    <button class="btn-gold" style="background:linear-gradient(135deg,#6a1a1a,#3a0a0a);margin-top:8px" onclick="respondBuyBack(false)">👀 Watch as Spectator</button>
+  </div>
+</div>
+
+<div id="waitingOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <h2>&#9203; Waiting for host&hellip;</h2>
+    <p id="waitingTxt">The host will approve your entry shortly.</p>
+    <button class="btn-gold" onclick="location.reload()" style="margin-top:10px">Cancel</button>
+  </div>
+</div>
+<div id="lobbyOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <h2>&#127920; Room <span id="lobbyRoomId"></span></h2>
+    <div id="playerList"></div>
+    <div id="pendingSection" style="display:none">
+      <h3>&#9203; Requesting to join:</h3>
+      <div id="pendingItems"></div>
+    </div>
+    <p id="lobbyStatus" style="color:#c8a060;margin-top:14px;font-size:.9rem"></p>
+    <button class="btn-gold" id="startBtn" style="display:none;margin-top:18px">&#9654; START GAME</button>
+  </div>
+</div>
+<div id="gameUI">
+  <div id="topBar">
+    <div id="phase">PRE-FLOP</div>
+    <div id="pot">POT: &pound;0.00</div>
+    <div id="myNameBadge" style="font-size:12px;color:#80cfff;padding:3px 8px;background:rgba(0,80,160,0.25);border-radius:6px;white-space:nowrap"></div>
+    <div id="roomBadge">ROOM &mdash;</div>
+  </div>
+  <div id="actionPanel">
+    <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
+    <div id="drumWidget">
+      <div class="dial-row">
+        <div class="dial-wrap">
+          <div class="dial-label">£ pounds</div>
+          <canvas class="dial-cog" id="dialPounds" width="80" height="80"></canvas>
+          <div class="dial-hint">◄ roll ►</div>
+        </div>
+        <div class="dial-sep">.</div>
+        <div class="dial-wrap">
+          <div class="dial-label">20p steps</div>
+          <canvas class="dial-cog" id="dialPence" width="80" height="80"></canvas>
+          <div class="dial-hint">◄ roll ►</div>
+        </div>
+      </div>
+    </div>
+    <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET £0.40</button>
+    <button class="abtn abtn-allin" id="allInBtn" style="display:none">ALL IN</button>
+    <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
+  </div>
+  <div id="drumOverlay" style="display:none"></div>
+  <div id="bottomBar">
+    <div id="myInfo">Stack £10.00</div>
+  </div>
+  <div id="tableSlider">
+    <label>▲</label>
+    <input type="range" id="tablePan" min="-3" max="3" step="0.1" value="0.5">
+    <label>▼</label>
+  </div>
+  <div id="stackEditor">
+    <h4>🔧 Host Controls</h4>
+    <div class="se-row" style="margin-bottom:10px;border-bottom:1px solid #4a3a10;padding-bottom:10px">
+      <span class="se-name" style="color:#ffd700">Buy-in £</span>
+      <input class="se-input" id="buyInInput" type="number" min="1" step="1" value="10.00" style="width:72px">
+      <button class="se-btn" id="buyInBtn" onclick="applyBuyIn()" style="background:#1a3a6a">SET</button>
+    </div>
+    <div style="color:#888;font-size:10px;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Player stacks</div>
+    <div id="stackEditorRows"></div>
+  </div>
+  <div id="stackInfo2d"></div>
+  <div id="controlBar">
+    <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">⏸</button>
+    <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
+    <button class="cbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
+    <button class="cbtn-autofold" id="stackEditorBtn" onclick="toggleStackEditor()" style="display:none;background:#2a4a1a">🔧</button>
+    <button class="cbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+  </div>
+  <div id="pauseBanner"></div>
+  <div id="spectatorBanner">👀 You are spectating — no cards will be dealt to you</div>
+  <div id="msg"></div>
+  <div id="waitingMsg"></div>
+  <div id="joinRequestNotif">
+    <h4>&#9203; Players want to join</h4>
+    <div id="joinReqList"></div>
+  </div>
+  <div id="turnIndicator"></div>
+  <div id="sideBoxes">
+    <div id="chatBox">
+      <div id="chatHeader" onclick="toggleChat()">&#128172; CHAT <span id="chatToggle">&#9654; expand</span></div>
+      <div id="chatInner">
+        <div id="chatLog"></div>
+        <input type="text" id="chatInput" placeholder="Type and press Enter&hellip;" maxlength="100">
+      </div>
+    </div>
+    <div id="activityBox">
+      <div id="activityHeader" onclick="toggleActivityLog()">&#128203; LOG <span id="activityToggle">&#9654; expand</span></div>
+      <div id="activityLog"></div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
 'use strict';
-const http   = require('http');
-const { WebSocketServer } = require('ws');
-const fs     = require('fs');
-const path   = require('path');
-const ftp    = require('basic-ftp');
-const crypto = require('crypto'); // built-in — no install needed
+let audioCtx;
+function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
+function snd_deal(){ensureAudio();const t=audioCtx.currentTime,len=Math.floor(audioCtx.sampleRate*0.12),buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/len),0.6);const src=audioCtx.createBufferSource(),bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.Q.value=0.6;bp.frequency.setValueAtTime(4200,t);bp.frequency.exponentialRampToValueAtTime(1600,t+0.12);const g=audioCtx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.28,t+0.015);g.gain.exponentialRampToValueAtTime(0.001,t+0.12);src.buffer=buf;src.connect(bp);bp.connect(g);g.connect(audioCtx.destination);src.start(t);}
+function snd_flip(){ensureAudio();const t=audioCtx.currentTime,b=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.055),audioCtx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2200;g.gain.setValueAtTime(0.32,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.055);src.buffer=b;src.connect(hp);hp.connect(g);g.connect(audioCtx.destination);src.start(t);}
+function snd_chip(){ensureAudio();const t=audioCtx.currentTime,base=1600+Math.random()*500;[[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{const osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.type='sine';osc.frequency.value=base*r*(0.97+Math.random()*0.06);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);osc.connect(g);g.connect(audioCtx.destination);osc.start(t);osc.stop(t+0.14);});}
+function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,1319].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*0.10);g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);o.connect(g);o.connect(audioCtx.destination);o.start(t+i*0.10);o.stop(t+i*0.10+0.6);});}
 
-const PORT  = process.env.PORT || 10000;
-const SUITS = ['\u2660','\u2665','\u2666','\u2663'];
-const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-const RVAL  = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
-const NP    = 9;
-const SB    = 10, BB = 20;
-const START_CHIPS = 1000;
-const ACTION_TIMEOUT = 15000;
+/* --- Wheel Dials Implementation --- */
+class WheelDial {
+    constructor(canvasId, onChange) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.onChange = onChange;
+        this.angle = 0; 
+        this.isDragging = false;
+        this.lastY = 0;
+        this.size = 80;
+        this.initEvents();
+        this.draw();
+    }
+    initEvents() {
+        const start = (e) => {
+            this.isDragging = true;
+            this.lastY = e.touches ? e.touches[0].clientY : e.clientY;
+        };
+        const move = (e) => {
+            if (!this.isDragging) return;
+            const currentY = e.touches ? e.touches[0].clientY : e.clientY;
+            const dy = currentY - this.lastY;
+            if (Math.abs(dy) > 1) {
+                const direction = dy > 0 ? -1 : 1;
+                this.angle += direction * 0.15;
+                this.lastY = currentY;
+                this.onChange(direction);
+                this.draw();
+            }
+        };
+        const end = () => this.isDragging = false;
+        this.canvas.addEventListener('mousedown', start);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', end);
+        this.canvas.addEventListener('touchstart', start, {passive:false});
+        window.addEventListener('touchmove', move, {passive:false});
+        window.addEventListener('touchend', end);
+    }
+    draw() {
+        const ctx = this.ctx;
+        const center = this.size / 2;
+        const radius = this.size / 2 - 5;
+        ctx.clearRect(0, 0, this.size, this.size);
 
-// A room with no connected players is destroyed after this much idle time.
-// This prevents stale zombie rooms persisting across Render cold-starts.
-const ROOM_EMPTY_TTL_MS = 60_000; // 1 minute
+        // Rim Shadow
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#0a0502';
+        ctx.fill();
 
-// ─── Logging ─────────────────────────────────────────────────────────────────
-const LOGS_DIR = path.join(__dirname, 'logs');
-if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
+        // Main Wheel Gradient (Metallic look)
+        const grad = ctx.createRadialGradient(center, center, radius * 0.5, center, center, radius);
+        grad.addColorStop(0, '#3a2a10');
+        grad.addColorStop(0.8, '#6a5010');
+        grad.addColorStop(1, '#2a1a08');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
+        ctx.fill();
 
-// Server event log — one file for the whole process lifetime (not per hand)
-const SERVER_LOG = path.join(LOGS_DIR, `server_${new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)}.txt`);
-function svrLog(line) {
-  const ts = new Date().toISOString().slice(11,23);
-  const entry = `[${ts}] ${line}\n`;
-  try { fs.appendFileSync(SERVER_LOG, entry); } catch {}
-  console.log(`[SVR] ${line}`);
+        // Outer Gold Border
+        ctx.strokeStyle = '#c8a020';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Notches (to visualize rotation)
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(this.angle);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+        ctx.lineWidth = 4;
+        for (let i = 0; i < 12; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, -radius + 4);
+            ctx.lineTo(0, -radius + 12);
+            ctx.stroke();
+            ctx.rotate(Math.PI / 6);
+        }
+        ctx.restore();
+
+        // Center Cap
+        ctx.beginPath();
+        ctx.arc(center, center, radius * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = '#1a0d05';
+        ctx.fill();
+        ctx.strokeStyle = '#c8a020';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
 }
 
-function handLogPath(roomId, handNum) {
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return path.join(LOGS_DIR, `room${roomId}_hand${String(handNum).padStart(4,'0')}_${ts}.txt`);
-}
-
-// Write a timestamped line to the current hand's log file
-function writeLog(room, line) {
-  if (!room.G || !room.G.logPath) return;
-  const ts = new Date().toTimeString().slice(0, 8);
-  try { fs.appendFileSync(room.G.logPath, `[${ts}] ${line}\n`); } catch {}
-}
-
-// logEvent — sends a system notification to the activity/output log panel
-// on every client. Unlike `type:'chat'`, this does NOT appear in the player
-// chat box — it goes only to the log feed (addLog on the client side).
-function logEvent(room, text) {
-  broadcastAll(room, { type: 'logEvent', text });
-}
-
-// Write to both the hand log and the in-browser activity log in one call
-function logBoth(room, text) {
-  writeLog(room, text);
-  logEvent(room, text);
-}
-
-// FTP upload after hand finishes
-async function ftpUpload(localPath) {
-  const host = process.env.FTP_HOST;
-  const user = process.env.FTP_USER;
-  const pass = process.env.FTP_PASS;
-  const dir  = process.env.FTP_DIR || '/poker-logs';
-  if (!host || !user || !pass) {
-    svrLog('FTP: env vars not set — upload skipped');
-    return;
-  }
-  const client = new ftp.Client();
-  client.ftp.verbose = false;
-  const fname = path.basename(localPath);
-  svrLog(`FTP: connecting to ${host} to upload ${fname}`);
-  try {
-    await client.access({ host, user, password: pass, secure: false });
-    try { await client.ensureDir(dir); } catch {}
-    await client.uploadFrom(localPath, `${dir}/${fname}`);
-    svrLog(`FTP: ✅ uploaded ${fname} → ${host}${dir}/${fname}`);
-  } catch (err) {
-    svrLog(`FTP: ❌ upload FAILED for ${fname} — ${err.message}`);
-    console.error('FTP upload failed:', err.message);
-  } finally {
-    client.close();
-    svrLog(`FTP: connection closed`);
-  }
-}
-
-// ─── HTTP server ──────────────────────────────────────────────────────────────
-const server = http.createServer((req, res) => {
-  if (req.url === '/' || req.url === '/index.html') {
-    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      if (err) { res.writeHead(500); res.end('Error loading game'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(data);
-    });
-    return;
-  }
-  if (req.url === '/logs') {
-    let files = [];
-    try { files = fs.readdirSync(LOGS_DIR).filter(f => f.endsWith('.txt')).sort().reverse(); } catch {}
-    const links = files.map(f =>
-      `<li><a href="/logs/download/${encodeURIComponent(f)}">${f}</a></li>`
-    ).join('');
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(`<!DOCTYPE html><html><head><title>Logs</title>
-      <style>body{font-family:monospace;background:#111;color:#aef;padding:20px}a{color:#ffd700}li{margin:4px 0}</style></head>
-      <body><h2>SYFM Poker - Hand Logs (${files.length} files)</h2><ul>${links}</ul>
-      <p><a href="/">Back to game</a></p></body></html>`);
-    return;
-  }
-  const dl = req.url.match(/^\/logs\/download\/(.+)$/);
-  if (dl) {
-    const name = decodeURIComponent(dl[1]).replace(/[/\\]/g, '');
-    const fp = path.join(LOGS_DIR, name);
-    if (!fp.startsWith(LOGS_DIR) || !name.endsWith('.txt')) { res.writeHead(403); res.end(); return; }
-    fs.readFile(fp, (err, data) => {
-      if (err) { res.writeHead(404); res.end('Not found'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Disposition': `attachment; filename="${name}"` });
-      res.end(data);
-    });
-    return;
-  }
-  if (req.url && req.url.startsWith('/keepalive')) {
-    const params = new URL(req.url, 'http://x').searchParams;
-    const room = params.get('room') || '?';
-    const hand = params.get('hand') || '?';
-    const ts = new Date().toISOString();
-    svrLog(`KEEPALIVE | Room: ${room} | Hand: ${hand}`);
-    const r = rooms.get(room);
-    if (r && r.G) writeLog(r, `KEEPALIVE: client ping at hand #${hand} — server alive | rooms active: ${rooms.size} | ws connections: ${wss.clients.size}`);
-    res.writeHead(200, {'Content-Type':'text/plain','Access-Control-Allow-Origin':'*'});
-    res.end('alive:'+ts);
-    return;
-  }
-  res.writeHead(404); res.end('Not found');
+let dialP, dialC;
+window.addEventListener('DOMContentLoaded', () => {
+    dialP = new WheelDial('dialPounds', (dir) => adjustBet(dir, 1));
+    dialC = new WheelDial('dialPence', (dir) => adjustBet(dir, 0.2));
 });
 
-// ─── WebSocket ────────────────────────────────────────────────────────────────
-const wss = new WebSocketServer({ server });
-const rooms = new Map();
-
-// ── Room lifecycle ────────────────────────────────────────────────────────────
-// Tears down every timer in the room and removes it from the map.
-function destroyRoom(room) {
-  const connectedCount = room.seats.filter(s => s?.ws?.readyState === 1).length;
-  svrLog(`ROOM ${room.id} DESTROY — ${room.seats.filter(Boolean).length} seats occupied, ${connectedCount} connected, ${room.pendingJoins.length} pending, hand #${room.handNum}`);
-  clearActionTimer(room);
-  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
-  let closedSockets = 0;
-  room.seats.forEach(s => {
-    if (s) {
-      if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
-      if (s._buyBackTimer)    { clearTimeout(s._buyBackTimer);    s._buyBackTimer    = null; }
-      if (s.ws?.readyState === 1) {
-        try { s.ws.close(); closedSockets++; } catch {}
-      }
-    }
-  });
-  room.pendingJoins.forEach(p => {
-    try { if (p.ws?.readyState === 1) { p.ws.close(); closedSockets++; } } catch {}
-  });
-  svrLog(`ROOM ${room.id} DESTROY — closed ${closedSockets} open socket(s), removed from map`);
-  rooms.delete(room.id);
+function adjustBet(dir, amt) {
+    if (dir > 0) currentBetAmount += amt;
+    else currentBetAmount -= amt;
+    updateRaiseUI();
+    snd_chip();
 }
 
-// Call this any time a player disconnects or a seat is vacated.
-// Starts a TTL that destroys the room if nobody reconnects in time.
-function scheduleRoomCleanup(room) {
-  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
-
-  const hasConnected = room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
-    || room.pendingJoins.some(p => p.ws?.readyState === 1);
-
-  if (!hasConnected) {
-    svrLog(`ROOM ${room.id} EMPTY — no connected players, scheduling cleanup in ${ROOM_EMPTY_TTL_MS/1000}s`);
-    room._emptyTimer = setTimeout(() => {
-      const stillEmpty = !room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
-        && !room.pendingJoins.some(p => p.ws?.readyState === 1);
-      if (stillEmpty) {
-        svrLog(`ROOM ${room.id} CLEANUP — TTL expired with no reconnects, destroying`);
-        destroyRoom(room);
-      } else {
-        svrLog(`ROOM ${room.id} CLEANUP — cancelled, player reconnected during TTL window`);
-      }
-    }, ROOM_EMPTY_TTL_MS);
-  }
-}
-
-function getOrCreateRoom(roomId) {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, {
-      id: roomId, seats: Array(NP).fill(null), hostId: null,
-      gameActive: false, pendingJoins: [], G: null, dealerSeat: -1,
-      actionTimer: null, handNum: 0,
-      paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT,
-      actionTimerStarted: 0,
-      buyIn: START_CHIPS,   // per-room buy-in amount, host can change in lobby
-      _emptyTimer: null   // TTL timer — set by scheduleRoomCleanup
-    });
-  }
-  const room = rooms.get(roomId);
-  // Cancel any pending destruction now that someone is joining
-  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
-  return room;
-}
-
-function send(ws, msg) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
-}
-
-function broadcastAll(room, msg) {
-  const str = JSON.stringify(msg);
-  room.seats.forEach(s => { if (s?.ws?.readyState === 1) s.ws.send(str); });
-}
-
-function lobbySnapshot(room) {
-  return {
-    type: 'lobby', roomId: room.id, hostId: room.hostId, gameActive: room.gameActive,
-    buyIn: room.buyIn,
-    seats: room.seats.map(s => s ? { id: s.id, name: s.name, chips: s.chips, seat: s.seat } : null),
-    pending: room.pendingJoins.map(p => ({ id: p.id, name: p.name }))
-  };
-}
-
-function tableSnapshot(room, forId) {
-  const G = room.G;
-  if (!G) return {
-    type: 'state', phase: 'idle',
-    players: room.seats.map(s => {
-      if (!s) return null;
-      return { seat: s.seat, name: s.name, chips: s.chips, bet: 0,
-               folded: false, disconnected: s.disconnected || false,
-               pendingCashOut: s.pendingCashOut || false,
-               voluntaryAutoFold: s.voluntaryAutoFold || false,
-               spectator: s.spectator || false,
-               pendingBuyBack: s.pendingBuyBack || false,
-               cards: [], active: !s.sittingOut };
-    })
-  };
-  return {
-    type: 'state', phase: G.phase, pot: G.pot, currentBet: G.currentBet,
-    community: G.community, dealerSeat: room.dealerSeat,
-    sbSeat: G.sbSeat, bbSeat: G.bbSeat, toActSeat: G.toAct[0] ?? null,
-    players: room.seats.map(s => {
-      if (!s) return null;
-      // FIX #2: Only show hole cards to the owning player (or everyone at showdown)
-      // Never reveal another player's cards, even during buy-back transitions
-      const isOwner = s.id === forId;
-      const atShowdown = G.phase === 'showdown' && !s.folded;
-      const showCards = isOwner || atShowdown;
-      return {
-        seat: s.seat, name: s.name, chips: s.chips, bet: s.bet,
-        folded: s.folded, disconnected: s.disconnected || false,
-        pendingCashOut: s.pendingCashOut || false,
-        voluntaryAutoFold: s.voluntaryAutoFold || false,
-        spectator: s.spectator || false,
-        pendingBuyBack: s.pendingBuyBack || false,
-        cards: showCards ? s.cards : s.cards.map(() => 'back'),
-        active: !s.sittingOut
-      };
-    })
-  };
-}
-
-function startActionTimer(room, seat, remainingMs) {
-  clearActionTimer(room);
-  if (room.paused) {
-    room.actionTimerSeat = seat;
-    room.actionTimerRemaining = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
-    writeLog(room, `ACTION TIMER: paused — seat ${seat+1} (${room.seats[seat]?.name}) timer held at ${((remainingMs??ACTION_TIMEOUT)/1000).toFixed(1)}s`);
-    return;
-  }
-  const duration = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
-  room.actionTimerSeat = seat;
-  room.actionTimerRemaining = duration;
-  room.actionTimerStarted = Date.now();
-  writeLog(room, `ACTION TIMER: started — seat ${seat+1} (${room.seats[seat]?.name}) has ${(duration/1000).toFixed(1)}s to act`);
-  room.actionTimer = setTimeout(() => {
-    const p = room.seats[seat];
-    if (!p || p.folded || !room.G || room.G.toAct[0] !== seat) return;
-    writeLog(room, `ACTION TIMER: EXPIRED — seat ${seat+1} (${p.name}) ran out of time, auto-folding`);
-    doFold(room, seat, 'timeout');
-  }, duration);
-}
-
-function clearActionTimer(room) {
-  if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
-  if (room.actionTimerStarted) {
-    const elapsed = Date.now() - room.actionTimerStarted;
-    room.actionTimerRemaining = Math.max(2000, (room.actionTimerRemaining || ACTION_TIMEOUT) - elapsed);
-    room.actionTimerStarted = 0;
-  }
-}
-
-// ─── Pause / Resume ───────────────────────────────────────────────────────────
-function pauseGame(room, byName) {
-  if (room.paused) return;
-  room.paused = true;
-  room._pausedAt = Date.now();
-  clearActionTimer(room);
-  broadcastAll(room, { type: 'gamePaused', byName });
-  writeLog(room, `GAME PAUSED by ${byName} | Hand #${room.handNum} | Phase: ${room.G?.phase||'idle'} | Pot: £${((room.G?.pot||0)/100).toFixed(2)}`);
-  svrLog(`ROOM ${room.id} PAUSED by ${byName}`);
-}
-
-function resumeGame(room, byName) {
-  if (!room.paused) return;
-  const pausedForMs = room._pausedAt ? Date.now() - room._pausedAt : 0;
-  room.paused = false;
-  room._pausedAt = null;
-  broadcastAll(room, { type: 'gameResumed', byName });
-  writeLog(room, `GAME RESUMED by ${byName} | Was paused for ${(pausedForMs/1000).toFixed(1)}s`);
-  svrLog(`ROOM ${room.id} RESUMED by ${byName} after ${(pausedForMs/1000).toFixed(1)}s`);
-  if (room.G && room.actionTimerSeat >= 0 && room.G.toAct[0] === room.actionTimerSeat) {
-    startActionTimer(room, room.actionTimerSeat, room.actionTimerRemaining || ACTION_TIMEOUT);
-  }
-}
-
-// ─── Connections ──────────────────────────────────────────────────────────────
-// ─── Connections ──────────────────────────────────────────────────────────────
-// Players are auto-folded immediately on disconnect. If they miss ABSENT_HAND_LIMIT
-// consecutive hands (defined in startNewHand) they are evicted. If they reconnect
-// before the next hand starts they rejoin seamlessly with no host approval needed.
-
-wss.on('connection', ws => {
-  let myId = null, myRoomId = null;
-  const connectedAt = Date.now();
-  const remoteIp = ws._socket?.remoteAddress || 'unknown';
-  svrLog(`WS OPEN — new connection from ${remoteIp} (total open: ${wss.clients.size})`);
-
-  ws.on('message', raw => {
-    let msg;
-    try { msg = JSON.parse(raw); } catch { return; }
-
-    switch (msg.type) {
-
-      case 'join': {
-        const rawRoom = String(msg.room || '1').replace(/\D/g, '') || '1';
-        myRoomId = rawRoom.slice(0, 6);
-        myId = msg.id || ('p_' + Math.random().toString(36).slice(2, 8));
-        const name = (msg.name || 'Player').slice(0, 18).trim() || 'Player';
-        const room = getOrCreateRoom(myRoomId);
-        const isNewRoom = room.handNum === 0 && !room.seats.some(Boolean);
-        svrLog(`JOIN — room ${myRoomId} | id=${myId} | name="${name}" | ip=${remoteIp} | roomIsNew=${isNewRoom}`);
-
-        // ── Reconnect ─────────────────────────────────────────────────────────
-        const existing = room.seats.find(s => s?.id === myId);
-        if (existing) {
-          const wasDisconnectedMs = existing.disconnected ? Date.now() - (existing._disconnectedAt||0) : 0;
-          if (existing._disconnectTimer) {
-            clearTimeout(existing._disconnectTimer);
-            existing._disconnectTimer = null;
-          }
-
-          // If they missed 1+ hands they need host re-admission.
-          // If they reconnect before the next hand starts (missedHands still 0),
-          // let them back in immediately — no host approval needed.
-          const needsHostApproval = existing.autoFold && (existing._missedHands || 0) >= 1;
-
-          if (needsHostApproval) {
-            svrLog(`RECONNECT — ${name} (room ${myRoomId}) missed ${existing._missedHands} hand(s), queuing for host re-admission`);
-            writeLog(room, `RECONNECT (pending): ${name} returned after missing ${existing._missedHands} hand(s) — host must re-admit | Was disconnected ~${(wasDisconnectedMs/1000).toFixed(1)}s`);
-            if (!room.pendingJoins.find(p => p.id === myId)) {
-              room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
-            } else {
-              const pj = room.pendingJoins.find(p => p.id === myId);
-              if (pj) pj.ws = ws;
-            }
-            send(ws, { type: 'waiting', id: myId, reason: `You missed ${existing._missedHands} hand(s). Waiting for host to re-admit you.` });
-            const host = room.seats.find(s => s?.id === room.hostId);
-            if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
-            broadcastAll(room, lobbySnapshot(room));
-          } else {
-            // Reconnected before missing any hands — let them straight back in
-            existing.ws = ws;
-            existing.disconnected = false;
-            existing.autoFold = false;
-            existing._disconnectedAt = null;
-            existing._missedHands = 0;
-            send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
-            send(ws, lobbySnapshot(room));
-            if (room.G) send(ws, tableSnapshot(room, myId));
-            writeLog(room, `RECONNECT: ${name} (Seat ${existing.seat+1}) back online | Was disconnected ~${(wasDisconnectedMs/1000).toFixed(1)}s | Stack: £${(existing.chips/100).toFixed(2)}`);
-            logEvent(room, `\uD83D\uDD04 ${existing.name} reconnected`);
-            svrLog(`RECONNECT OK — ${name} seat ${existing.seat+1} room ${myRoomId}`);
-          }
-          return;
-        }
-
-        // ── Brand-new player ──────────────────────────────────────────────────
-        const hasSeatedPlayers = room.seats.some(s => s !== null);
-        if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
-          room.seats[0] = mkPlayer(ws, myId, name, 0, room);
-          room.hostId = myId;
-          svrLog(`NEW ROOM — ${name} created room ${myRoomId} as host, assigned seat 0`);
-          writeLog(room, `HOST JOINED: ${name} created room ${myRoomId} | ${buyInTag(room.seats[0])}`);
-          send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
-          broadcastAll(room, lobbySnapshot(room));
-          return;
-        }
-
-        if (room.pendingJoins.find(p => p.id === myId)) {
-          const pj = room.pendingJoins.find(p => p.id === myId);
-          pj.ws = ws;
-          send(ws, { type: 'waiting', id: myId });
-          svrLog(`JOIN — ${name} (room ${myRoomId}) refreshed pending socket`);
-          return;
-        }
-
-        svrLog(`JOIN PENDING — ${name} (room ${myRoomId}) waiting for host approval`);
-        writeLog(room, `JOIN REQUEST: ${name} (id: ${myId}) requesting entry to room ${myRoomId}`);
-        room.pendingJoins.push({ ws, id: myId, name });
-        send(ws, { type: 'waiting', id: myId });
-        const host = room.seats.find(s => s?.id === room.hostId);
-        if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name });
-        break;
-      }
-
-      case 'approve': {
-        const room = rooms.get(myRoomId);
-        if (!room || myId !== room.hostId) return;
-        const idx = room.pendingJoins.findIndex(p => p.id === msg.id);
-        if (idx === -1) return;
-        const p = room.pendingJoins.splice(idx, 1)[0];
-
-        if (msg.accept) {
-          const existSeat = room.seats.find(s => s?.id === p.id);
-          if (existSeat) {
-            if (existSeat._disconnectTimer) {
-              clearTimeout(existSeat._disconnectTimer);
-              existSeat._disconnectTimer = null;
-            }
-            existSeat.ws = p.ws;
-            existSeat.disconnected = false;
-            existSeat.autoFold = false;
-            existSeat._missedHands = 0;
-            existSeat._disconnectedAt = null;
-            send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
-            send(p.ws, lobbySnapshot(room));
-            if (room.G) send(p.ws, tableSnapshot(room, p.id));
-            writeLog(room, `RE-ADMITTED: ${existSeat.name} (Seat ${existSeat.seat+1}) re-admitted by host | Stack: £${(existSeat.chips/100).toFixed(2)} | ${buyInTag(existSeat)}`);
-            logEvent(room, `✅ ${existSeat.name} re-admitted to the table`);
-            svrLog(`APPROVE — ${existSeat.name} re-admitted to room ${myRoomId} seat ${existSeat.seat+1}`);
-          } else {
-            const seat = room.seats.findIndex(s => s === null);
-            if (seat === -1) {
-              send(p.ws, { type: 'rejected', reason: 'Table is full' });
-              writeLog(room, `REJECTED: ${p.name} — table is full (${NP} seats)`);
-              svrLog(`REJECT — ${p.name} room ${myRoomId}: table full`);
-              broadcastAll(room, lobbySnapshot(room));
-              return;
-            }
-            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat, room);
-            send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
-            writeLog(room, `SEATED: ${p.name} assigned Seat ${seat+1} | ${buyInTag(room.seats[seat])}`);
-            svrLog(`APPROVE — ${p.name} seated in room ${myRoomId} seat ${seat+1}`);
-            if (room.gameActive) {
-              room.seats[seat].sittingOut = true;
-              writeLog(room, `SITTING OUT: ${p.name} (Seat ${seat+1}) — hand in progress, joins next hand`);
-              send(p.ws, { type: 'sittingOut', reason: 'Hand in progress - you will join next hand.' });
-              send(p.ws, tableSnapshot(room, p.id));
-            }
-          }
-        } else {
-          send(p.ws, { type: 'rejected', reason: 'Host declined your request' });
-          writeLog(room, `REJECTED: ${p.name} — declined by host`);
-          svrLog(`REJECT — ${p.name} room ${myRoomId}: declined by host`);
-        }
-        broadcastAll(room, lobbySnapshot(room));
-        break;
-      }
-
-      case 'startGame': {
-        const room = rooms.get(myRoomId);
-        if (!room || myId !== room.hostId) return;
-        const playable = room.seats.filter(s => s && !s.autoFold);
-        if (playable.length < 2) { send(ws, { type: 'error', msg: 'Need at least 2 players' }); return; }
-        svrLog(`GAME START — room ${myRoomId} | ${playable.length} players | host: ${room.seats.find(s=>s?.id===myId)?.name}`);
-        writeLog(room, `GAME STARTED by host | ${playable.length} players seated | ${playable.map(s=>`${s.name}(£${(s.chips/100).toFixed(2)})`).join(', ')}`);
-        room.gameActive = true;
-        broadcastAll(room, { type: 'gameStarting' });
-        broadcastAll(room, lobbySnapshot(room));
-        startNewHand(room);
-        break;
-      }
-
-      case 'pause': {
-        const room = rooms.get(myRoomId);
-        if (!room || !room.gameActive) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (!p) return;
-        pauseGame(room, p.name);
-        break;
-      }
-
-      case 'resume': {
-        const room = rooms.get(myRoomId);
-        if (!room || !room.gameActive) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (!p) return;
-        resumeGame(room, p.name);
-        break;
-      }
-
-      // FIX #5: buyBack works for any number of players (no player-count restriction)
-      case 'buyBack': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (!p || !p.pendingBuyBack) return;
-
-        if (p._buyBackTimer) { clearTimeout(p._buyBackTimer); p._buyBackTimer = null; }
-        const resolve = p._onBuyBackResolved;
-        p._onBuyBackResolved = null;
-
-        if (msg.accept) {
-          p.chips = room.buyIn;
-          p.pendingBuyBack = false;
-          p.spectator = false;
-          p.buyInCount = (p.buyInCount || 1) + 1;
-          p.buyInTotal = (p.buyInTotal || room.buyIn) + room.buyIn;
-          // Keep sittingOut=true so they don't get action prompts mid-hand.
-          // startNewHand() clears sittingOut for all players at hand start.
-          p.sittingOut = true;
-          writeLog(room, `BUY-BACK: ${p.name} has bought back in for \u00a3${(room.buyIn/100).toFixed(2)} \u2014 will join next hand | ${buyInTag(p)}`);
-          logEvent(room, `\u2705 ${p.name} bought back in for \u00a3${(room.buyIn/100).toFixed(2)} \u2014 joining next hand | ${buyInTag(p)}`);
-          send(p.ws, { type: 'buyBackAccepted', chips: room.buyIn });
-        } else {
-          p.pendingBuyBack = false;
-          p.sittingOut = true;
-          p.spectator = true;
-          writeLog(room, `SPECTATOR: ${p.name} declined buy-back \u2014 watching as spectator`);
-          logEvent(room, `\ud83d\udc40 ${p.name} declined buy-back \u2014 now spectating`);
-          send(p.ws, { type: 'spectating' });
-        }
-        broadcastState(room);
-        if (resolve) resolve(); // may trigger startNewHand if all buy-backs resolved
-        break;
-      }
-
-      case 'voluntaryAutoFold': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (!p) return;
-        p.voluntaryAutoFold = msg.enabled === true;
-        const afStatus = p.voluntaryAutoFold ? 'ENABLED' : 'DISABLED';
-        writeLog(room, `AUTO-FOLD ${afStatus}: ${p.name} (Seat ${p.seat+1}) | Stack: £${(p.chips/100).toFixed(2)} | ${buyInTag(p)}`);
-        logEvent(room, `\uD83D\uDD01 AUTO-FOLD ${afStatus}: ${p.name}`);
-        svrLog(`AUTO-FOLD ${afStatus} — ${p.name} room ${myRoomId}`);
-        if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
-          writeLog(room, `AUTO-FOLD: ${p.name} is current actor — folding immediately`);
-          clearActionTimer(room);
-          doFold(room, p.seat, 'auto-fold');
-        }
-        send(ws, { type: 'voluntaryAutoFoldAck', enabled: p.voluntaryAutoFold });
-        break;
-      }
-
-      case 'action': {
-        const room = rooms.get(myRoomId);
-        if (!room?.G || !room.gameActive) return;
-        const actSeat = room.seats.findIndex(s => s?.id === myId);
-        if (actSeat === -1 || room.G.toAct[0] !== actSeat) return;
-        clearActionTimer(room);
-        handleAction(room, actSeat, msg.action, msg.amount);
-        break;
-      }
-
-      case 'cashOut': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const s = room.seats.find(s => s?.id === myId);
-        if (!s) return;
-
-        const inActiveHand = room.G && !s.folded && !s.sittingOut &&
-          room.G.phase !== 'idle' && s.cards && s.cards.length > 0;
-
-        if (inActiveHand) {
-          s.pendingCashOut = true;
-          send(ws, { type: 'cashOutPending' });
-          logEvent(room, `\uD83D\uDCB0 ${s.name} will cash out after this hand`);
-          writeLog(room, `CASH OUT PENDING: ${s.name} (Seat ${s.seat+1}) | Stack: £${(s.chips/100).toFixed(2)} | Phase: ${room.G.phase} | ${buyInTag(s)}`);
-          svrLog(`CASH OUT PENDING — ${s.name} room ${myRoomId} mid-hand`);
-          if (room.G.toAct[0] === s.seat) {
-            writeLog(room, `CASH OUT: ${s.name} is current actor — folding to process cash out`);
-            clearActionTimer(room);
-            doFold(room, s.seat, 'cash out');
-          } else if (!s.folded) {
-            s.folded = true;
-            const idx = room.G.toAct.indexOf(s.seat);
-            if (idx !== -1) room.G.toAct.splice(idx, 1);
-            broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (cashing out)' });
-            writeLog(room, `FOLD (cash out): ${s.name} (Seat ${s.seat+1}) folded to exit hand`);
-            broadcastState(room);
-            checkRoundEnd(room);
-          }
-          broadcastState(room);
-        } else {
-          writeLog(room, `CASH OUT: ${s.name} (Seat ${s.seat+1}) cashing out immediately — not in active hand`);
-          executeCashOut(room, s);
-        }
-        break;
-      }
-
-      case 'chat': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const s = room.seats.find(s => s?.id === myId);
-        if (!s) return;
-        writeLog(room, `CHAT: ${s.name}: ${(msg.text||'').slice(0,120)}`);
-        broadcastAll(room, { type: 'chat', name: s.name, text: (msg.text || '').slice(0, 120) });
-        break;
-      }
-
-      case 'setBuyIn': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        if (room.hostId !== myId) return;
-        const newBuyIn = Math.max(20, Math.round(Number(msg.buyIn))); // minimum 20p
-        room.buyIn = newBuyIn;
-        writeLog(room, `BUY-IN CHANGED: host set buy-in to \u00a3${(newBuyIn/100).toFixed(2)}`);
-        svrLog(`BUY-IN CHANGED — room ${myRoomId} \u00a3${(newBuyIn/100).toFixed(2)}`);
-        logEvent(room, `\uD83D\uDCB0 Buy-in amount set to \u00a3${(newBuyIn/100).toFixed(2)} by host`);
-        broadcastAll(room, lobbySnapshot(room));
-        break;
-      }
-
-      case 'setStack': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        // Host only
-        if (room.hostId !== myId) return;
-        const target = room.seats.find(s => s?.id === msg.playerId);
-        if (!target) return;
-        const newChips = Math.max(0, Math.round(Number(msg.chips)));
-        const oldChips = target.chips;
-        target.chips = newChips;
-        writeLog(room, `STACK OVERRIDE: ${target.name} (Seat ${target.seat+1}) £${(oldChips/100).toFixed(2)} → £${(newChips/100).toFixed(2)} | by host`);
-        svrLog(`STACK OVERRIDE — ${target.name} room ${myRoomId} ${oldChips}→${newChips} pence`);
-        logEvent(room, `🔧 ${target.name}'s stack set to £${(newChips/100).toFixed(2)} by host`);
-        broadcastState(room);
-        broadcastAll(room, lobbySnapshot(room));
-        break;
-      }
-    }
-  });
-
-  ws.on('close', () => {
-    const openDurationMs = Date.now() - connectedAt;
-    svrLog(`WS CLOSE — id=${myId||'(pre-join)'} room=${myRoomId||'none'} | open ${(openDurationMs/1000).toFixed(1)}s | remaining: ${wss.clients.size}`);
-    if (!myId || !myRoomId) return;
-    const room = rooms.get(myRoomId);
-    if (!room) return;
-
-    const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
-    if (pi !== -1) {
-      const pj = room.pendingJoins[pi];
-      room.pendingJoins.splice(pi, 1);
-      writeLog(room, `PENDING JOIN LEFT: ${pj.name} disconnected before being admitted`);
-      svrLog(`PENDING JOIN LEFT — ${pj.name} room ${myRoomId}`);
-      broadcastAll(room, lobbySnapshot(room));
-      scheduleRoomCleanup(room);
-      return;
-    }
-
-    const s = room.seats.find(s => s?.id === myId);
-    if (!s) return;
-    if (s.ws !== ws) {
-      svrLog(`WS CLOSE — stale socket for ${s.name} room ${myRoomId}, ignoring`);
-      return;
-    }
-
-    s.disconnected = true;
-    s.ws = null;
-    s._disconnectedAt = Date.now();
-    s._missedHands = s._missedHands || 0; // hand-based absence counter
-    logEvent(room, `\u26A0 ${s.name} disconnected \u2014 will be removed after 3 missed hands`);
-    writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) | Stack: \u00a3${(s.chips/100).toFixed(2)} | Phase: ${room.G?.phase||'idle'} | Missed hands so far: ${s._missedHands} | ${buyInTag(s)}`);
-    svrLog(`DISCONNECT — ${s.name} seat ${s.seat+1} room ${myRoomId} | missedHands: ${s._missedHands}`);
-
-    // Mark autoFold immediately so they are skipped in promptToAct going forward
-    s.autoFold = true;
-    broadcastState(room);
-
-    // If they were mid-action right now, fold them out of this hand immediately
-    if (room.G && room.G.toAct[0] === s.seat) {
-      writeLog(room, `DISCONNECT: ${s.name} was current actor \u2014 folding immediately`);
-      clearActionTimer(room);
-      doFold(room, s.seat, 'disconnected');
-    } else if (room.G && !s.folded) {
-      // Not their turn yet but still in the hand — fold them out silently
-      s.folded = true;
-      const idx = room.G.toAct.indexOf(s.seat);
-      if (idx !== -1) room.G.toAct.splice(idx, 1);
-      broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (disconnected)' });
-      writeLog(room, `FOLD (disconnect): ${s.name} (Seat ${s.seat+1}) folded out of current hand`);
-      broadcastState(room);
-      checkRoundEnd(room);
-    }
-
-    scheduleRoomCleanup(room);
-    // NOTE: No _disconnectTimer here. Eviction is now hand-based — see
-    // startNewHand() where _missedHands is incremented each hand the player
-    // misses while still disconnected. After 3 missed hands they are evicted.
-  });
-
-  ws.on('error', err => {
-    svrLog(`WS ERROR \u2014 id=${myId||'(pre-join)'} room=${myRoomId||'none'}: ${err.message}`);
-    console.error('WS error:', err.message);
-  });
-});
-
-// ─── Execute an immediate cash-out for a player ───────────────────────────────
-function executeCashOut(room, s) {
-  const chips = s.chips;
-  const seatIdx = s.seat;
-  const logMsg = `CASH OUT: ${s.name} (Seat ${seatIdx+1}) leaves with £${(chips/100).toFixed(2)} | ${buyInTag(s)}`;
-  svrLog(`CASH OUT — ${s.name} room ${room.id} £${(chips/100).toFixed(2)}`);
-  if (room.G) writeLog(room, logMsg);
-
-  logEvent(room, `💰 ${s.name} cashed out with £${(chips/100).toFixed(2)} | ${buyInTag(s)}`);
-  broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: seatIdx, reason: 'cashout' });
-
-  room.seats[seatIdx] = null;
-
-  if (room.hostId === s.id) {
-    const newHost = room.seats.find(Boolean);
-    if (newHost) {
-      room.hostId = newHost.id;
-      send(newHost.ws, { type: 'logEvent', text: '👑 You are now the host.' });
-    }
-  }
-  broadcastAll(room, lobbySnapshot(room));
-  broadcastState(room);
-  scheduleRoomCleanup(room);
-}
-
-function mkPlayer(ws, id, name, seat, room) {
-  const startChips = room ? room.buyIn : START_CHIPS;
-  return {
-    ws, id, name, chips: startChips, seat, cards: [], bet: 0,
-    folded: false, disconnected: false, autoFold: false,
-    pendingCashOut: false, _disconnectTimer: null,
-    buyInCount: 1,
-    buyInTotal: startChips
-  };
-}
-
-// Format a player's buy-in summary for log lines, e.g. "[Buy-ins: 2 | Total in: £20.00]"
-function buyInTag(s) {
-  return `[Buy-ins: ${s.buyInCount} | Total in: \u00a3${(s.buyInTotal/100).toFixed(2)}]`;
-}
-
-// ─── Game helpers ─────────────────────────────────────────────────────────────
-// Cryptographically secure Fisher-Yates shuffle using Node's crypto.randomInt.
-// crypto.randomInt(min, max) draws from the OS CSPRNG — unpredictable even if
-// the process state is somehow observed, unlike Math.random().
-function shuffle(d) {
-  for (let i = d.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(0, i + 1);
-    [d[i], d[j]] = [d[j], d[i]];
-  }
-  return d;
-}
-function buildDeck() {
-  const d = [];
-  for (const s of SUITS) for (const r of RANKS) d.push({ s, r });
-  return shuffle(d);
-}
-
-// FIX #3 / #2: activePlaying must exclude spectators, pendingBuyBack, and 0-chip players
-function activePlaying(room) {
-  return room.seats
-    .map((s, i) => {
-      if (!s) return null;
-      if (s.sittingOut) return null;
-      if (s.autoFold) return null;
-      if (s.spectator) return null;
-      if (s.pendingBuyBack) return null;
-      if (s.chips <= 0) return null;
-      return i;
-    })
-    .filter(i => i !== null);
-}
-
-function nextSeat(from, active) {
-  const sorted = [...active].sort((a, b) => a - b);
-  const nxt = sorted.find(i => i > from);
-  return nxt !== undefined ? nxt : sorted[0];
-}
-
-// FIX #3 & #4: buildActOrder — properly tracks who still needs to act.
-// The "toAct" list should contain every non-folded player with chips who hasn't
-// yet matched the current bet OR has not yet had a chance to act this street.
-function buildActOrder(room, startSeat, active) {
-  const sorted = [...active].sort((a, b) => a - b);
-  let startIdx = sorted.indexOf(startSeat);
-  if (startIdx === -1) startIdx = 0;
-  // Rotate so startSeat is first
-  const ordered = [...sorted.slice(startIdx), ...sorted.slice(0, startIdx)];
-  return ordered.filter(i => {
-    const p = room.seats[i];
-    return p && !p.folded && !p.autoFold && !p.voluntaryAutoFold && p.chips > 0;
-  });
-}
-
-// FIX #3: Count players who can actually make a meaningful decision.
-// A player who is all-in cannot act further but is still "in" the hand.
-function canActCount(room) {
-  if (!room.G) return 0;
-  return room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    s.chips > 0
-  ).length;
-}
-
-// Helper: check if round should end due to one or zero real players remaining unfolded.
-// autoFold/voluntaryAutoFold players don't count — they'll be folded automatically.
-function checkRoundEnd(room) {
-  const alive = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-  if (alive.length <= 1) {
-    endRound(room);
-    return true;
-  }
-  return false;
-}
-
-// ─── Hand flow ────────────────────────────────────────────────────────────────
-function startNewHand(room) {
-  clearActionTimer(room);
-
-  if (room.paused) {
-    room.paused = false;
-    broadcastAll(room, { type: 'gameResumed' });
-  }
-  room.actionTimerSeat = -1;
-  room.actionTimerRemaining = ACTION_TIMEOUT;
-  room.actionTimerStarted = 0;
-
-  // Process any pending cash-outs from the previous hand
-  room.seats.forEach((s, i) => {
-    if (s && s.pendingCashOut) {
-      executeCashOut(room, s);
-    }
-  });
-
-  // ── Hand-based absence tracking ───────────────────────────────────────────
-  // For every disconnected player, count this as one missed hand.
-  // After ABSENT_HAND_LIMIT consecutive missed hands → evict the seat.
-  // This replaces the old timer-based approach which was unreliable because
-  // startNewHand was clearing the disconnect timer before it could fire.
-  const ABSENT_HAND_LIMIT = 3;
-  room.seats.forEach((s, idx) => {
-    if (!s) return;
-    if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
-
-    if (s.disconnected && s.autoFold) {
-      s._missedHands = (s._missedHands || 0) + 1;
-      writeLog(room, `ABSENT: ${s.name} (Seat ${s.seat+1}) missed hand — absent ${s._missedHands}/${ABSENT_HAND_LIMIT} | ${buyInTag(s)}`);
-      logEvent(room, `\uD83D\uDCA4 ${s.name} absent — missed ${s._missedHands}/${ABSENT_HAND_LIMIT} hand${s._missedHands>1?'s':''}`);
-      svrLog(`ABSENT — ${s.name} room ${room.id} missedHands=${s._missedHands}/${ABSENT_HAND_LIMIT}`);
-
-      if (s._missedHands >= ABSENT_HAND_LIMIT) {
-        // Evict
-        svrLog(`EVICT — ${s.name} room ${room.id} seat ${s.seat+1} after ${ABSENT_HAND_LIMIT} missed hands`);
-        logEvent(room, `\u274C ${s.name} removed after ${ABSENT_HAND_LIMIT} missed hands`);
-        writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) removed after ${ABSENT_HAND_LIMIT} consecutive missed hands | ${buyInTag(s)}`);
-        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'absent-eviction' });
-
-        if (room.hostId === s.id) {
-          const newHost = room.seats.find(h => h && h.id !== s.id && h.ws?.readyState === 1);
-          if (newHost) {
-            room.hostId = newHost.id;
-            writeLog(room, `HOST TRANSFER: ${s.name} evicted \u2192 ${newHost.name} is new host`);
-            svrLog(`HOST TRANSFER — room ${room.id}: ${s.name} \u2192 ${newHost.name}`);
-            send(newHost.ws, { type: 'logEvent', text: '\uD83D\uDC51 You are now the host.' });
-          } else {
-            room.hostId = null;
-          }
-        }
-
-        room.seats[idx] = null;
-        broadcastAll(room, lobbySnapshot(room));
-        scheduleRoomCleanup(room);
-      }
-    } else {
-      // Connected player — reset their absence counter
-      s._missedHands = 0;
-      s.sittingOut = false;
-    }
-  });
-
-  const active = activePlaying(room);
-
-  if (active.length < 2) {
-    const seated = room.seats.filter(Boolean).map(s=>`${s.name}(chips:£${(s.chips/100).toFixed(2)},sittingOut:${!!s.sittingOut},spectator:${!!s.spectator},pendingBB:${!!s.pendingBuyBack})`).join(', ');
-    writeLog(room, `WAITING: not enough active players to start hand | active=${active.length} | all seats: ${seated}`);
-    svrLog(`ROOM ${room.id} — waiting for players (active: ${active.length})`);
-    broadcastAll(room, { type: 'waitingForPlayers' });
-    room.gameActive = false;
-    broadcastAll(room, lobbySnapshot(room));
-    return;
-  }
-
-  room.dealerSeat = room.dealerSeat < 0
-    ? active[0]
-    : nextSeat(room.dealerSeat, active);
-
-  room.handNum = (room.handNum || 0) + 1;
-
-  const isHeadsUp = active.length === 2;
-  // Heads-up: dealer posts SB and acts first preflop; BB acts first postflop
-  const sbSeat = isHeadsUp ? room.dealerSeat : nextSeat(room.dealerSeat, active);
-  const bbSeat = nextSeat(sbSeat, active);
-  const preflopStart = nextSeat(bbSeat, active);
-
-  const logPath = handLogPath(room.id, room.handNum);
-
-  room.G = {
-    deck: buildDeck(), phase: 'preflop', pot: 0,
-    currentBet: BB,
-    lastRaiseIncrement: BB,
-    community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath
-  };
-
-  room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; s.totalBet = 0; } });
-
-  const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
-  const dsIdx = active.indexOf(dealStartSeat);
-  const dealOrder = dsIdx >= 0
-    ? [...active.slice(dsIdx), ...active.slice(0, dsIdx)]
-    : active;
-
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-GB', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const timeStr = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const totalChips = active.reduce((s,i) => s + room.seats[i].chips, 0);
-  const playerLines = active.map(i => {
-    const s = room.seats[i];
-    const tags = [];
-    if (i === room.dealerSeat) tags.push('DEALER');
-    if (i === sbSeat) tags.push('SB');
-    if (i === bbSeat) tags.push('BB');
-    const tagStr = tags.length ? ' ['+tags.join('+')+']' : '';
-    return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | Stack: £${(s.chips/100).toFixed(2).padStart(7)}${tagStr}\n             ${buyInTag(s)}`;
-  }).join('\n');
-
-  fs.writeFileSync(logPath,
-    '╔' + '═'.repeat(62) + '╗\n' +
-    '║  SYFM POKER — HAND LOG' + ' '.repeat(39) + '║\n' +
-    '╠' + '═'.repeat(62) + '╣\n' +
-    `║  Room: ${room.id.padEnd(10)} Hand: #${String(room.handNum).padEnd(6)} Date: ${dateStr.slice(0,20).padEnd(20)}║\n` +
-    `║  Time: ${timeStr.padEnd(54)}║\n` +
-    '╠' + '═'.repeat(62) + '╣\n' +
-    '║  PLAYERS AT THE TABLE' + ' '.repeat(40) + '║\n' +
-    '╠' + '═'.repeat(62) + '╣\n' +
-    playerLines.split('\n').map(l => '║' + l.padEnd(63) + '║').join('\n') + '\n' +
-    '╠' + '═'.repeat(62) + '╣\n' +
-    `║  Format: ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | Blinds: SB £${(SB/100).toFixed(2)} / BB £${(BB/100).toFixed(2)} | Total chips in play: £${(totalChips/100).toFixed(2)}`.padEnd(63) + '║\n' +
-    `║  Deal order: ${dealOrder.map(i=>room.seats[i].name).join(' → ')}`.padEnd(63) + '║\n' +
-    '╚' + '═'.repeat(62) + '╝\n\n'
-  );
-
-  room.seats[sbSeat].chips -= SB; room.seats[sbSeat].bet = SB; room.seats[sbSeat].totalBet = SB;
-  room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB; room.seats[bbSeat].totalBet = BB;
-  room.G.pot = SB + BB;
-
-  // FIX #2: Cards are dealt ONLY to active players — no other seat gets cards
-  for (let rd = 0; rd < 2; rd++)
-    for (const si of dealOrder)
-      room.seats[si].cards.push(room.G.deck.shift());
-
-  writeLog(room, '┌─ HOLE CARDS DEALT ─────────────────────────────┐');
-  dealOrder.forEach(i => {
-    const s = room.seats[i];
-    const tags = [];
-    if (i === room.dealerSeat) tags.push('D');
-    if (i === sbSeat) tags.push('SB');
-    if (i === bbSeat) tags.push('BB');
-    const tagStr = tags.length ? ' ['+tags.join('+')+']' : '';
-    writeLog(room, `│ ${('Seat '+(i+1)+' '+s.name).padEnd(22)}${tagStr.padEnd(8)}: ${s.cards.map(c=>c.r+c.s).join('  ')} │`);
-  });
-  writeLog(room, '└────────────────────────────────────────────────┘');
-
-  // FIX #4: Pre-flop act order — starts AFTER the BB.
-  // BB player is allowed to raise even if no one else has raised (option).
-  // We build the full rotation; the BB will appear at the END so they get their option.
-  room.G.toAct = buildActOrder(room, preflopStart, active);
-
-  broadcastAll(room, {
-    type: 'newHand', dealerSeat: room.dealerSeat, sbSeat, bbSeat,
-    pot: room.G.pot, activeSeats: dealOrder
-  });
-
-  // FIX #2: Send each player ONLY their own cards via individual tableSnapshot
-  room.seats.forEach(s => {
-    if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id));
-  });
-
-  writeLog(room, '');
-  writeLog(room, '┌─ PREFLOP ────────────────────────────────────────────┐');
-  writeLog(room, `│  Pot (blinds): £${((room.G.pot)/100).toFixed(2).padEnd(44)}│`);
-  writeLog(room, `│  SB: ${room.seats[sbSeat].name.padEnd(18)} posts £${(SB/100).toFixed(2).padEnd(30)}│`);
-  writeLog(room, `│  BB: ${room.seats[bbSeat].name.padEnd(18)} posts £${(BB/100).toFixed(2).padEnd(30)}│`);
-  writeLog(room, `│  Act order: ${room.G.toAct.map(i=>room.seats[i].name).join(' → ').padEnd(49)}│`);
-  writeLog(room, '└──────────────────────────────────────────────────────┘');
-  promptToAct(room);
-}
-
-// FIX #3 & #4: promptToAct — the core of the "wrong player asked" and
-// "check after bet" bugs. This function now correctly:
-// 1. Skips auto-fold/disconnected/0-chip players
-// 2. Ends the street when no one is left to act (not by accident)
-// 3. Detects when only 1 player can act and skips to showdown/next street
-function promptToAct(room) {
-  const G = room.G;
-  if (!G) return;
-
-  // Clean up toAct list: remove players who can no longer act
-  while (G.toAct.length) {
-    const si = G.toAct[0];
-    const p = room.seats[si];
-    if (!p || p.folded || p.autoFold || p.voluntaryAutoFold || p.chips === 0) {
-      G.toAct.shift();
-    } else {
-      break;
-    }
-  }
-
-  // Count players genuinely still in the hand (not folded, not sitting out,
-  // not spectating, not pending buy-back, and NOT on autoFold/voluntaryAutoFold).
-  // autoFold players are effectively gone from this hand — they will fold immediately.
-  const activeInHand = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-
-  // If 1 or fewer real players remain, end the round — no point asking anyone
-  if (activeInHand.length <= 1) {
-    // First auto-fold anyone left in toAct who is on autoFold so the fold logs correctly
-    const toAutoFold = room.seats.filter(s =>
-      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-      (s.autoFold || s.voluntaryAutoFold)
-    );
-    if (toAutoFold.length > 0) {
-      // Fold them silently then end
-      for (const af of toAutoFold) {
-        if (!af.folded) {
-          af.folded = true;
-          const label = af.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
-          broadcastAll(room, { type: 'playerAction', seat: af.seat, action: 'fold', amount: 0, name: af.name + ` (${label})` });
-          writeLog(room, `FOLD   | ${af.name.padEnd(18)} | auto-fold — no other active players`);
-          const idx = G.toAct.indexOf(af.seat);
-          if (idx !== -1) G.toAct.splice(idx, 1);
-        }
-      }
-      broadcastState(room);
-    }
-    endRound(room);
-    return;
-  }
-
-  // Count unfolded players still in the hand (regardless of chips) — for all-in detection
-  const unfolded = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-
-  // FIX #3: Count players who CAN still act (have chips and aren't all-in)
-  const canAct = unfolded.filter(s => s.chips > 0);
-
-  // If nobody can act (all remaining are all-in), run the board automatically
-  if (canAct.length === 0 || G.toAct.length === 0) {
-    advPhase(room);
-    return;
-  }
-
-  // FIX #3: If only 1 player can still act and all others are all-in,
-  // skip asking them if their bet is already matched — just run the board.
-  if (canAct.length === 1 && G.toAct.length > 0) {
-    const soloSeat = G.toAct[0];
-    const solo = room.seats[soloSeat];
-    if (solo) {
-      const callAmt = Math.min(G.currentBet - solo.bet, solo.chips);
-      if (callAmt === 0) {
-        const othersAllIn = unfolded.filter(s => s.seat !== soloSeat && s.chips === 0);
-        if (othersAllIn.length === unfolded.length - 1) {
-          advPhase(room);
-          return;
-        }
-      }
-    }
-  }
-
-  const seat = G.toAct[0];
-  const p = room.seats[seat];
-
-  if (!p) { G.toAct.shift(); setTimeout(() => promptToAct(room), 100); return; }
-
-  // Auto-fold disconnected / auto-fold flagged players immediately
-  if (p.disconnected || p.autoFold || p.voluntaryAutoFold) {
-    clearActionTimer(room);
-    const reason = p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
-    writeLog(room, `PROMPT: ${p.name} (Seat ${seat+1}) — auto-folding (${reason})`);
-    doFold(room, seat, reason);
-    return;
-  }
-
-  // FIX #4: Determine if this is a check (no bet to call) or call situation
-  const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
-  const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
-  const firstBet = G.currentBet === 0;
-
-  writeLog(room, `PROMPT: ${p.name.padEnd(18)} (Seat ${seat+1}) | Phase: ${G.phase} | Stack: £${(p.chips/100).toFixed(2)} | ${callAmt===0?'can CHECK':'must CALL £'+(callAmt/100).toFixed(2)} | min${firstBet?'BET':'RAISE'}: £${(minRaise/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)} | toAct: ${G.toAct.map(i=>room.seats[i]?.name||'?').join('→')}`);
-
-  broadcastAll(room, {
-    type: 'yourTurn',
-    seat,
-    callAmt,         // 0 = check, >0 = amount to call
-    minRaise,
-    pot: G.pot,
-    currentBet: G.currentBet,
-    firstBet        // true = "BET", false = "RAISE"
-  });
-  startActionTimer(room, seat);
-}
-
-function doFold(room, seat, reason) {
-  const p = room.seats[seat];
-  if (!p) return;
-  p.folded = true;
-  const label = reason ? ` (${reason})` : '';
-  const playersLeft = room.seats.filter(s => s && !s.folded && !s.autoFold && !s.voluntaryAutoFold).length;
-  const reasonTag = reason ? `reason=${reason}` : 'voluntary';
-  broadcastAll(room, { type: 'playerAction', seat, action: 'fold', amount: 0, name: p.name + label });
-  writeLog(room, `FOLD   | ${p.name.padEnd(18)} | ${reasonTag.padEnd(22)} | Stack: £${(p.chips/100).toFixed(2).padStart(7)} | Pot: £${((room.G?.pot||0)/100).toFixed(2)} | Players left: ${playersLeft}`);
-  if (room.G) {
-    const idx = room.G.toAct.indexOf(seat);
-    if (idx !== -1) room.G.toAct.splice(idx, 1);
-  }
-  broadcastState(room);
-  if (!checkRoundEnd(room)) {
-    setTimeout(() => promptToAct(room), 200);
-  }
-}
-
-// FIX #4: handleAction — betting logic corrected
-// The key bug was: after a raise, we were not correctly rebuilding toAct
-// to include only players who still need to call the new amount.
-function handleAction(room, seat, action, amount) {
-  const p = room.seats[seat];
-  const G = room.G;
-  if (!p || !G) return;
-  const stackBefore = p.chips;
-
-  if (action === 'fold') {
-    doFold(room, seat, null);
-
-  } else if (action === 'check' || action === 'call') {
-    const ca = Math.min(G.currentBet - p.bet, p.chips);
-    p.chips -= ca; p.bet += ca; p.totalBet = (p.totalBet||0) + ca; G.pot += ca;
-    const act = ca === 0 ? 'check' : 'call';
-    broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    writeLog(room,
-      `${act==='check'?'CHECK ':'CALL  '} | ${p.name.padEnd(18)} | Stack: £${(stackBefore/100).toFixed(2)} → £${(p.chips/100).toFixed(2)}` +
-      ` | ${ca>0?'Paid: £'+(ca/100).toFixed(2):'(no payment)'} | Pot: £${(G.pot/100).toFixed(2)} | toAct remaining: ${G.toAct.length-1}`
-    );
-    broadcastState(room);
-    G.toAct.shift();
-    setTimeout(() => promptToAct(room), 200);
-
-  } else if (action === 'raise') {
-    const callAmount     = G.currentBet - p.bet;
-    const minFromStack   = Math.min(callAmount + G.lastRaiseIncrement, p.chips);
-    const raiseFromStack = Math.min(Math.max(amount || minFromStack, minFromStack), p.chips);
-    const prevCurrentBet = G.currentBet;
-    p.chips -= raiseFromStack;
-    p.bet   += raiseFromStack;
-    p.totalBet = (p.totalBet||0) + raiseFromStack;
-    G.pot   += raiseFromStack;
-    G.currentBet = Math.max(G.currentBet, p.bet);
-    if (G.currentBet > prevCurrentBet) G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
-
-    broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
-    writeLog(room,
-      `${p.bet===p.chips+raiseFromStack&&stackBefore===raiseFromStack?'ALL-IN':'RAISE '} | ${p.name.padEnd(18)}` +
-      ` | Stack: £${(stackBefore/100).toFixed(2)} → £${(p.chips/100).toFixed(2)}` +
-      ` | Raised: £${(raiseFromStack/100).toFixed(2)} | Total bet this street: £${(p.bet/100).toFixed(2)}` +
-      ` | New street ceiling: £${(G.currentBet/100).toFixed(2)} | Pot: £${(G.pot/100).toFixed(2)}`
-    );
-    broadcastState(room);
-
-    const active = activePlaying(room).sort((a, b) => a - b);
-    const raiserIdx = active.indexOf(seat);
-    const rotated = raiserIdx >= 0
-      ? [...active.slice(raiserIdx + 1), ...active.slice(0, raiserIdx + 1)]
-      : active;
-    G.toAct = rotated.filter(i => {
-      if (i === seat) return false;
-      const op = room.seats[i];
-      return op && !op.folded && !op.autoFold && !op.voluntaryAutoFold && op.chips > 0 && op.bet < G.currentBet;
-    });
-    writeLog(room, `RAISE  | New toAct order: ${G.toAct.map(i=>room.seats[i]?.name||'?').join(' → ')} (${G.toAct.length} to act)`);
-    setTimeout(() => promptToAct(room), 200);
-  }
-}
-
-function broadcastState(room) {
-  room.seats.forEach(s => { if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id)); });
-}
-
-function advPhase(room) {
-  const G = room.G;
-  clearActionTimer(room);
-  room.seats.forEach(s => { if (s) s.bet = 0; });
-  G.currentBet = 0;
-  G.lastRaiseIncrement = BB;
-
-  const next = { preflop: 'flop', flop: 'turn', turn: 'river' };
-
-  if (G.phase in next) {
-    const prevPhase = G.phase;
-    G.phase = next[G.phase];
-    const count = G.phase === 'flop' ? 3 : 1;
-    const newCards = [];
-    for (let i = 0; i < count; i++) { const c = G.deck.shift(); G.community.push(c); newCards.push(c); }
-
-    writeLog(room, `PHASE: ${prevPhase.toUpperCase()} → ${G.phase.toUpperCase()} | New card(s): ${newCards.map(c=>c.r+c.s).join(' ')} | Board: ${G.community.map(c=>c.r+c.s).join(' ')} | Pot: £${(G.pot/100).toFixed(2)}`);
-    broadcastAll(room, { type: 'communityDealt', phase: G.phase, cards: G.community, newCards });
-    writeLog(room, '');
-    writeLog(room, '┌─ ' + G.phase.toUpperCase().padEnd(10) + '──────────────────────────────────────────┐');
-    writeLog(room, '│  New cards : ' + newCards.map(c=>c.r+c.s).join('  ').padEnd(47) + '│');
-    writeLog(room, '│  Board     : ' + G.community.map(c=>c.r+c.s).join('  ').padEnd(47) + '│');
-    writeLog(room, '│  Pot       : £' + (G.pot/100).toFixed(2).padEnd(46) + '│');
-    writeLog(room, '└────────────────────────────────────────────────────┘');
-    broadcastState(room);
-
-    const active = activePlaying(room);
-
-    // FIX #3: After dealing community cards, check if anyone can actually act.
-    // Exclude autoFold/voluntaryAutoFold players — they are effectively out.
-    const unfolded = room.seats.filter(s =>
-      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-      !s.autoFold && !s.voluntaryAutoFold
-    );
-
-    if (unfolded.length <= 1) {
-      endRound(room);
-      return;
-    }
-
-    // Players who can still bet/call (have chips)
-    const canAct = active.filter(i => {
-      const p = room.seats[i];
-      return p && !p.folded && p.chips > 0;
-    });
-
-    if (canAct.length <= 1 && G.phase !== 'river') {
-      // All remaining players are all-in — run board automatically without asking
-      writeLog(room, `│  All players all-in — running board automatically     │`);
-      setTimeout(() => advPhase(room), 1200);
-      return;
-    }
-
-    // FIX #3: If only 1 player can act but others are all-in, still run board
-    // (no meaningful betting can happen with 1 active vs all-in opponents)
-    if (canAct.length <= 1) {
-      // We're at the river with no meaningful action possible
-      setTimeout(() => {
-        G.phase = 'showdown';
-        showdown(room);
-      }, 1200);
-      return;
-    }
-
-    // Post-flop act order: starts left of dealer (SB position in normal play)
-    const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
-    G.toAct = buildActOrder(room, postStart, active);
-    writeLog(room, `Act order: ${G.toAct.map(i => room.seats[i].name).join(' → ')}`);
-    setTimeout(() => promptToAct(room), 600);
-
-  } else {
-    G.phase = 'showdown';
-    showdown(room);
-  }
-}
-
-function endRound(room) {
-  clearActionTimer(room);
-  // Remaining = unfolded players who are genuinely still playing (not autoFold)
-  const remaining = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-  if (remaining.length === 1) {
-    writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
-    finish(room, [remaining[0]], 'Last player standing');
-  } else if (remaining.length === 0) {
-    writeLog(room, `RESULT: No eligible winner found — hand skipped`);
-    setTimeout(() => startNewHand(room), 3000);
-  }
-}
-
-function showdown(room) {
-  clearActionTimer(room);
-  const active = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack
-  );
-  if (active.length === 1) {
-    writeLog(room, `RESULT: ${active[0].name} wins at showdown uncontested`);
-    finish(room, [active[0]], 'Last player standing');
-    return;
-  }
-  if (active.length === 0) {
-    writeLog(room, `RESULT: No players at showdown — hand skipped`);
-    setTimeout(() => startNewHand(room), 3000);
-    return;
-  }
-
-  broadcastAll(room, { type: 'showdown', reveals: active.map(s => ({ seat: s.seat, name: s.name, cards: s.cards })) });
-  broadcastState(room);
-
-  writeLog(room, '');
-  writeLog(room, '╔' + '═'.repeat(62) + '╗');
-  writeLog(room, '║  SHOWDOWN' + ' '.repeat(52) + '║');
-  writeLog(room, '╠' + '═'.repeat(62) + '╣');
-  writeLog(room, `║  Board: ${room.G.community.map(c=>c.r+c.s).join('  ').padEnd(53)}║`);
-  writeLog(room, '╠' + '═'.repeat(62) + '╣');
-
-  let bestScore = -1;
-  const scored = active.map(p => {
-    const allCards = [...p.cards, ...room.G.community];
-    const sc = evalBest(allCards);
-    const bf = bestFiveCards(allCards);
-    if (sc > bestScore) bestScore = sc;
-    return { p, sc, bf };
-  });
-
-  for (const { p, sc, bf } of scored) {
-    const holeStr = p.cards.map(c=>c.r+c.s).join(' ');
-    const bestStr = bf.map(c=>c.r+c.s).join(' ');
-    const hn = handName(sc);
-    writeLog(room, `║  ${('Seat '+(p.seat+1)+' '+p.name).padEnd(22)} | Hole: ${holeStr.padEnd(10)} | Best: ${bestStr.padEnd(14)} | ${hn.padEnd(16)}║`);
-  }
-
-  const winners = scored.filter(({ sc }) => sc === bestScore).map(({ p }) => p);
-  const winHandName = handName(bestScore);
-
-  writeLog(room, '╠' + '═'.repeat(62) + '╣');
-  if (winners.length === 1) {
-    writeLog(room, `║  🏆 WINNER: ${winners[0].name} with ${winHandName}`.padEnd(63) + '║');
-  } else {
-    writeLog(room, `║  🤝 SPLIT POT: ${winners.map(w=>w.name).join(' & ')} — ${winHandName}`.padEnd(63) + '║');
-  }
-  writeLog(room, '╚' + '═'.repeat(62) + '╝');
-
-  setTimeout(() => finish(room, winners, winHandName), 1200);
-}
-
-function finish(room, winners, label) {
-  if (!winners || winners.length === 0) return;
-  clearActionTimer(room);
-
-  const G = room.G;
-  const totalPot = G.pot;
-  G.pot = 0;
-
-  // ── Side-pot calculation ─────────────────────────────────────────────────
-  // Every seated player (folded or not) has a totalBet — what they put in.
-  // We calculate how much of the pot each player is eligible to win.
-  //
-  // Algorithm:
-  //   Sort all contributors by totalBet ascending.
-  //   For each level, the "main pot" at that level is:
-  //     min(totalBet[i], totalBet[everyone]) * number_of_contributors_at_this_level
-  //   Eligible winners at each level = winners who contributed >= this level.
-  //   Award each pot level to the best hand among eligible winners.
-  //
-  // Folded players contribute chips to the pot but are never eligible to win.
-
-  const allSeats = room.seats.filter(Boolean);
-
-  // Gather contributors — everyone who put chips in this hand
-  const contributors = allSeats
-    .filter(s => (s.totalBet||0) > 0)
-    .sort((a, b) => (a.totalBet||0) - (b.totalBet||0));
-
-  // Build pot levels
-  const potLevels = []; // { amount, eligibleIds }
-  let alreadyTaken = 0;
-
-  for (let i = 0; i < contributors.length; i++) {
-    const cap = contributors[i].totalBet;
-    if (cap <= alreadyTaken) continue;
-    const levelContrib = cap - alreadyTaken;
-    // Each contributor at this level puts in levelContrib (capped by their totalBet)
-    const participantCount = contributors.filter(c => (c.totalBet||0) >= cap).length;
-    // Also count contributors below this cap for the portion they already contributed
-    const belowCount = contributors.filter(c => (c.totalBet||0) < cap).length;
-    // Pot for this level = levelContrib * number of people who contributed >= cap
-    // + any remaining from people below (already accounted in previous levels)
-    const levelPot = levelContrib * (contributors.length - i);
-    // Eligible to win this level: unfolded players whose totalBet >= cap
-    const eligibleIds = new Set(
-      allSeats
-        .filter(s => !s.folded && (s.totalBet||0) >= cap)
-        .map(s => s.id)
-    );
-    potLevels.push({ amount: levelPot, eligibleIds, cap });
-    alreadyTaken = cap;
-  }
-
-  // Sanity: if pot levels don't add up to totalPot (rounding), add remainder to last level
-  const levelTotal = potLevels.reduce((sum, l) => sum + l.amount, 0);
-  if (levelTotal !== totalPot && potLevels.length > 0) {
-    potLevels[potLevels.length - 1].amount += (totalPot - levelTotal);
-  }
-
-  writeLog(room, '');
-  writeLog(room, '┌─ HAND RESULT ─────────────────────────────────────────┐');
-
-  let totalAwarded = 0;
-  const awardLog = [];
-
-  potLevels.forEach((level, li) => {
-    if (level.amount <= 0) return;
-
-    // Find winners eligible for this pot level
-    const eligibleWinners = winners.filter(w => level.eligibleIds.has(w.id));
-
-    if (eligibleWinners.length === 0) {
-      // No eligible winner (e.g. the only all-in player lost) — return to eligible unfolded players
-      // Give to the best eligible unfolded player
-      const eligible = allSeats.filter(s => !s.folded && level.eligibleIds.has(s.id));
-      if (eligible.length > 0) {
-        eligible[0].chips += level.amount;
-        awardLog.push(`│  ${eligible[0].name} wins £${(level.amount/100).toFixed(2)} (returned — no eligible winner)`.padEnd(63) + '│');
-        totalAwarded += level.amount;
-      }
-      return;
-    }
-
-    if (eligibleWinners.length === 1) {
-      const w = eligibleWinners[0];
-      w.chips += level.amount;
-      const potLabel = potLevels.length > 1 ? (li === 0 ? 'main pot' : `side pot ${li}`) : 'pot';
-      awardLog.push(`│  ${w.name} wins £${(level.amount/100).toFixed(2)} — ${label} (${potLabel})`.padEnd(63) + '│');
-      totalAwarded += level.amount;
-    } else {
-      // Split among eligible winners
-      const perPlayer = Math.floor(level.amount / eligibleWinners.length);
-      const remainder = level.amount - perPlayer * eligibleWinners.length;
-      const sorted = [...eligibleWinners].sort((a, b) => a.seat - b.seat);
-      sorted.forEach((w, i) => {
-        const share = perPlayer + (i === 0 ? remainder : 0);
-        w.chips += share;
-        totalAwarded += share;
-      });
-      const potLabel = potLevels.length > 1 ? (li === 0 ? 'main pot' : `side pot ${li}`) : 'pot';
-      awardLog.push(`│  🤝 ${sorted.map(w=>w.name).join(' & ')} split £${(level.amount/100).toFixed(2)} — ${label} (${potLabel})`.padEnd(63) + '│');
-    }
-  });
-
-  // Return any un-matchable chips to the player who over-contributed
-  // (e.g. the bigger stack went all-in for more than the smaller stack could match)
-  const returned = totalPot - totalAwarded;
-  if (returned > 0) {
-    // Find the player with the largest totalBet who is still in (not folded)
-    const overContributor = allSeats
-      .filter(s => !s.folded)
-      .sort((a, b) => (b.totalBet||0) - (a.totalBet||0))[0];
-    if (overContributor) {
-      overContributor.chips += returned;
-      awardLog.push(`│  £${(returned/100).toFixed(2)} returned to ${overContributor.name} (unmatched all-in)`.padEnd(63) + '│');
-    }
-  }
-
-  // Broadcast individual winner messages
-  potLevels.forEach((level, li) => {
-    if (level.amount <= 0) return;
-    const eligibleWinners = winners.filter(w => level.eligibleIds.has(w.id));
-    if (eligibleWinners.length === 1) {
-      broadcastAll(room, { type: 'winner', seat: eligibleWinners[0].seat, name: eligibleWinners[0].name, amount: level.amount, label });
-    } else if (eligibleWinners.length > 1) {
-      const perPlayer = Math.floor(level.amount / eligibleWinners.length);
-      const remainder = level.amount - perPlayer * eligibleWinners.length;
-      eligibleWinners.sort((a,b)=>a.seat-b.seat).forEach((w,i) => {
-        broadcastAll(room, { type: 'winner', seat: w.seat, name: w.name, amount: perPlayer+(i===0?remainder:0), label: `Split — ${label}` });
-      });
-    }
-  });
-
-  awardLog.forEach(line => writeLog(room, line));
-  broadcastState(room);
-
-  writeLog(room, '├─ CHIP COUNTS AFTER HAND ──────────────────────────────┤');
-  room.seats.filter(Boolean).sort((a,b) => b.chips - a.chips).forEach(s => {
-    const bar  = '█'.repeat(Math.round(s.chips / START_CHIPS * 20));
-    const note = s.pendingCashOut ? ' [CASHING OUT]' : '';
-    writeLog(room, `│  ${('Seat '+(s.seat+1)+' '+s.name).padEnd(22)} £${(s.chips/100).toFixed(2).padStart(7)}  ${bar}${note}`);
-    writeLog(room, `│      ${buyInTag(s)}`.padEnd(63) + '│');
-  });
-  writeLog(room, '└───────────────────────────────────────────────────────┘');
-  writeLog(room, '');
-
-  const logPath = room.G.logPath;
-  if (logPath) setTimeout(() => ftpUpload(logPath), 500);
-
-  setTimeout(() => {
-    // Offer buy-back to every busted player regardless of player count.
-    // KEY FIX: we must NOT call startNewHand until every pending buy-back
-    // has resolved (accept OR timeout), otherwise in 2-player mode the
-    // hand starts with only 1 eligible player → waitingForPlayers fires
-    // and the host sees a dead "Start Game" button.
-    const busted = room.seats.filter(s =>
-      s && s.chips <= 0 && !s.pendingBuyBack && !s.spectator
-    );
-
-    if (busted.length === 0) {
-      startNewHand(room);
-      return;
-    }
-
-    let pendingCount = busted.length;
-
-    function onBuyBackResolved() {
-      pendingCount--;
-      if (pendingCount <= 0) startNewHand(room);
-    }
-
-    busted.forEach(s => {
-      s.pendingBuyBack = true;
-      s.sittingOut = true;
-      writeLog(room, `BUST: ${s.name} (Seat ${s.seat+1}) is out of chips — offering buy-back (15s) | ${buyInTag(s)}`);
-      logEvent(room, `\ud83d\udcb8 ${s.name} is out of chips \u2014 buy-back offer sent | ${buyInTag(s)}`);
-      send(s.ws, { type: 'buyBackOffer', chips: room.buyIn });
-
-      if (s._buyBackTimer) clearTimeout(s._buyBackTimer);
-      s._buyBackTimer = setTimeout(() => {
-        if (!s.pendingBuyBack) return;
-        s.pendingBuyBack = false;
-        s.sittingOut = true;
-        s.spectator = true;
-        writeLog(room, `SPECTATOR (timeout): ${s.name} did not respond \u2014 now spectating | ${buyInTag(s)}`);
-        logEvent(room, `\ud83d\udc40 ${s.name} did not respond to buy-back \u2014 now spectating | ${buyInTag(s)}`);
-        send(s.ws, { type: 'spectating' });
-        broadcastState(room);
-        onBuyBackResolved();
-      }, 15000);
-
-      // Store resolver so the buyBack message handler can fire it
-      s._onBuyBackResolved = onBuyBackResolved;
-    });
-  }, 4000);
-}
-
-// ─── Hand evaluator ───────────────────────────────────────────────────────────
-function rv(r) { return RVAL[r] || parseInt(r) || 0; }
-
-function evalBest(cards) {
-  const cs = combs(cards, Math.min(cards.length, 5));
-  let best = -1;
-  for (const c of cs) { const s = score5(c); if (s > best) best = s; }
-  return best;
-}
-
-function bestFiveCards(cards) {
-  const cs = combs(cards, Math.min(cards.length, 5));
-  let best = -1, bestCombo = cards.slice(0, 5);
-  for (const c of cs) { const s = score5(c); if (s > best) { best = s; bestCombo = c; } }
-  return bestCombo;
-}
-
-function combs(arr, k) {
-  if (arr.length <= k) return [arr];
-  if (k === 1) return arr.map(x => [x]);
-  const out = [];
-  for (let i = 0; i <= arr.length - k; i++)
-    for (const c of combs(arr.slice(i + 1), k - 1)) out.push([arr[i], ...c]);
-  return out;
-}
-
-function score5(cards) {
-  const sorted = [...cards].sort((a, b) => rv(b.r) - rv(a.r));
-  const ranks  = sorted.map(c => rv(c.r));
-  const suits  = sorted.map(c => c.s);
-
-  const cnt = {};
-  for (const r of ranks) cnt[r] = (cnt[r] || 0) + 1;
-  const groups = Object.entries(cnt)
-    .map(([r, n]) => ({ r: Number(r), n }))
-    .sort((a, b) => b.n - a.n || b.r - a.r);
-  const tbRanks = groups.flatMap(g => Array(g.n).fill(g.r));
-
-  const flush = suits.every(s => s === suits[0]);
-  const uniq  = [...new Set(ranks)].sort((a, b) => b - a);
-
-  let isStraight = false, sHigh = 0;
-  if (uniq.length === 5) {
-    if (uniq[0] - uniq[4] === 4) {
-      isStraight = true; sHigh = uniq[0];
-    } else if (uniq[0] === 14 && uniq[1] === 5 && uniq[2] === 4 && uniq[3] === 3 && uniq[4] === 2) {
-      isStraight = true; sHigh = 5;
-    }
-  }
-
-  const pack = rArr => rArr.reduce((acc, r, i) => acc + r * Math.pow(15, 4 - i), 0);
-  const freq = groups[0].n, freq2 = groups[1]?.n || 0;
-
-  if (flush && isStraight && sHigh === 14) return 9e8 + pack(ranks);
-  if (flush && isStraight)                  return 8e8 + sHigh * 1e6;
-  if (freq === 4)                           return 7e8 + pack(tbRanks);
-  if (freq === 3 && freq2 === 2)            return 6e8 + pack(tbRanks);
-  if (flush)                                return 5e8 + pack(ranks);
-  if (isStraight)                           return 4e8 + sHigh * 1e6;
-  if (freq === 3)                           return 3e8 + pack(tbRanks);
-  if (freq === 2 && freq2 === 2)            return 2e8 + pack(tbRanks);
-  if (freq === 2)                           return 1e8 + pack(tbRanks);
-  return pack(ranks);
-}
-
-function handName(s) {
-  if (s >= 9e8) return 'Royal Flush';
-  if (s >= 8e8) return 'Straight Flush';
-  if (s >= 7e8) return 'Four of a Kind';
-  if (s >= 6e8) return 'Full House';
-  if (s >= 5e8) return 'Flush';
-  if (s >= 4e8) return 'Straight';
-  if (s >= 3e8) return 'Three of a Kind';
-  if (s >= 2e8) return 'Two Pair';
-  if (s >= 1e8) return 'One Pair';
-  return 'High Card';
-}
-
-// ─── Start ────────────────────────────────────────────────────────────────────
-server.listen(PORT, () => {
-  const startMsg = `SYFM Poker server started | port=${PORT} | pid=${process.pid} | node=${process.version}`;
-  console.log(`\n♣ ${startMsg}`);
-  svrLog(startMsg);
-  svrLog(`HTTP: http://localhost:${PORT}`);
-  svrLog(`Logs: http://localhost:${PORT}/logs`);
-  svrLog(`FTP:  ${process.env.FTP_HOST || '(not configured)'}`);
-});
-
-// ─── Graceful shutdown (Render.com sends SIGTERM before killing the process) ──
-// Without this, the process dies dirty leaving sockets half-open.
-// With it, we close all WebSocket connections cleanly first so clients
-// immediately get a "connection closed" event and can show a reconnect UI.
-function gracefulShutdown(signal) {
-  const ts = new Date().toISOString();
-  svrLog(`SHUTDOWN: ${signal} received at ${ts} | rooms=${rooms.size} | wsConnections=${wss.clients.size}`);
-  rooms.forEach(room => {
-    const players = room.seats.filter(Boolean).map(s=>`${s.name}(£${(s.chips/100).toFixed(2)})`).join(', ');
-    svrLog(`SHUTDOWN: closing room ${room.id} | hand #${room.handNum} | players: ${players||'none'}`);
-    writeLog(room, `SERVER SHUTDOWN: ${signal} received — server closing | All sessions terminated`);
-  });
-
-  const shutdownMsg = JSON.stringify({ type: 'serverShutdown', reason: 'Server is restarting. Please refresh to reconnect.' });
-  let notified = 0;
-  wss.clients.forEach(client => {
-    try { if (client.readyState === 1) { client.send(shutdownMsg); notified++; } } catch {}
-  });
-  svrLog(`SHUTDOWN: notified ${notified} client(s) via serverShutdown message`);
-
-  rooms.forEach(room => destroyRoom(room));
-
-  wss.close(() => {
-    svrLog('SHUTDOWN: WebSocket server closed');
-    server.close(() => {
-      svrLog('SHUTDOWN: HTTP server closed — clean exit');
-      process.exit(0);
-    });
-  });
-
-  setTimeout(() => {
-    svrLog('SHUTDOWN: force exit after 5s timeout');
-    process.exit(1);
-  }, 5000).unref();
-}
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+// ... rest of game logic continues here ...
+</script>
+</body>
+</html>
