@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SYFM Poker">
@@ -49,7 +49,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .btn-deny:hover{opacity:.8}
 #gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
 #gameUI > *{pointer-events:auto}
-#topBar{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
+#topBar{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
@@ -89,9 +89,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
 #tablePan::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
 #tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
-#bottomBar{position:absolute;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
+#bottomBar{position:fixed;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
 #myInfo{font-size:14px;font-weight:bold;color:#ffd700;line-height:1.5;letter-spacing:0.5px}
-#controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:112}
+#controlBar{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:1000}
 .cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;line-height:1;cursor:pointer;color:#fff;background:#1a4a7a}
 .cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
 .cbtn-cashout{padding:9px 11px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
@@ -112,7 +112,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   .cbtn-fs{display:none!important}
 }
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
-#sideBoxes{position:absolute;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
+#sideBoxes{position:fixed;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
 #chatBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #3a2a10;overflow:hidden}
 #chatBox.flash #chatHeader{animation:chatFlash 0.6s ease 3}
 @keyframes chatFlash{0%{background:transparent}50%{background:rgba(200,160,32,0.35)}100%{background:transparent}}
@@ -258,6 +258,77 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .p2d-token.toact{background:#cc2020;color:#fff;animation:p2dPulse 0.8s ease-in-out infinite}
 @keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .p2d-waiting{color:#888;font-size:9px;font-style:italic}
+
+/* ── Android / narrow screen fixes ───────────────────────────────────────────
+   On narrow phones the left-side action panel can be obscured by the 3D canvas.
+   Move it to the bottom on narrow screens. Also fix panel scaling on small screens. */
+@media screen and (max-width: 480px) {
+  .panel{padding:20px 18px;min-width:0;width:94%;}
+  .panel h1{font-size:1.6rem;}
+  .panel input[type=text],.panel input[type=number]{font-size:1rem;padding:10px 12px;}
+  .btn-gold{font-size:1rem;padding:12px;}
+}
+
+/* On mobile: move action panel from left-centre to bottom-left,
+   shrink slightly so it doesn't eat the whole screen */
+@media screen and (max-height: 700px), screen and (max-width: 500px) {
+  #actionPanel{
+    top:auto !important;
+    bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;
+    transform:none !important;
+    left:0 !important;
+    right:auto !important;
+    width:160px !important;
+    padding:6px 8px !important;
+    gap:5px !important;
+    max-height:calc(100vh - 120px);
+    overflow-y:auto;
+    border-radius:0 12px 12px 0 !important;
+  }
+  .abtn{padding:9px 6px !important;font-size:13px !important;}
+  #drumWidget{gap:2px !important;}
+  .dial-wheel{width:60px !important;height:80px !important;}
+  .dial-item.selected{font-size:18px !important;}
+  .dial-item.adj1{font-size:13px !important;}
+  .dial-sep{font-size:18px !important;margin-top:14px !important;}
+}
+
+/* Ensure toggle view and control bar always visible on Android */
+#toggleViewBtn{
+  /* Force above any canvas overlap */
+  isolation:isolate;
+}
+/* On very small screens push toggle btn away from top chrome */
+@media screen and (max-width: 500px) {
+  #toggleViewBtn{
+    top:calc(8px + env(safe-area-inset-top,0px)) !important;
+    right:calc(8px + env(safe-area-inset-right,0px)) !important;
+    font-size:11px !important;
+    padding:0 10px !important;
+    height:38px !important;
+  }
+  #topBar{
+    top:calc(56px + env(safe-area-inset-top,0px)) !important;
+    font-size:11px;
+  }
+  #phase{font-size:11px !important;}
+  #pot{font-size:13px !important;}
+  #controlBar{
+    bottom:calc(4px + env(safe-area-inset-bottom,0px)) !important;
+    right:calc(4px + env(safe-area-inset-right,0px)) !important;
+    gap:3px !important;
+  }
+  .cbtn-pause,.cbtn-cashout,.cbtn-autofold,.cbtn-fs{
+    padding:7px 8px !important;
+    font-size:11px !important;
+  }
+  #sideBoxes{
+    width:160px !important;
+    top:104px !important;
+    right:4px !important;
+  }
+  #tableSlider{display:none !important;}
+}
 </style>
 </head>
 <body>
