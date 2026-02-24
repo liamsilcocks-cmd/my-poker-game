@@ -181,50 +181,83 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #pot2d{text-align:center;}
 #pot2d .pot-label{color:#c8a060;font-size:9px;letter-spacing:2px;text-transform:uppercase}
 #pot2d .pot-val{color:#ffd700;font-size:17px;font-weight:bold;text-shadow:0 0 10px rgba(200,160,32,0.7)}
-#community2d{display:flex;gap:5px;}
+/* Community cards strip — allow overflow so doubled cards fit */
+#community2d{display:flex;gap:4px;overflow:visible;}
+/* Community card — doubled in size */
 .c2d-card{
-  width:48px;height:68px;border-radius:6px;
+  position:relative;
+  width:72px;height:102px;border-radius:7px;
   background:#fff;border:1px solid #ccc;
-  display:flex;align-items:center;justify-content:center;
-  font-size:17px;font-weight:bold;line-height:1.1;text-align:center;
-  flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  box-shadow:0 2px 10px rgba(0,0,0,0.5);
+  flex-shrink:0;
 }
-.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;color:transparent}
-.c2d-card.red{color:#cc2020}
-.c2d-card.black{color:#111}
+.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
+.c2d-card.red{color:#cc2020;}
+.c2d-card.black{color:#111;}
 /* Seat container */
 .p2d-seat{
   position:absolute;transform:translate(-50%,-50%);
   display:flex;flex-direction:row;align-items:center;gap:5px;
   pointer-events:none;
 }
-/* Info block: name, tokens, stack, bet — sits beside the cards */
-.p2d-info{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:72px;}
+/* Info block: name, tokens, bet (not stack — that lives above pause) */
+.p2d-info{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:74px;}
 .p2d-name{
   font-size:10px;font-weight:bold;color:#e0d0a0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  max-width:72px;
-  background:rgba(0,0,0,0.75);border-radius:4px;padding:2px 5px;
+  max-width:74px;
+  background:rgba(0,0,0,0.78);border-radius:4px;padding:2px 5px;
 }
 .p2d-name.me{color:#ffd700;background:rgba(200,160,32,0.22)}
 .p2d-name.folded{color:#555;text-decoration:line-through}
-.p2d-stack{font-size:9px;color:#80cfff;background:rgba(0,0,0,0.6);border-radius:3px;padding:1px 4px;}
-.p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.6);border-radius:3px;padding:1px 4px;}
-/* Cards */
-.p2d-cards{display:flex;gap:5px;}
+.p2d-stack{font-size:9px;color:#80cfff;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
+.p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
+/* Player hole cards */
+.p2d-cards{display:flex;gap:4px;}
 .p2d-card{
-  width:52px;height:74px;border-radius:6px;
+  position:relative;
+  width:70px;height:99px;border-radius:7px;
   background:#fff;border:1px solid #aaa;
-  display:flex;align-items:center;justify-content:center;
-  font-size:18px;font-weight:bold;line-height:1.1;
-  flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  flex-shrink:0;
 }
-/* My cards — even bigger */
-.p2d-seat.me .p2d-card{width:66px;height:92px;font-size:24px;border-radius:8px;box-shadow:0 3px 14px rgba(0,0,0,0.6);}
-.p2d-card.back{background:#1a3a8a;border-color:#2a4aaa}
-.p2d-card.red{color:#cc2020}
-.p2d-card.black{color:#111}
-.p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5}
+/* My cards — 1/3 bigger */
+.p2d-seat.me .p2d-card{width:90px;height:126px;border-radius:9px;box-shadow:0 3px 14px rgba(0,0,0,0.6);}
+.p2d-card.back,.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
+.p2d-card.red,.c2d-card.red{color:#cc2020;}
+.p2d-card.black,.c2d-card.black{color:#111;}
+.p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5;}
+/* Card face anatomy — corners and centre */
+.p2dc-tl{position:absolute;top:3px;left:5px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;}
+.p2dc-br{position:absolute;bottom:3px;right:5px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;transform:rotate(180deg);}
+.c2d-card .p2dc-tl,.c2d-card .p2dc-br{font-size:13px;}
+.p2d-seat.me .p2d-card .p2dc-tl,.p2d-seat.me .p2d-card .p2dc-br{font-size:14px;}
+.p2dc-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);line-height:1;font-weight:bold;text-align:center;}
+/* 2-10: suit in center, BIGGEST */
+.p2dc-suit-num{font-size:44px;}
+.c2d-card .p2dc-suit-num{font-size:58px;}
+.p2d-seat.me .p2d-card .p2dc-suit-num{font-size:56px;}
+/* A: suit in center, medium */
+.p2dc-suit-a{font-size:36px;}
+.c2d-card .p2dc-suit-a{font-size:48px;}
+.p2d-seat.me .p2d-card .p2dc-suit-a{font-size:46px;}
+/* J Q K: rank letter in center */
+.p2dc-face{font-size:34px;font-weight:900;}
+.c2d-card .p2dc-face{font-size:46px;}
+.p2d-seat.me .p2d-card .p2dc-face{font-size:44px;}
+/* Stack info badge — fixed above pause button in 2D mode */
+#stackInfo2d{
+  position:fixed;
+  bottom:calc(56px + env(safe-area-inset-bottom,0px));
+  right:calc(10px + env(safe-area-inset-right,0px));
+  background:rgba(0,0,0,0.88);
+  border:1px solid #6a5010;border-radius:8px;
+  padding:5px 12px;color:#ffd700;
+  font-size:13px;font-weight:bold;
+  text-align:right;white-space:nowrap;
+  display:none;z-index:112;pointer-events:none;
+  box-shadow:0 2px 10px rgba(0,0,0,0.6);
+}
 .p2d-token{
   display:inline-block;font-size:8px;font-weight:bold;
   border-radius:3px;padding:1px 3px;margin-right:2px;
@@ -428,6 +461,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div style="color:#888;font-size:10px;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Player stacks</div>
     <div id="stackEditorRows"></div>
   </div>
+  <div id="stackInfo2d"></div>
   <div id="controlBar">
     <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">⏸</button>
     <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
@@ -596,8 +630,8 @@ function mkFrontTex(suit,rank){
     '9': [[0.2,0.10,false],[0.8,0.10,false],[0.2,0.34,false],[0.8,0.34,false],[0.5,0.50,false],[0.2,0.66,true],[0.8,0.66,true],[0.2,0.90,true],[0.8,0.90,true]],
     '10':[[0.2,0.10,false],[0.8,0.10,false],[0.5,0.26,false],[0.2,0.40,false],[0.8,0.40,false],[0.2,0.60,true],[0.8,0.60,true],[0.5,0.74,true],[0.2,0.90,true],[0.8,0.90,true]]
   };
-  const pSzMap={'A':190,'2':120,'3':112,'4':108,'5':102,'6':96,'7':90,'8':84,'9':78,'10':74};
-  const pSz=pSzMap[rank]||90;
+  const pSzMap={'A':180,'J':100,'Q':100,'K':100};
+  const pSz=pSzMap[rank]||240; // 2-10 get 240px suit — bigger than A's 180px
   if(rank==='A'){
     c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
     c.fillStyle=col;c.fillText(suit,W/2,pipTop+pipH*0.5);
@@ -609,21 +643,9 @@ function mkFrontTex(suit,rank){
     c.font='100px Arial';
     c.fillText(suit,W/2,H*0.78);
   }else{
-    const pips=L[rank]||[];
-    c.fillStyle=col;
-    for(const [fx,fy,flip] of pips){
-      const px=pipLeft+fx*pipW;
-      const py=pipTop+fy*pipH;
-      if(flip){
-        c.save();c.translate(px,py);c.rotate(Math.PI);
-        c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
-        c.fillText(suit,0,0);
-        c.restore();
-      }else{
-        c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
-        c.fillText(suit,px,py);
-      }
-    }
+    // 2-10: single large suit centred — bigger than Ace's suit
+    c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
+    c.fillStyle=col;c.fillText(suit,W/2,pipTop+pipH*0.5);
   }
   if(rank==='6'||rank==='9'){
     const word=rank==='6'?'SIX':'NINE';
@@ -845,10 +867,14 @@ function toggle2D(){
   const canvas=document.getElementById('c');
   const view2d=document.getElementById('view2d');
   const slider=document.getElementById('tableSlider');
+  const bottomBar=document.getElementById('bottomBar');
+  const stackInfo2d=document.getElementById('stackInfo2d');
   if(is2D){
     canvas.style.display='none';
     view2d.style.display='block';
     if(slider)slider.style.display='none';
+    if(bottomBar)bottomBar.style.display='none';
+    if(stackInfo2d)stackInfo2d.style.display='block';
     if(label)label.textContent='→3D';
     btn.classList.add('mode2d');
     btn.title='Switch to 3D view';
@@ -857,11 +883,49 @@ function toggle2D(){
     canvas.style.display='block';
     view2d.style.display='none';
     if(slider)slider.style.display='';
+    if(bottomBar)bottomBar.style.display='';
+    if(stackInfo2d)stackInfo2d.style.display='none';
     if(label)label.textContent='→2D';
     btn.classList.remove('mode2d');
     btn.title='Switch to 2D view';
     if(lastState)applyState(lastState);
   }
+}
+
+// Build a 2D player hole card DOM element
+function build2DCard(rank,suit,folded){
+  const el=document.createElement('div');
+  el.className='p2d-card';
+  if(folded){el.classList.add('folded');return el;}
+  if(!rank||rank==='back'){el.classList.add('back');return el;}
+  const isRed=(suit==='\u2665'||suit==='\u2666');
+  el.classList.add(isRed?'red':'black');
+  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
+  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
+  el.appendChild(tl);el.appendChild(br);
+  const ctr=document.createElement('div');
+  if(rank==='A'){ctr.className='p2dc-center p2dc-suit-a';ctr.textContent=suit;}
+  else if(['J','Q','K'].includes(rank)){ctr.className='p2dc-center p2dc-face';ctr.textContent=rank;}
+  else{ctr.className='p2dc-center p2dc-suit-num';ctr.textContent=suit;}
+  el.appendChild(ctr);
+  return el;
+}
+// Build a community card DOM element (same design, community sizing via CSS)
+function build2DCommCard(rank,suit){
+  const el=document.createElement('div');
+  el.className='c2d-card';
+  if(!rank||rank==='back'){el.classList.add('back');return el;}
+  const isRed=(suit==='\u2665'||suit==='\u2666');
+  el.classList.add(isRed?'red':'black');
+  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
+  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
+  el.appendChild(tl);el.appendChild(br);
+  const ctr=document.createElement('div');
+  if(rank==='A'){ctr.className='p2dc-center p2dc-suit-a';ctr.textContent=suit;}
+  else if(['J','Q','K'].includes(rank)){ctr.className='p2dc-center p2dc-face';ctr.textContent=rank;}
+  else{ctr.className='p2dc-center p2dc-suit-num';ctr.textContent=suit;}
+  el.appendChild(ctr);
+  return el;
 }
 
 function render2D(st){
@@ -872,40 +936,39 @@ function render2D(st){
   // Pot
   document.getElementById('pot2dVal').textContent='\u00a3'+((st.pot||0)/100).toFixed(2);
 
+  // My stack above pause button
+  const p0=st.players[mySeat];
+  const si2d=document.getElementById('stackInfo2d');
+  if(si2d&&p0){
+    si2d.innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff;font-size:11px">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
+  }
+
   // Community cards
   const comm=st.community||[];
   const commEl=document.getElementById('community2d');
   commEl.innerHTML='';
   for(let i=0;i<5;i++){
-    const div=document.createElement('div');
-    div.className='c2d-card';
     if(i<comm.length&&comm[i]&&comm[i]!=='back'){
-      const c=comm[i];
-      const isRed=(c.s==='\u2665'||c.s==='\u2666');
-      div.classList.add(isRed?'red':'black');
-      div.innerHTML='<span>'+c.r+'</span><span>'+c.s+'</span>';
-    } else if(i<comm.length){
-      div.classList.add('back');
-    } else {
-      div.style.visibility='hidden';
+      commEl.appendChild(build2DCommCard(comm[i].r,comm[i].s));
+    }else if(i<comm.length){
+      commEl.appendChild(build2DCommCard('back',null));
+    }else{
+      const ph=document.createElement('div');ph.className='c2d-card';ph.style.visibility='hidden';commEl.appendChild(ph);
     }
-    commEl.appendChild(div);
   }
 
-  // Seat positions — player always at bottom (angle = Math.PI/2)
+  // Seats — me always bottom
   const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);
   const n=seated.length||2;
-  const rx=44; // % of width radius
-  const ry=38; // % of height radius
+  const rx=44,ry=38;
 
   seated.forEach((srvSeat)=>{
     const p=st.players[srvSeat];
     if(!p)return;
     const vSeat=vs(srvSeat);
-    // vSeat=0 (me) → angle=-PI/2 → cos=0,sin=-1 → px=50%,py=88% (bottom) ✓
     const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;
     const px=50+rx*Math.cos(angle);
-    const py=50-ry*Math.sin(angle); // minus = screen y inverted vs math y
+    const py=50-ry*Math.sin(angle);
 
     const isMe=(srvSeat===mySeat);
     const isToAct=(st.toActSeat===srvSeat);
@@ -915,62 +978,51 @@ function render2D(st){
 
     const div=document.createElement('div');
     div.className='p2d-seat'+(isMe?' me':'');
-    div.style.left=px+'%';
-    div.style.top=py+'%';
+    div.style.left=px+'%';div.style.top=py+'%';
 
-    // Cards first (left side of flex row)
+    // Cards
     if(p.cards&&p.cards.length){
       const cardsDiv=document.createElement('div');
       cardsDiv.className='p2d-cards';
       p.cards.forEach(cd=>{
-        const c=document.createElement('div');
-        c.className='p2d-card';
-        if(p.folded) c.classList.add('folded');
-        else if(cd&&cd!=='back'){
-          const isRed=(cd.s==='\u2665'||cd.s==='\u2666');
-          c.classList.add(isRed?'red':'black');
-          c.innerHTML='<span>'+cd.r+'</span><span>'+cd.s+'</span>';
-        } else {
-          c.classList.add('back');
-        }
-        cardsDiv.appendChild(c);
+        const rank=cd&&cd!=='back'?cd.r:null;
+        const suit=cd&&cd!=='back'?cd.s:null;
+        cardsDiv.appendChild(build2DCard(rank,suit,p.folded));
       });
       div.appendChild(cardsDiv);
     }
 
-    // Info block (right side of flex row)
+    // Info block beside cards
     const info=document.createElement('div');
     info.className='p2d-info';
-
     const nameDiv=document.createElement('div');
     nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');
     nameDiv.textContent=p.name;
     info.appendChild(nameDiv);
-
-    // Tokens row
     const tokens=document.createElement('div');
     if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}
     if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}
     if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}
     if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}
     if(tokens.children.length)info.appendChild(tokens);
-
-    const stackDiv=document.createElement('div');
-    stackDiv.className='p2d-stack';
-    stackDiv.textContent='\u00a3'+(p.chips/100).toFixed(2);
-    info.appendChild(stackDiv);
-
+    // Stack for opponents only — mine is above pause button
+    if(!isMe){
+      const stackDiv=document.createElement('div');
+      stackDiv.className='p2d-stack';
+      stackDiv.textContent='\u00a3'+(p.chips/100).toFixed(2);
+      info.appendChild(stackDiv);
+    }
     if(p.bet>0){
       const betDiv=document.createElement('div');
       betDiv.className='p2d-bet';
       betDiv.textContent='bet \u00a3'+(p.bet/100).toFixed(2);
       info.appendChild(betDiv);
     }
-
     div.appendChild(info);
     inner.appendChild(div);
   });
 }
+
 
 function getOrCreateCommunityMesh(idx){
   if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
