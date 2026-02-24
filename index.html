@@ -53,7 +53,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
-#actionPanel{position:absolute;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px;background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
+#actionPanel{position:fixed;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px;background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
 .abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
 .abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
 .abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
@@ -142,14 +142,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 /* ── 2D/3D Toggle button — fixed top-right, always reachable ── */
 #toggleViewBtn{
   position:fixed;top:12px;right:12px;z-index:9999;
-  width:52px;height:52px;border-radius:50%;
+  height:44px;padding:0 14px;border-radius:22px;
   border:2px solid #c8a020;
-  background:rgba(10,5,2,0.92);
-  color:#ffd700;font-size:22px;line-height:1;
+  background:rgba(10,5,2,0.94);
+  color:#ffd700;font-size:13px;font-weight:bold;letter-spacing:1px;
   cursor:pointer;display:none;
   box-shadow:0 0 0 3px rgba(200,160,32,0.25),0 4px 18px rgba(0,0,0,0.7);
   -webkit-tap-highlight-color:transparent;
   transition:background 0.2s,box-shadow 0.2s;
+  display:none;align-items:center;gap:7px;white-space:nowrap;
 }
 #toggleViewBtn:active{background:rgba(200,160,32,0.3);box-shadow:0 0 0 5px rgba(200,160,32,0.4)}
 #toggleViewBtn.mode2d{background:rgba(200,160,32,0.18);border-color:#ffd700;box-shadow:0 0 0 3px rgba(200,160,32,0.5),0 4px 18px rgba(0,0,0,0.7)}
@@ -163,64 +164,70 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #table2d{
   position:absolute;top:50%;left:50%;
   transform:translate(-50%,-50%);
-  width:min(90vw,540px);height:min(56vw,340px);
+  width:min(92vw,560px);height:min(58vw,360px);
   background:radial-gradient(ellipse at center,#0d3a18 0%,#072010 60%,#041408 100%);
   border-radius:50%;
   border:4px solid #1a5a28;
-  box-shadow:0 0 0 6px #0a2a10, 0 0 60px rgba(0,0,0,0.8),inset 0 0 40px rgba(0,0,0,0.5);
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  box-shadow:0 0 0 6px #0a2a10,0 0 60px rgba(0,0,0,0.8),inset 0 0 40px rgba(0,0,0,0.5);
 }
 #table2dInner{position:relative;width:100%;height:100%;}
-#pot2d{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  text-align:center;pointer-events:none;
+/* Centre column: pot label sits above community cards */
+#table2dCenter{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-52%);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  pointer-events:none;
 }
-#pot2d .pot-label{color:#c8a060;font-size:10px;letter-spacing:2px;text-transform:uppercase}
-#pot2d .pot-val{color:#ffd700;font-size:20px;font-weight:bold;text-shadow:0 0 12px rgba(200,160,32,0.6)}
-#community2d{
-  position:absolute;top:50%;left:50%;transform:translate(-55%,-16px);
-  display:flex;gap:4px;
-}
+#pot2d{text-align:center;}
+#pot2d .pot-label{color:#c8a060;font-size:9px;letter-spacing:2px;text-transform:uppercase}
+#pot2d .pot-val{color:#ffd700;font-size:17px;font-weight:bold;text-shadow:0 0 10px rgba(200,160,32,0.7)}
+#community2d{display:flex;gap:5px;}
 .c2d-card{
-  width:28px;height:40px;border-radius:4px;
+  width:36px;height:52px;border-radius:5px;
   background:#fff;border:1px solid #ccc;
   display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:bold;line-height:1.1;text-align:center;
-  flex-direction:column;box-shadow:0 2px 6px rgba(0,0,0,0.5);
+  font-size:13px;font-weight:bold;line-height:1.1;text-align:center;
+  flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,0.5);
 }
 .c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;color:transparent}
 .c2d-card.red{color:#cc2020}
 .c2d-card.black{color:#111}
+/* Seat container */
 .p2d-seat{
   position:absolute;transform:translate(-50%,-50%);
-  text-align:center;pointer-events:none;
-  min-width:72px;
+  display:flex;flex-direction:row;align-items:center;gap:5px;
+  pointer-events:none;
 }
+/* Info block: name, tokens, stack, bet — sits beside the cards */
+.p2d-info{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:72px;}
 .p2d-name{
   font-size:10px;font-weight:bold;color:#e0d0a0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  max-width:80px;margin:0 auto;
-  background:rgba(0,0,0,0.7);border-radius:4px;padding:1px 5px;
+  max-width:72px;
+  background:rgba(0,0,0,0.75);border-radius:4px;padding:2px 5px;
 }
-.p2d-name.me{color:#ffd700;background:rgba(200,160,32,0.2)}
-.p2d-name.folded{color:#666;text-decoration:line-through}
-.p2d-stack{font-size:9px;color:#80cfff;margin-top:2px}
-.p2d-bet{font-size:9px;color:#40e860;margin-top:1px}
-.p2d-cards{display:flex;gap:2px;justify-content:center;margin-top:3px}
+.p2d-name.me{color:#ffd700;background:rgba(200,160,32,0.22)}
+.p2d-name.folded{color:#555;text-decoration:line-through}
+.p2d-stack{font-size:9px;color:#80cfff;background:rgba(0,0,0,0.6);border-radius:3px;padding:1px 4px;}
+.p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.6);border-radius:3px;padding:1px 4px;}
+/* Cards */
+.p2d-cards{display:flex;gap:3px;}
 .p2d-card{
-  width:20px;height:28px;border-radius:3px;
+  width:34px;height:48px;border-radius:4px;
   background:#fff;border:1px solid #aaa;
   display:flex;align-items:center;justify-content:center;
-  font-size:8px;font-weight:bold;line-height:1;
-  flex-direction:column;box-shadow:0 1px 4px rgba(0,0,0,0.5);
+  font-size:13px;font-weight:bold;line-height:1.1;
+  flex-direction:column;box-shadow:0 1px 6px rgba(0,0,0,0.5);
 }
+/* My cards — even bigger since I'm at the bottom */
+.p2d-seat.me .p2d-card{width:44px;height:62px;font-size:16px;border-radius:6px;}
 .p2d-card.back{background:#1a3a8a;border-color:#2a4aaa}
 .p2d-card.red{color:#cc2020}
 .p2d-card.black{color:#111}
-.p2d-card.folded{background:#444;border-color:#333;opacity:0.5}
+.p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5}
 .p2d-token{
   display:inline-block;font-size:8px;font-weight:bold;
-  border-radius:3px;padding:1px 3px;margin:1px;
+  border-radius:3px;padding:1px 3px;margin-right:2px;
 }
 .p2d-token.dealer{background:#c8a020;color:#000}
 .p2d-token.sb{background:#1a6a1a;color:#fff}
@@ -234,16 +241,28 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <canvas id="c"></canvas>
 
 <!-- ── Emergency 2D/3D toggle — always visible top-right ── -->
-<button id="toggleViewBtn" onclick="toggle2D()" title="Switch 2D/3D view">🎲</button>
+<button id="toggleViewBtn" onclick="toggle2D()" title="Switch to 2D view">
+  <svg width="18" height="18" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+    <circle cx="18" cy="18" r="16" fill="#2a1a00" stroke="#c8a020" stroke-width="3"/>
+    <circle cx="18" cy="18" r="10" fill="none" stroke="#c8a020" stroke-width="2"/>
+    <line x1="18" y1="2" x2="18" y2="8" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="18" y1="28" x2="18" y2="34" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="2" y1="18" x2="8" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="28" y1="18" x2="34" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <span id="toggleViewLabel">→2D</span>
+</button>
 
 <!-- ── 2D fallback view ── -->
 <div id="view2d">
   <div id="table2d">
     <div id="table2dInner">
-      <div id="community2d"></div>
-      <div id="pot2d">
-        <div class="pot-label">POT</div>
-        <div class="pot-val" id="pot2dVal">£0.00</div>
+      <div id="table2dCenter">
+        <div id="pot2d">
+          <div class="pot-label">POT</div>
+          <div class="pot-val" id="pot2dVal">£0.00</div>
+        </div>
+        <div id="community2d"></div>
       </div>
     </div>
   </div>
@@ -821,6 +840,7 @@ function applyState(st){
 function toggle2D(){
   is2D=!is2D;
   const btn=document.getElementById('toggleViewBtn');
+  const label=document.getElementById('toggleViewLabel');
   const canvas=document.getElementById('c');
   const view2d=document.getElementById('view2d');
   const slider=document.getElementById('tableSlider');
@@ -828,7 +848,7 @@ function toggle2D(){
     canvas.style.display='none';
     view2d.style.display='block';
     if(slider)slider.style.display='none';
-    btn.textContent='🎲';
+    if(label)label.textContent='→3D';
     btn.classList.add('mode2d');
     btn.title='Switch to 3D view';
     if(lastState)render2D(lastState);
@@ -836,10 +856,9 @@ function toggle2D(){
     canvas.style.display='block';
     view2d.style.display='none';
     if(slider)slider.style.display='';
-    btn.textContent='📋';
+    if(label)label.textContent='→2D';
     btn.classList.remove('mode2d');
     btn.title='Switch to 2D view';
-    // Re-apply state to refresh 3D labels
     if(lastState)applyState(lastState);
   }
 }
@@ -847,7 +866,6 @@ function toggle2D(){
 function render2D(st){
   if(!st||!st.players)return;
   const inner=document.getElementById('table2dInner');
-  // Remove old seat divs, keep community and pot
   inner.querySelectorAll('.p2d-seat').forEach(el=>el.remove());
 
   // Pot
@@ -862,7 +880,7 @@ function render2D(st){
     div.className='c2d-card';
     if(i<comm.length&&comm[i]&&comm[i]!=='back'){
       const c=comm[i];
-      const isRed=(c.s==='♥'||c.s==='♦');
+      const isRed=(c.s==='\u2665'||c.s==='\u2666');
       div.classList.add(isRed?'red':'black');
       div.innerHTML='<span>'+c.r+'</span><span>'+c.s+'</span>';
     } else if(i<comm.length){
@@ -873,29 +891,20 @@ function render2D(st){
     commEl.appendChild(div);
   }
 
-  // Seat positions — ellipse around the table
-  // table2d is min(90vw,540px) wide, min(56vw,340px) tall
-  // We position as percentage of container
+  // Seat positions — player always at bottom (angle = Math.PI/2)
   const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);
   const n=seated.length||2;
-  const tableEl=document.getElementById('table2d');
-  const tw=tableEl.offsetWidth||300;
-  const th=tableEl.offsetHeight||180;
-  const rx=46; // % of width radius
-  const rz=40; // % of height radius
+  const rx=44; // % of width radius
+  const ry=38; // % of height radius
 
-  seated.forEach((srvSeat,idx)=>{
+  seated.forEach((srvSeat)=>{
     const p=st.players[srvSeat];
     if(!p)return;
     const vSeat=vs(srvSeat);
-    const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;
+    // Start at bottom (Math.PI/2) and go clockwise
+    const angle=Math.PI/2-(vSeat/n)*Math.PI*2;
     const px=50+rx*Math.cos(angle);
-    const py=50+rz*Math.sin(angle);
-
-    const div=document.createElement('div');
-    div.className='p2d-seat';
-    div.style.left=px+'%';
-    div.style.top=py+'%';
+    const py=50-ry*Math.sin(angle); // subtract because screen y is inverted
 
     const isMe=(srvSeat===mySeat);
     const isToAct=(st.toActSeat===srvSeat);
@@ -903,35 +912,12 @@ function render2D(st){
     const isSB=(st.sbSeat===srvSeat);
     const isBB=(st.bbSeat===srvSeat);
 
-    // Name
-    const nameDiv=document.createElement('div');
-    nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');
-    nameDiv.textContent=p.name;
-    div.appendChild(nameDiv);
+    const div=document.createElement('div');
+    div.className='p2d-seat'+(isMe?' me':'');
+    div.style.left=px+'%';
+    div.style.top=py+'%';
 
-    // Tokens
-    const tokens=document.createElement('div');
-    if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}
-    if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}
-    if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}
-    if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}
-    if(tokens.children.length)div.appendChild(tokens);
-
-    // Stack
-    const stackDiv=document.createElement('div');
-    stackDiv.className='p2d-stack';
-    stackDiv.textContent='\u00a3'+(p.chips/100).toFixed(2);
-    div.appendChild(stackDiv);
-
-    // Bet
-    if(p.bet>0){
-      const betDiv=document.createElement('div');
-      betDiv.className='p2d-bet';
-      betDiv.textContent='bet \u00a3'+(p.bet/100).toFixed(2);
-      div.appendChild(betDiv);
-    }
-
-    // Cards
+    // Cards first (left side of flex row)
     if(p.cards&&p.cards.length){
       const cardsDiv=document.createElement('div');
       cardsDiv.className='p2d-cards';
@@ -940,7 +926,7 @@ function render2D(st){
         c.className='p2d-card';
         if(p.folded) c.classList.add('folded');
         else if(cd&&cd!=='back'){
-          const isRed=(cd.s==='♥'||cd.s==='♦');
+          const isRed=(cd.s==='\u2665'||cd.s==='\u2666');
           c.classList.add(isRed?'red':'black');
           c.innerHTML='<span>'+cd.r+'</span><span>'+cd.s+'</span>';
         } else {
@@ -951,6 +937,36 @@ function render2D(st){
       div.appendChild(cardsDiv);
     }
 
+    // Info block (right side of flex row)
+    const info=document.createElement('div');
+    info.className='p2d-info';
+
+    const nameDiv=document.createElement('div');
+    nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');
+    nameDiv.textContent=p.name;
+    info.appendChild(nameDiv);
+
+    // Tokens row
+    const tokens=document.createElement('div');
+    if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}
+    if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}
+    if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}
+    if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}
+    if(tokens.children.length)info.appendChild(tokens);
+
+    const stackDiv=document.createElement('div');
+    stackDiv.className='p2d-stack';
+    stackDiv.textContent='\u00a3'+(p.chips/100).toFixed(2);
+    info.appendChild(stackDiv);
+
+    if(p.bet>0){
+      const betDiv=document.createElement('div');
+      betDiv.className='p2d-bet';
+      betDiv.textContent='bet \u00a3'+(p.bet/100).toFixed(2);
+      info.appendChild(betDiv);
+    }
+
+    div.appendChild(info);
     inner.appendChild(div);
   });
 }
@@ -1114,9 +1130,7 @@ case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
 case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');
-  document.getElementById('toggleViewBtn').style.display='flex';
-  document.getElementById('toggleViewBtn').title='Switch to 2D view';
-  document.getElementById('toggleViewBtn').textContent='📋';
+  {const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}
   // FIX #2: Show a brief fullscreen hint if the API is available on this device
   setTimeout(()=>{
     const fsBtn=document.getElementById('fsBtn');
@@ -1161,7 +1175,7 @@ case 'newHand':{
     setTimeout(()=>{showBet(bbSeat,20);},280);
     if(lastState)applyState(lastState);
   });break;}
-case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');document.getElementById('toggleViewBtn').style.display='flex';}if(!dealing)applyState(msg);break;
+case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='flex';}if(!dealing)applyState(msg);break;
 case 'playerAction':{
   const pname=msg.name||'Player';
   let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
