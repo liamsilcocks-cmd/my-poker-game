@@ -28,12 +28,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
 .pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
 #cookieOverlay{z-index:500}
-#cookieOverlay .panel{max-width:560px;text-align:left}
-.cookie-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.85rem}
-.cookie-table th, .cookie-table td{padding:7px 10px;border:1px solid #4a3a10;text-align:left}
-.cookie-table th{background:rgba(200,160,32,0.18);color:#ffd700}
-.cookie-table td{color:#d0b860}
-.cookie-uat{margin-top:16px;padding:10px;background:rgba(180,40,40,0.18);border:1px solid #8a2020;border-radius:8px;color:#e08080;font-size:.85rem;text-align:center}
+#cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px}
+.cookie-subtitle{color:#e09020;font-size:.82rem;letter-spacing:1px;text-transform:uppercase;text-align:center;margin-bottom:18px;display:block}
+.cookie-table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:.85rem}
+.cookie-table th{background:rgba(200,160,32,0.18);color:#ffd700;padding:7px 10px;text-align:left;border:1px solid #4a3a10}
+.cookie-table td{padding:7px 10px;border:1px solid #3a2a08;color:#d0b860;vertical-align:top;line-height:1.45}
+.cookie-uat{margin-top:16px;padding:10px 14px;background:rgba(180,40,40,0.18);border:1px solid #8a2020;border-radius:8px;color:#e08080;font-size:.85rem;text-align:center}
 #gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
 #gameUI > *{pointer-events:auto}
 #topBar{position:absolute;top:10px;left:10px;right:10px;background:rgba(0,0,0,0.8);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center}
@@ -43,15 +43,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-raise{background:#7a5800}
 .abtn-allin{background:#8a7a00}
 .abtn-fold{background:#7a1a1a}
-/* --- WHEEL STYLES --- */
 #drumWidget{width:100%;display:none;flex-direction:column;gap:5px;align-items:center;padding:10px 0}
 .dial-row{display:flex;gap:4px;justify-content:center;align-items:center}
 .dial-wrap{display:flex;flex-direction:column;align-items:center}
 .dial-label{font-size:9px;color:#c8a060;margin-bottom:2px}
 .dial-cog{width:70px;height:70px;cursor:grab;touch-action:none}
 .dial-sep{font-size:24px;font-weight:bold;color:#c8a060;margin-bottom:15px}
-/* --- END WHEEL STYLES --- */
 #bottomBar{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#ffd700}
+#myInfo{font-size:14px;font-weight:bold;color:#ffd700}
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px;border-radius:12px;color:#fff;display:none;border:1px solid #c8a020}
 </style>
 </head>
@@ -61,16 +60,28 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <div id="cookieOverlay" class="overlay">
   <div class="panel">
     <h2>🍪 Cookie Notice</h2>
-    <p>This game stores local identity data and game history for development purposes.</p>
+    <span class="cookie-subtitle">Please read before continuing</span>
+    <p style="color:#c8a060;font-size:.9rem;line-height:1.6;margin-bottom:4px">
+      Whilst no cookies are deliberately created to track you or your behaviour, the following data is stored locally and on our server for the purposes of playing this game online:
+    </p>
     <table class="cookie-table">
-        <tr><th>Feature</th><th>Handling</th></tr>
-        <tr><td>User ID</td><td>Stored in Local Storage</td></tr>
-        <tr><td>Game Log</td><td>Sent to server for debug</td></tr>
+      <thead>
+        <tr><th>Feature</th><th>How it's handled</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>User Identity</td><td>Generated as a random string and saved in Local Storage.</td></tr>
+        <tr><td>Session Tracking</td><td>Handled by a persistent WebSocket connection (ws).</td></tr>
+        <tr><td>Game History</td><td>Written to text files on the server disk and uploaded via FTP. This is used during development for debug purposes.</td></tr>
+        <tr><td>Reconnection</td><td>The client reads the ID from Local Storage and sends it to the server to “resume” their seat.</td></tr>
+      </tbody>
     </table>
-    <div class="cookie-uat">⚠️ Development & UAT: Never bet real money.</div>
-    <div class="cookie-btns" style="display:flex;gap:10px">
-      <button class="btn-gold" onclick="cookieAccept()" style="flex:1">Accept</button>
-      <button class="btn-gold" onclick="location.href='https://google.com'" style="flex:1;background:#4a1a1a;color:#c06060">Deny</button>
+    <div class="cookie-uat">
+      ⚠️ <strong>Development & UAT Notice</strong><br>
+      This game is in development and UAT. You should <strong>never</strong> bet any real money using this game.
+    </div>
+    <div class="cookie-btns" style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn-gold" onclick="cookieAccept()" style="flex:1">✅ Accept & Continue</button>
+      <button class="btn-gold" onclick="location.href='https://google.com'" style="flex:1;background:#4a1a1a;color:#c06060">✖ Deny</button>
     </div>
   </div>
 </div>
@@ -78,7 +89,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <div id="loginOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h1>SYFM POKER</h1>
-    <input type="text" id="nameInput" placeholder="Your name">
+    <input type="text" id="nameInput" placeholder="Your name" maxlength="18">
     <input type="number" id="roomInput" placeholder="Room number">
     <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
   </div>
@@ -89,7 +100,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <h2>Room <span id="lobbyRoomId"></span></h2>
     <div id="playerList"></div>
     <div id="pendingSection" style="display:none">
-      <h3>Waiting to Join:</h3>
+      <h3>Requesting to join:</h3>
       <div id="pendingItems"></div>
     </div>
     <button class="btn-gold" id="startBtn" style="display:none">START GAME</button>
@@ -117,9 +128,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       </div>
     </div>
     <button class="abtn abtn-raise" id="raiseBtn">BET £0.40</button>
+    <button class="abtn abtn-allin" id="allInBtn">ALL IN</button>
     <button class="abtn abtn-fold" id="foldBtn">FOLD</button>
   </div>
-  <div id="bottomBar"><div id="myInfo">Stack £10.00</div></div>
+  <div id="bottomBar">
+    <div id="myInfo">Stack £10.00</div>
+  </div>
   <div id="msg"></div>
 </div>
 
@@ -129,10 +143,10 @@ let myId = localStorage.getItem('syfm_id') || Math.random().toString(36).substr(
 localStorage.setItem('syfm_id', myId);
 let ws, myName, roomNum, gameState, isHost, currentBetAmount = 0.40, myBet = 0, myStack = 0;
 
-/* --- WHEEL CLASS --- */
 class WheelDial {
     constructor(id, onChange) {
         this.canvas = document.getElementById(id);
+        if(!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
         this.onChange = onChange;
         this.rot = 0;
@@ -174,36 +188,24 @@ class WheelDial {
     }
 }
 
-let dialP, dialC;
-
-window.onload = () => {
-    dialP = new WheelDial('dialPounds', (dir) => adjustBet(dir, 1.0));
-    dialC = new WheelDial('dialPence', (dir) => adjustBet(dir, 0.2));
-
-    document.getElementById('joinBtn').onclick = () => {
-        myName = document.getElementById('nameInput').value;
-        roomNum = document.getElementById('roomInput').value;
-        if(myName && roomNum) connect();
-    };
-    document.getElementById('startBtn').onclick = () => send({type:'start_game'});
-    document.getElementById('callBtn').onclick = () => send({type:'action', action:'call'});
-    document.getElementById('raiseBtn').onclick = () => send({type:'action', action:'raise', amount: currentBetAmount});
-    document.getElementById('foldBtn').onclick = () => send({type:'action', action:'fold'});
-};
-
 function cookieAccept(){
     document.getElementById('cookieOverlay').style.display = 'none';
     document.getElementById('loginOverlay').style.display = 'flex';
 }
 
 function connect() {
+    console.log("Connecting to room:", roomNum);
     let protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.host}`);
-    ws.onopen = () => send({type:'join', roomId: roomNum, name: myName, id: myId});
+    ws.onopen = () => {
+        console.log("WS Open");
+        send({type:'join', roomId: roomNum, name: myName, id: myId});
+    };
     ws.onmessage = (e) => handleMsg(JSON.parse(e.data));
+    ws.onerror = (err) => console.error("WS Error", err);
 }
 
-function send(obj) { ws.send(JSON.stringify(obj)); }
+function send(obj) { if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
 
 function handleMsg(data) {
     if(data.type === 'joined') {
@@ -226,17 +228,16 @@ function handleMsg(data) {
 
 function updateLobby(plist, pending) {
     document.getElementById('playerList').innerHTML = plist.map(p => `
-        <div class="player-row"><span>${p.name} ${p.isHost?'(Host)':''}</span><b>£${p.stack.toFixed(2)}</b></div>
+        <div class="player-row"><span>${p.name} ${p.isHost?'<span class="host-badge">HOST</span>':''}</span><span class="chips">£${p.stack.toFixed(2)}</span></div>
     `).join('');
     if(isHost) {
         document.getElementById('startBtn').style.display = plist.length >= 2 ? 'block' : 'none';
         if(pending && pending.length > 0) {
             document.getElementById('pendingSection').style.display = 'block';
             document.getElementById('pendingItems').innerHTML = pending.map(p => `
-                <div class="pending-row"><span>${p.name}</span>
-                <button onclick="approve('${p.id}',true)">Add</button></div>
+                <div class="pending-row"><span>${p.name}</span><div><button class="btn-sm btn-approve" onclick="approve('${p.id}',true)">Allow</button></div></div>
             `).join('');
-        }
+        } else { document.getElementById('pendingSection').style.display = 'none'; }
     }
 }
 
@@ -271,6 +272,22 @@ function init3D() {
     BABYLON.MeshBuilder.CreateCylinder("table", {diameter: 8, height: 0.2}, scene);
     engine.runRenderLoop(() => scene.render());
 }
+
+// Attach listeners directly
+document.getElementById('joinBtn').onclick = () => {
+    myName = document.getElementById('nameInput').value;
+    roomNum = document.getElementById('roomInput').value;
+    if(myName && roomNum) connect();
+};
+document.getElementById('startBtn').onclick = () => send({type:'start_game'});
+document.getElementById('callBtn').onclick = () => send({type:'action', action:'call'});
+document.getElementById('raiseBtn').onclick = () => send({type:'action', action:'raise', amount: currentBetAmount});
+document.getElementById('allInBtn').onclick = () => send({type:'action', action:'allin'});
+document.getElementById('foldBtn').onclick = () => send({type:'action', action:'fold'});
+
+// Init wheels
+new WheelDial('dialPounds', (dir) => adjustBet(dir, 1.0));
+new WheelDial('dialPence', (dir) => adjustBet(dir, 0.2));
 </script>
 </body>
 </html>
