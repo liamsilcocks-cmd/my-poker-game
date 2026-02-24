@@ -598,6 +598,24 @@ wss.on('connection', ws => {
         broadcastAll(room, { type: 'chat', name: s.name, text: (msg.text || '').slice(0, 120) });
         break;
       }
+
+      case 'setStack': {
+        const room = rooms.get(myRoomId);
+        if (!room) return;
+        // Host only
+        if (room.hostId !== myId) return;
+        const target = room.seats.find(s => s?.id === msg.playerId);
+        if (!target) return;
+        const newChips = Math.max(0, Math.round(Number(msg.chips)));
+        const oldChips = target.chips;
+        target.chips = newChips;
+        writeLog(room, `STACK OVERRIDE: ${target.name} (Seat ${target.seat+1}) £${(oldChips/100).toFixed(2)} → £${(newChips/100).toFixed(2)} | by host`);
+        svrLog(`STACK OVERRIDE — ${target.name} room ${myRoomId} ${oldChips}→${newChips} pence`);
+        logEvent(room, `🔧 ${target.name}'s stack set to £${(newChips/100).toFixed(2)} by host`);
+        broadcastState(room);
+        broadcastAll(room, lobbySnapshot(room));
+        break;
+      }
     }
   });
 
