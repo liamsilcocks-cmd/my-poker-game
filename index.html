@@ -1433,16 +1433,17 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
 
     function onEnd(){ active = false; }
 
-    // Touch (mobile)
-    el.addEventListener('touchstart', e=>{ e.preventDefault(); onStart(e.touches[0].clientY); }, {passive:false});
-    el.addEventListener('touchmove',  e=>{ e.preventDefault(); onMove(e.touches[0].clientY);  }, {passive:false});
-    el.addEventListener('touchend',   e=>{ e.preventDefault(); onEnd(); }, {passive:false});
-    el.addEventListener('touchcancel',e=>{ e.preventDefault(); onEnd(); }, {passive:false});
-
-    // Mouse (desktop)
-    el.addEventListener('mousedown', e=>{ onStart(e.clientY); });
-    window.addEventListener('mousemove', e=>{ if(active) onMove(e.clientY); });
-    window.addEventListener('mouseup',   ()=>{ if(active) onEnd(); });
+    // Unified pointer events — no synthetic mouse events on mobile
+    el.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      onStart(e.clientY);
+    }, {passive:false});
+    el.addEventListener('pointermove', e=>{
+      if(active){ e.preventDefault(); onMove(e.clientY); }
+    }, {passive:false});
+    el.addEventListener('pointerup',     ()=>{ onEnd(); });
+    el.addEventListener('pointercancel', ()=>{ onEnd(); });
   }
 
   window.addEventListener('load',()=>{
