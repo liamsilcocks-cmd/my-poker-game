@@ -183,10 +183,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #pot2d .pot-val{color:#ffd700;font-size:17px;font-weight:bold;text-shadow:0 0 10px rgba(200,160,32,0.7)}
 #community2d{display:flex;gap:5px;}
 .c2d-card{
-  width:36px;height:52px;border-radius:5px;
+  width:48px;height:68px;border-radius:6px;
   background:#fff;border:1px solid #ccc;
   display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:bold;line-height:1.1;text-align:center;
+  font-size:17px;font-weight:bold;line-height:1.1;text-align:center;
   flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,0.5);
 }
 .c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;color:transparent}
@@ -211,16 +211,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .p2d-stack{font-size:9px;color:#80cfff;background:rgba(0,0,0,0.6);border-radius:3px;padding:1px 4px;}
 .p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.6);border-radius:3px;padding:1px 4px;}
 /* Cards */
-.p2d-cards{display:flex;gap:3px;}
+.p2d-cards{display:flex;gap:5px;}
 .p2d-card{
-  width:34px;height:48px;border-radius:4px;
+  width:52px;height:74px;border-radius:6px;
   background:#fff;border:1px solid #aaa;
   display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:bold;line-height:1.1;
-  flex-direction:column;box-shadow:0 1px 6px rgba(0,0,0,0.5);
+  font-size:18px;font-weight:bold;line-height:1.1;
+  flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,0.5);
 }
-/* My cards — even bigger since I'm at the bottom */
-.p2d-seat.me .p2d-card{width:44px;height:62px;font-size:16px;border-radius:6px;}
+/* My cards — even bigger */
+.p2d-seat.me .p2d-card{width:66px;height:92px;font-size:24px;border-radius:8px;box-shadow:0 3px 14px rgba(0,0,0,0.6);}
 .p2d-card.back{background:#1a3a8a;border-color:#2a4aaa}
 .p2d-card.red{color:#cc2020}
 .p2d-card.black{color:#111}
@@ -258,6 +258,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <div id="table2d">
     <div id="table2dInner">
       <div id="table2dCenter">
+        <div id="msg2d" style="display:none;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:8px 18px;color:#fff;font-size:15px;font-weight:bold;text-align:center;white-space:pre-line;max-width:260px;pointer-events:none;"></div>
         <div id="pot2d">
           <div class="pot-label">POT</div>
           <div class="pot-val" id="pot2dVal">£0.00</div>
@@ -901,10 +902,10 @@ function render2D(st){
     const p=st.players[srvSeat];
     if(!p)return;
     const vSeat=vs(srvSeat);
-    // Start at bottom (Math.PI/2) and go clockwise
-    const angle=Math.PI/2-(vSeat/n)*Math.PI*2;
+    // vSeat=0 (me) → angle=-PI/2 → cos=0,sin=-1 → px=50%,py=88% (bottom) ✓
+    const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;
     const px=50+rx*Math.cos(angle);
-    const py=50-ry*Math.sin(angle); // subtract because screen y is inverted
+    const py=50-ry*Math.sin(angle); // minus = screen y inverted vs math y
 
     const isMe=(srvSeat===mySeat);
     const isToAct=(st.toActSeat===srvSeat);
@@ -1322,7 +1323,14 @@ function setActions(v){
   }
 }
 function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
-function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);}
+function showMsg(m,ms=2400){
+  const el=document.getElementById('msg');
+  el.textContent=m;el.style.display=m?'block':'none';
+  if(ms>0)setTimeout(()=>el.style.display='none',ms);
+  // Mirror into 2D overlay
+  const el2=document.getElementById('msg2d');
+  if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}
+}
 function addChat(txt){
   const log=document.getElementById('chatLog'),div=document.createElement('div');
   div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;
