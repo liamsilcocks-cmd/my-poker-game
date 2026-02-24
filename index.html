@@ -60,19 +60,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
 #drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
-.drum-row{display:flex;gap:6px;justify-content:center;width:100%}
-.drum{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
-.drum-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
-.drum-track{background:rgba(0,0,0,0.75);border:1px solid #6a5010;border-radius:8px;overflow:hidden;width:100%;position:relative;height:96px;cursor:pointer;user-select:none;touch-action:none}
-.drum-track::before,.drum-track::after{content:'';position:absolute;left:0;right:0;height:28px;z-index:2;pointer-events:none}
-.drum-track::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,0.82),transparent)}
-.drum-track::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,0.82),transparent)}
-.drum-highlight{position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:32px;border-top:1px solid #c8a020;border-bottom:1px solid #c8a020;pointer-events:none;z-index:1}
-.drum-inner{position:absolute;width:100%}
-.drum-item{height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#a08040}
-.drum-item.sel{color:#ffd700;font-size:22px}
-.drum-arrow{background:rgba(255,255,255,0.08);border:none;color:#e0c060;font-size:24px;cursor:pointer;padding:7px 0;width:100%;text-align:center;line-height:1;-webkit-tap-highlight-color:transparent;border-radius:5px}
-.drum-arrow:active{background:rgba(200,160,32,0.3);color:#ffd700}
+/* ── Cog dial CSS (replaces drum-* styles) ── */
+.dial-row{display:flex;gap:4px;justify-content:center;align-items:flex-end;width:100%;padding:2px 0}
+.dial-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+.dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
+.dial-cog{width:76px;height:76px;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;display:block}
+.dial-cog:active{cursor:grabbing}
+.dial-sep{font-size:20px;font-weight:bold;color:#c8a060;line-height:1;padding-bottom:28px}
 #tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
 #tableSlider label{font-size:11px;color:#c8a060}
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
@@ -228,23 +222,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .p2d-card.black,.c2d-card.black{color:#111;}
 .p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5;}
 /* Card face anatomy — corners and centre */
-.p2dc-tl{position:absolute;top:3px;left:5px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;}
-.p2dc-br{position:absolute;bottom:3px;right:5px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;transform:rotate(180deg);}
+.p2dc-tl{position:absolute;top:3px;left:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;}
+.p2dc-br{position:absolute;bottom:3px;right:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;transform:rotate(180deg);}
 .c2d-card .p2dc-tl,.c2d-card .p2dc-br{font-size:13px;}
 .p2d-seat.me .p2d-card .p2dc-tl,.p2d-seat.me .p2d-card .p2dc-br{font-size:14px;}
-.p2dc-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);line-height:1;font-weight:bold;text-align:center;}
-/* 2-10: suit in center, BIGGEST */
-.p2dc-suit-num{font-size:44px;}
-.c2d-card .p2dc-suit-num{font-size:58px;}
-.p2d-seat.me .p2d-card .p2dc-suit-num{font-size:56px;}
-/* A: suit in center, medium */
-.p2dc-suit-a{font-size:36px;}
-.c2d-card .p2dc-suit-a{font-size:48px;}
-.p2d-seat.me .p2d-card .p2dc-suit-a{font-size:46px;}
-/* J Q K: rank letter in center */
-.p2dc-face{font-size:34px;font-weight:900;}
-.c2d-card .p2dc-face{font-size:46px;}
-.p2d-seat.me .p2d-card .p2dc-face{font-size:44px;}
+/* Centre: rank + suit side by side */
+.p2dc-center{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  display:flex;align-items:center;gap:3px;
+  font-weight:bold;line-height:1;white-space:nowrap;
+}
+.p2dc-center .p2dc-rank{font-size:28px;font-weight:900;}
+.p2dc-center .p2dc-suit{font-size:28px;}
+.c2d-card .p2dc-center .p2dc-rank{font-size:36px;}
+.c2d-card .p2dc-center .p2dc-suit{font-size:36px;}
+.p2d-seat.me .p2d-card .p2dc-center .p2dc-rank{font-size:36px;}
+.p2d-seat.me .p2d-card .p2dc-center .p2dc-suit{font-size:36px;}
 /* Stack info badge — fixed above pause button in 2D mode */
 #stackInfo2d{
   position:fixed;
@@ -414,22 +407,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
     <!-- Drum wheels sit under the CHECK button, above the raise/bet button -->
     <div id="drumWidget">
-      <div class="drum-row">
-        <div class="drum">
-          <div class="drum-label">£</div>
-          <div class="drum-track" id="drumPounds">
-            <div class="drum-highlight"></div>
-            <div class="drum-inner" id="drumPoundsInner"></div>
-          </div>
-          <button class="drum-arrow" onclick="drumStep('pounds',1)">▼</button>
+      <div class="dial-row">
+        <div class="dial-wrap">
+          <div class="dial-label">£ pounds</div>
+          <canvas class="dial-cog" id="dialPounds" width="76" height="76"></canvas>
         </div>
-        <div class="drum">
-          <div class="drum-label">20p</div>
-          <div class="drum-track" id="drumPence">
-            <div class="drum-highlight"></div>
-            <div class="drum-inner" id="drumPenceInner"></div>
-          </div>
-          <button class="drum-arrow" onclick="drumStep('pence',1)">▼</button>
+        <div class="dial-sep">.</div>
+        <div class="dial-wrap">
+          <div class="dial-label">20p steps</div>
+          <canvas class="dial-cog" id="dialPence" width="76" height="76"></canvas>
         </div>
       </div>
     </div>
@@ -630,29 +616,24 @@ function mkFrontTex(suit,rank){
     '9': [[0.2,0.10,false],[0.8,0.10,false],[0.2,0.34,false],[0.8,0.34,false],[0.5,0.50,false],[0.2,0.66,true],[0.8,0.66,true],[0.2,0.90,true],[0.8,0.90,true]],
     '10':[[0.2,0.10,false],[0.8,0.10,false],[0.5,0.26,false],[0.2,0.40,false],[0.8,0.40,false],[0.2,0.60,true],[0.8,0.60,true],[0.5,0.74,true],[0.2,0.90,true],[0.8,0.90,true]]
   };
-  const pSzMap={'A':180,'J':100,'Q':100,'K':100};
-  const pSz=pSzMap[rank]||240; // 2-10 get 240px suit — bigger than A's 180px
-  if(rank==='A'){
-    c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
-    c.fillStyle=col;c.fillText(suit,W/2,pipTop+pipH*0.5);
-  }else if(['J','Q','K'].includes(rank)){
-    c.fillStyle=col;
-    c.font='bold 260px Arial';
-    c.textAlign='center';c.textBaseline='middle';
-    c.fillText(rank,W/2,H*0.52);
-    c.font='100px Arial';
-    c.fillText(suit,W/2,H*0.78);
-  }else{
-    // 2-10: single large suit centred — bigger than Ace's suit
-    c.font=pSz+'px Arial';c.textAlign='center';c.textBaseline='middle';
-    c.fillStyle=col;c.fillText(suit,W/2,pipTop+pipH*0.5);
-  }
-  if(rank==='6'||rank==='9'){
-    const word=rank==='6'?'SIX':'NINE';
-    c.fillStyle=col+'66';
-    c.font='bold 26px Arial';c.textAlign='center';c.textBaseline='bottom';
-    c.fillText(word,W/2,H-BY-10);
-  }
+  // Centre: rank + suit side by side, large, same style for all cards
+  c.fillStyle=col;
+  c.textAlign='center';c.textBaseline='middle';
+  const centreY=H*0.54;
+  // Measure and draw rank + gap + suit as a unit centred on card
+  const cSz=rank==='10'?160:190; // font size for centre
+  c.font='bold '+cSz+'px Arial';
+  const rankW=c.measureText(rank).width;
+  const gap=14;
+  c.font=cSz+'px Arial';
+  const suitW=c.measureText(suit).width;
+  const totalW=rankW+gap+suitW;
+  const startX=(W-totalW)/2;
+  c.font='bold '+cSz+'px Arial';
+  c.textAlign='left';c.textBaseline='middle';
+  c.fillText(rank, startX, centreY);
+  c.font=cSz+'px Arial';
+  c.fillText(suit, startX+rankW+gap, centreY);
   tex.update();return tex;
 }
 let cardFoldedMat=null;
@@ -903,10 +884,10 @@ function build2DCard(rank,suit,folded){
   const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
   const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
   el.appendChild(tl);el.appendChild(br);
-  const ctr=document.createElement('div');
-  if(rank==='A'){ctr.className='p2dc-center p2dc-suit-a';ctr.textContent=suit;}
-  else if(['J','Q','K'].includes(rank)){ctr.className='p2dc-center p2dc-face';ctr.textContent=rank;}
-  else{ctr.className='p2dc-center p2dc-suit-num';ctr.textContent=suit;}
+  const ctr=document.createElement('div');ctr.className='p2dc-center';
+  const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;
+  const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;
+  ctr.appendChild(rSpan);ctr.appendChild(sSpan);
   el.appendChild(ctr);
   return el;
 }
@@ -920,10 +901,10 @@ function build2DCommCard(rank,suit){
   const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
   const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
   el.appendChild(tl);el.appendChild(br);
-  const ctr=document.createElement('div');
-  if(rank==='A'){ctr.className='p2dc-center p2dc-suit-a';ctr.textContent=suit;}
-  else if(['J','Q','K'].includes(rank)){ctr.className='p2dc-center p2dc-face';ctr.textContent=rank;}
-  else{ctr.className='p2dc-center p2dc-suit-num';ctr.textContent=suit;}
+  const ctr=document.createElement('div');ctr.className='p2dc-center';
+  const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;
+  const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;
+  ctr.appendChild(rSpan);ctr.appendChild(sSpan);
   el.appendChild(ctr);
   return el;
 }
@@ -1580,65 +1561,112 @@ document.getElementById('tablePan').addEventListener('input', function(){
   if(cam) cam.target.y = parseFloat(this.value);
 });
 
-// ── Raise drum wheels ─────────────────────────────────────────────────────────
+// ── Cog dial raise wheels ──────────────────────────────────────────────────────
 (function(){
   let poundsIdx=0, penceIdx=0, minRaisePence=40;
   const POUNDS=Array.from({length:100},(_,i)=>i);
   const PENCE=[0,20,40,60,80];
 
-  function buildDrum(innerId, items, getIdx){
-    const inner=document.getElementById(innerId);
-    inner.innerHTML='';
-    const pad=1;
-    for(let p=0;p<pad;p++){const g=document.createElement('div');g.className='drum-item';g.textContent='\u00a0';inner.appendChild(g);}
-    items.forEach((v,i)=>{
-      const d=document.createElement('div');
-      d.className='drum-item'+(i===getIdx()?' sel':'');
-      d.textContent=String(v).padStart(2,'0');
-      inner.appendChild(d);
-    });
-    for(let p=0;p<pad;p++){const g=document.createElement('div');g.className='drum-item';g.textContent='\u00a0';inner.appendChild(g);}
-    renderDrum(innerId,getIdx()+pad);
+  // Draw one cog dial onto a canvas element
+  function drawDial(canvasEl, valueStr, rotation){
+    const W=76, R=38, cx=38, cy=38;
+    const ctx=canvasEl.getContext('2d');
+    ctx.clearRect(0,0,W,W);
+
+    // Outer cog — draw teeth
+    const teeth=16, toothH=5, baseR=R-toothH-1, outerR=R-1;
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(rotation);
+
+    // Cog body
+    ctx.beginPath();
+    for(let i=0;i<teeth;i++){
+      const a1=(i/teeth)*Math.PI*2;
+      const a2=((i+0.35)/teeth)*Math.PI*2;
+      const a3=((i+0.65)/teeth)*Math.PI*2;
+      const a4=((i+1)/teeth)*Math.PI*2;
+      if(i===0) ctx.moveTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
+      else ctx.lineTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
+      ctx.lineTo(Math.cos(a2)*outerR, Math.sin(a2)*outerR);
+      ctx.lineTo(Math.cos(a3)*outerR, Math.sin(a3)*outerR);
+      ctx.lineTo(Math.cos(a4)*baseR, Math.sin(a4)*baseR);
+    }
+    ctx.closePath();
+    const grad=ctx.createRadialGradient(0,0,0,0,0,baseR);
+    grad.addColorStop(0,'#3a2800');
+    grad.addColorStop(1,'#1a1200');
+    ctx.fillStyle=grad;
+    ctx.fill();
+    ctx.strokeStyle='#c8a020';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+
+    // Tick marks on inner face
+    for(let i=0;i<teeth;i++){
+      const a=(i/teeth)*Math.PI*2+Math.PI/teeth;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a)*(baseR-1), Math.sin(a)*(baseR-1));
+      ctx.lineTo(Math.cos(a)*(baseR-5), Math.sin(a)*(baseR-5));
+      ctx.strokeStyle='rgba(200,160,32,0.5)';
+      ctx.lineWidth=1;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Inner disc
+    ctx.beginPath();
+    ctx.arc(cx,cy,baseR-3,0,Math.PI*2);
+    const igrad=ctx.createRadialGradient(cx,cy-4,2,cx,cy,baseR-3);
+    igrad.addColorStop(0,'#2a1800');
+    igrad.addColorStop(1,'#0d0800');
+    ctx.fillStyle=igrad;
+    ctx.fill();
+    ctx.strokeStyle='rgba(200,160,32,0.3)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+
+    // Value text
+    ctx.fillStyle='#ffd700';
+    ctx.font='bold 20px Arial';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(valueStr,cx,cy);
   }
 
-  function renderDrum(innerId,centreRow){
-    const inner=document.getElementById(innerId);
-    const itemH=32,trackH=96;
-    const offset=(trackH/2)-(centreRow*itemH)-(itemH/2);
-    inner.style.transform=`translateY(${offset}px)`;
-    Array.from(inner.children).forEach((el,i)=>{
-      el.classList.toggle('sel',i===centreRow);
-    });
-  }
+  // Rotation state per dial
+  let poundsRot=0, penceRot=0;
 
-  function rebuildAll(){
-    buildDrum('drumPoundsInner',POUNDS,()=>poundsIdx);
-    buildDrum('drumPenceInner',PENCE,()=>penceIdx);
-    updateDisplay();
+  function redrawPounds(){
+    const el=document.getElementById('dialPounds');
+    if(el) drawDial(el, String(POUNDS[poundsIdx]).padStart(2,'0'), poundsRot);
   }
+  function redrawPence(){
+    const el=document.getElementById('dialPence');
+    if(el) drawDial(el, String(PENCE[penceIdx]).padStart(2,'0'), penceRot);
+  }
+  function redrawAll(){ redrawPounds(); redrawPence(); }
 
   function updateDisplay(){
     const total=POUNDS[poundsIdx]*100+PENCE[penceIdx];
     const clamped=Math.max(total,minRaisePence);
     const p=Math.floor(clamped/100), pn=clamped%100;
     const amtStr='\u00a3'+p+'.'+String(pn).padStart(2,'0');
-    // Write directly into the raise/bet button so there's no separate display
     const btn=document.getElementById('raiseBtn');
-    if(btn){
-      const verb=btn.dataset.verb||'RAISE';
-      btn.textContent=verb+' '+amtStr;
-    }
+    if(btn){ const verb=btn.dataset.verb||'RAISE'; btn.textContent=verb+' '+amtStr; }
   }
 
+  // Step function (kept for any legacy calls)
   window.drumStep=function(drum,dir){
-    ensureAudio();
-    snd_chip();
+    ensureAudio(); snd_chip();
     if(drum==='pounds'){
       poundsIdx=Math.max(0,Math.min(POUNDS.length-1,poundsIdx+dir));
-      buildDrum('drumPoundsInner',POUNDS,()=>poundsIdx);
-    } else {
+      poundsRot+=(dir*Math.PI*2)/16;
+      redrawPounds();
+    }else{
       penceIdx=Math.max(0,Math.min(PENCE.length-1,penceIdx+dir));
-      buildDrum('drumPenceInner',PENCE,()=>penceIdx);
+      penceRot+=(dir*Math.PI*2)/5;
+      redrawPence();
     }
     updateDisplay();
   };
@@ -1652,7 +1680,7 @@ document.getElementById('tablePan').addEventListener('input', function(){
       penceIdx=nextP!==undefined?PENCE.indexOf(nextP):0;
       if(penceIdx===-1)penceIdx=0;
     }
-    rebuildAll();
+    redrawAll(); updateDisplay();
   };
 
   window.drumGetPence=function(){
@@ -1660,28 +1688,77 @@ document.getElementById('tablePan').addEventListener('input', function(){
     return Math.max(raw,minRaisePence);
   };
 
-  function attachSwipe(trackId,drum){
-    const el=document.getElementById(trackId);
-    let startY=0,startIdx=0;
+  // Attach drag-to-rotate to a canvas dial
+  function attachDial(canvasId, drum){
+    const el=document.getElementById(canvasId);
+    if(!el)return;
+    const PX_PER_STEP=28; // pixels of drag per value step
+    let active=false, startY=0, startIdx=0, lastY=0, vel=0, accumulated=0;
+
+    function getIdx(){ return drum==='pounds'?poundsIdx:penceIdx; }
+    function getList(){ return drum==='pounds'?POUNDS:PENCE; }
+    function setIdx(i){
+      if(drum==='pounds') poundsIdx=i;
+      else penceIdx=i;
+    }
+    function getRot(){ return drum==='pounds'?poundsRot:penceRot; }
+    function setRot(r){ if(drum==='pounds') poundsRot=r; else penceRot=r; }
+
+    function onStart(y){
+      active=true; startY=y; lastY=y;
+      startIdx=getIdx(); accumulated=0; vel=0;
+      el.style.cursor='grabbing';
+    }
+    function onMove(y){
+      if(!active)return;
+      const dy=startY-y; // drag up = increase
+      vel=lastY-y; lastY=y;
+      const steps=Math.round(dy/PX_PER_STEP);
+      const list=getList();
+      const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));
+      const prev=getIdx();
+      if(ni!==prev){
+        const delta=ni-prev;
+        snd_chip();
+        setIdx(ni);
+        setRot(getRot()+(delta*Math.PI*2)/list.length);
+        if(drum==='pounds') redrawPounds(); else redrawPence();
+        updateDisplay();
+      }
+    }
+    function onEnd(){
+      active=false;
+      el.style.cursor='grab';
+      // Momentum: if velocity fast enough, add 1 more step
+      if(Math.abs(vel)>6){
+        const dir=vel>0?1:-1; // up = increase
+        window.drumStep(drum,-dir);
+      }
+    }
+
+    // Touch events
     el.addEventListener('touchstart',e=>{
-      startY=e.touches[0].clientY;
-      startIdx=drum==='pounds'?poundsIdx:penceIdx;
       e.preventDefault();
+      onStart(e.touches[0].clientY);
     },{passive:false});
     el.addEventListener('touchmove',e=>{
-      const dy=startY-e.touches[0].clientY;
-      const steps=Math.round(dy/32);
-      const list=drum==='pounds'?POUNDS:PENCE;
-      const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));
-      if(drum==='pounds'&&ni!==poundsIdx){poundsIdx=ni;buildDrum('drumPoundsInner',POUNDS,()=>poundsIdx);updateDisplay();}
-      if(drum==='pence'&&ni!==penceIdx){penceIdx=ni;buildDrum('drumPenceInner',PENCE,()=>penceIdx);updateDisplay();}
       e.preventDefault();
+      onMove(e.touches[0].clientY);
     },{passive:false});
+    el.addEventListener('touchend',e=>{e.preventDefault();onEnd();},{passive:false});
+
+    // Mouse events (desktop)
+    el.addEventListener('mousedown',e=>{onStart(e.clientY);});
+    window.addEventListener('mousemove',e=>{if(active)onMove(e.clientY);});
+    window.addEventListener('mouseup',()=>{if(active)onEnd();});
   }
 
-  attachSwipe('drumPounds','pounds');
-  attachSwipe('drumPence','pence');
-  window.addEventListener('load',()=>rebuildAll());
+  window.addEventListener('load',()=>{
+    redrawAll();
+    updateDisplay();
+    attachDial('dialPounds','pounds');
+    attachDial('dialPence','pence');
+  });
 })();
 // ── Cookie notice gate ────────────────────────────────────────────────────────
 function cookieAccept() {
