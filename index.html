@@ -91,6 +91,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.65}}
 .cbtn-autofold{padding:9px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#3a1a5a;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .cbtn-autofold.active{background:#8a10cc;box-shadow:0 0 10px rgba(180,60,255,0.7)}
+#stackEditor{position:absolute;bottom:calc(50px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.93);border:1px solid #c8a020;border-radius:10px;padding:10px 12px;z-index:115;display:none;min-width:210px;max-height:60vh;overflow-y:auto}
+#stackEditor h4{color:#ffd700;font-size:12px;margin:0 0 8px 0;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #4a3a10;padding-bottom:5px}
+.se-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.se-name{flex:1;color:#e0d0a0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.se-input{width:68px;background:#1a1000;border:1px solid #6a5010;border-radius:5px;color:#ffd700;font-size:13px;font-weight:bold;padding:4px 6px;text-align:right}
+.se-input:focus{outline:none;border-color:#c8a020}
+.se-btn{padding:4px 8px;border-radius:5px;border:none;background:#4a6a00;color:#fff;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.se-btn:active{background:#6a9a00}
 /* FIX #1: Show fullscreen button everywhere except iOS Safari (no API support) */
 .cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent;display:block}
 /* Hide only on iOS Safari using the -webkit-touch-callout trick */
@@ -176,7 +184,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     </div>
     <div class="cookie-btns">
       <button class="btn-gold" onclick="cookieAccept()">✅ Accept &amp; Continue</button>
-      <button class="btn-deny" onclick="cookieDeny()">✖ Deny &amp; SYFMUC</button>
+      <button class="btn-deny" onclick="cookieDeny()">✖ Deny</button>
     </div>
   </div>
 </div>
@@ -287,10 +295,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <!-- FIX #1: Fullscreen button — no longer unconditionally hidden on touch devices.
        CSS now only hides it on iOS Safari (which lacks the Fullscreen API).
        Android Chrome supports fullscreen fine and will show the button.       -->
+  <div id="stackEditor">
+    <h4>🔧 Set Player Stacks</h4>
+    <div id="stackEditorRows"></div>
+  </div>
   <div id="controlBar">
     <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">⏸</button>
     <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
     <button class="cbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
+    <button class="cbtn-autofold" id="stackEditorBtn" onclick="toggleStackEditor()" style="display:none;background:#2a4a1a">🔧</button>
     <button class="cbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
   </div>
   <div id="pauseBanner"></div>
@@ -837,7 +850,9 @@ case 'logEvent':{
   // System event from server — goes to activity log only, never the chat box
   addLog(msg.text,'log-system');
   break;}
-case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';break;
+case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';
+  document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';
+  break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
 case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
@@ -888,7 +903,7 @@ case 'newHand':{
     setTimeout(()=>{showBet(bbSeat,20);},280);
     if(lastState)applyState(lastState);
   });break;}
-case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');}if(!dealing)applyState(msg);break;
+case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');}if(!dealing)applyState(msg);maybeRefreshStackEditor();break;
 case 'playerAction':{
   const pname=msg.name||'Player';
   let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
@@ -1064,6 +1079,47 @@ function maybeKeepAlive(){
 function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
 let gamePaused=false;
 function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
+
+// ── Host stack editor ─────────────────────────────────────────────────────────
+function toggleStackEditor(){
+  const panel=document.getElementById('stackEditor');
+  const open=panel.style.display==='block';
+  panel.style.display=open?'none':'block';
+  if(!open)renderStackEditor();
+}
+function renderStackEditor(){
+  if(!lastState||!lastState.players)return;
+  const rows=document.getElementById('stackEditorRows');
+  rows.innerHTML='';
+  lastState.players.forEach((p,i)=>{
+    if(!p)return;
+    const row=document.createElement('div');
+    row.className='se-row';
+    // Input holds pounds with 2 dp
+    const pounds=(p.chips/100).toFixed(2);
+    row.innerHTML=
+      '<span class="se-name">'+p.name+'</span>'+
+      '<span style="color:#888;font-size:10px">£</span>'+
+      '<input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="0.20" value="'+pounds+'">'+
+      '<button class="se-btn" onclick="applyStack('+i+',\''+p.id+'\')">SET</button>';
+    rows.appendChild(row);
+  });
+}
+function applyStack(seatIdx, playerId){
+  const inp=document.getElementById('se-inp-'+seatIdx);
+  if(!inp)return;
+  const pounds=parseFloat(inp.value);
+  if(isNaN(pounds)||pounds<0)return;
+  const pence=Math.round(pounds*100);
+  wsSend({type:'setStack',playerId,chips:pence});
+  // Visual feedback
+  inp.style.borderColor='#c8a020';
+  setTimeout(()=>{ if(inp)inp.style.borderColor=''; },800);
+}
+// Re-render stack editor when state updates (keeps values fresh if panel is open)
+function maybeRefreshStackEditor(){
+  if(document.getElementById('stackEditor').style.display==='block')renderStackEditor();
+}
 function handlePaused(isPaused,byName){
   gamePaused=isPaused;
   const btn=document.getElementById('pauseBtn');
