@@ -31,6 +31,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .player-row .chips{color:#ffd700;font-weight:bold}
 .host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
 .pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
+/* ── Cookie / UAT notice overlay ── */
 #cookieOverlay{z-index:500}
 #cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px;overflow-y:auto;max-height:92vh}
 #cookieOverlay h2{text-align:center;margin-bottom:4px;font-size:1.35rem}
@@ -59,7 +60,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
 #drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
-/* ── Top-Down Dial Styling ── */
+/* ── TOP-DOWN WHEELS ── */
 .dial-row{display:flex;gap:4px;justify-content:center;align-items:flex-end;width:100%;padding:2px 0}
 .dial-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
 .dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
@@ -386,13 +387,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
         <div class="dial-wrap">
           <div class="dial-label">£ pounds</div>
           <canvas class="dial-cog" id="dialPounds" width="80" height="80"></canvas>
-          <div class="dial-hint">◄ roll ►</div>
+          <div class="dial-hint">◄ slide ►</div>
         </div>
         <div class="dial-sep">.</div>
         <div class="dial-wrap">
           <div class="dial-label">20p steps</div>
           <canvas class="dial-cog" id="dialPence" width="80" height="80"></canvas>
-          <div class="dial-hint">◄ roll ►</div>
+          <div class="dial-hint">◄ slide ►</div>
         </div>
       </div>
     </div>
@@ -460,111 +461,305 @@ function snd_flip(){ensureAudio();const t=audioCtx.currentTime,b=audioCtx.create
 function snd_chip(){ensureAudio();const t=audioCtx.currentTime,base=1600+Math.random()*500;[[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{const osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.type='sine';osc.frequency.value=base*r*(0.97+Math.random()*0.06);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);osc.connect(g);g.connect(audioCtx.destination);osc.start(t);osc.stop(t+0.14);});}
 function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,1319].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*0.10);g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);o.connect(g);o.connect(audioCtx.destination);o.start(t+i*0.10);o.stop(t+i*0.10+0.6);});}
 
-/* --- Wheel Dials Implementation --- */
+/* --- Wheel Dial Logic --- */
 class WheelDial {
-    constructor(canvasId, onChange) {
-        this.canvas = document.getElementById(canvasId);
+    constructor(id, onChange) {
+        this.canvas = document.getElementById(id);
         this.ctx = this.canvas.getContext('2d');
         this.onChange = onChange;
-        this.angle = 0; 
-        this.isDragging = false;
+        this.rot = 0;
+        this.dragging = false;
         this.lastY = 0;
-        this.size = 80;
-        this.initEvents();
+        this.canvas.addEventListener('mousedown', (e) => this.start(e.clientY));
+        this.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); this.start(e.touches[0].clientY); }, {passive:false});
+        window.addEventListener('mousemove', (e) => this.move(e.clientY));
+        window.addEventListener('touchmove', (e) => { this.move(e.touches[0].clientY); }, {passive:false});
+        window.addEventListener('mouseup', () => this.end());
+        window.addEventListener('touchend', () => this.end());
         this.draw();
     }
-    initEvents() {
-        const start = (e) => {
-            this.isDragging = true;
-            this.lastY = e.touches ? e.touches[0].clientY : e.clientY;
-        };
-        const move = (e) => {
-            if (!this.isDragging) return;
-            const currentY = e.touches ? e.touches[0].clientY : e.clientY;
-            const dy = currentY - this.lastY;
-            if (Math.abs(dy) > 1) {
-                const direction = dy > 0 ? -1 : 1;
-                this.angle += direction * 0.15;
-                this.lastY = currentY;
-                this.onChange(direction);
-                this.draw();
-            }
-        };
-        const end = () => this.isDragging = false;
-        this.canvas.addEventListener('mousedown', start);
-        window.addEventListener('mousemove', move);
-        window.addEventListener('mouseup', end);
-        this.canvas.addEventListener('touchstart', start, {passive:false});
-        window.addEventListener('touchmove', move, {passive:false});
-        window.addEventListener('touchend', end);
-    }
-    draw() {
-        const ctx = this.ctx;
-        const center = this.size / 2;
-        const radius = this.size / 2 - 5;
-        ctx.clearRect(0, 0, this.size, this.size);
-
-        // Rim Shadow
-        ctx.beginPath();
-        ctx.arc(center, center, radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#0a0502';
-        ctx.fill();
-
-        // Main Wheel Gradient (Metallic look)
-        const grad = ctx.createRadialGradient(center, center, radius * 0.5, center, center, radius);
-        grad.addColorStop(0, '#3a2a10');
-        grad.addColorStop(0.8, '#6a5010');
-        grad.addColorStop(1, '#2a1a08');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(center, center, radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Outer Gold Border
-        ctx.strokeStyle = '#c8a020';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // Notches (to visualize rotation)
-        ctx.save();
-        ctx.translate(center, center);
-        ctx.rotate(this.angle);
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
-        ctx.lineWidth = 4;
-        for (let i = 0; i < 12; i++) {
-            ctx.beginPath();
-            ctx.moveTo(0, -radius + 4);
-            ctx.lineTo(0, -radius + 12);
-            ctx.stroke();
-            ctx.rotate(Math.PI / 6);
+    start(y) { this.dragging = true; this.lastY = y; }
+    move(y) {
+        if (!this.dragging) return;
+        let dy = y - this.lastY;
+        if (Math.abs(dy) > 4) {
+            let dir = dy > 0 ? -1 : 1;
+            this.rot += dir * 0.2;
+            this.onChange(dir);
+            this.lastY = y;
+            this.draw();
         }
-        ctx.restore();
-
-        // Center Cap
-        ctx.beginPath();
-        ctx.arc(center, center, radius * 0.3, 0, Math.PI * 2);
-        ctx.fillStyle = '#1a0d05';
-        ctx.fill();
-        ctx.strokeStyle = '#c8a020';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+    }
+    end() { this.dragging = false; }
+    draw() {
+        const c = this.ctx, w = 80, h = 80;
+        c.clearRect(0,0,w,h);
+        // Base wheel
+        c.beginPath(); c.arc(40,40,36,0,7); c.fillStyle='#2a1a08'; c.fill();
+        c.strokeStyle='#c8a020'; c.lineWidth=3; c.stroke();
+        // Inner wheel
+        c.beginPath(); c.arc(40,40,30,0,7);
+        let g = c.createRadialGradient(40,40,5,40,40,30);
+        g.addColorStop(0,'#4a3a10'); g.addColorStop(1,'#1a0d05');
+        c.fillStyle=g; c.fill();
+        // Spokes
+        c.save(); c.translate(40,40); c.rotate(this.rot);
+        c.strokeStyle='rgba(200,160,32,0.5)'; c.lineWidth=4;
+        for(let i=0;i<12;i++){
+            c.beginPath(); c.moveTo(0,-34); c.lineTo(0,-26); c.stroke();
+            c.rotate(Math.PI/6);
+        }
+        c.restore();
+        // Center cap
+        c.beginPath(); c.arc(40,40,8,0,7); c.fillStyle='#c8a020'; c.fill();
     }
 }
 
+let canvas, engine, scene, camera, gl;
+let myId = localStorage.getItem('syfm_poker_id') || Math.random().toString(36).substr(2, 9);
+localStorage.setItem('syfm_poker_id', myId);
+let myName = '';
+let roomNum = '';
+let ws;
+let players = [];
+let gameState = null;
+let isHost = false;
+let currentBetAmount = 0.40;
+let minRaise = 0.40;
+let myStack = 0;
+let myBet = 0;
+let isMyTurn = false;
+let viewMode = '3d';
 let dialP, dialC;
+
 window.addEventListener('DOMContentLoaded', () => {
-    dialP = new WheelDial('dialPounds', (dir) => adjustBet(dir, 1));
-    dialC = new WheelDial('dialPence', (dir) => adjustBet(dir, 0.2));
+    dialP = new WheelDial('dialPounds', (dir) => { adjustBet(dir, 1.0); });
+    dialC = new WheelDial('dialPence', (dir) => { adjustBet(dir, 0.2); });
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const rParam = urlParams.get('r');
+    if(rParam) document.getElementById('roomInput').value = rParam;
+
+    document.getElementById('joinBtn').onclick = () => {
+        myName = document.getElementById('nameInput').value.trim();
+        roomNum = document.getElementById('roomInput').value.trim();
+        if(!myName || !roomNum) return;
+        connect();
+    };
+
+    document.getElementById('startBtn').onclick = () => {
+        send({type:'start_game'});
+    };
+
+    document.getElementById('callBtn').onclick = () => send({type:'action', action:'call'});
+    document.getElementById('raiseBtn').onclick = () => send({type:'action', action:'raise', amount: currentBetAmount});
+    document.getElementById('allInBtn').onclick = () => send({type:'action', action:'allin'});
+    document.getElementById('foldBtn').onclick = () => send({type:'action', action:'fold'});
+    
+    document.getElementById('chatInput').onkeydown = (e) => {
+        if(e.key === 'Enter') {
+            let val = e.target.value.trim();
+            if(val) {
+                send({type:'chat', msg: val});
+                e.target.value = '';
+            }
+        }
+    };
 });
 
 function adjustBet(dir, amt) {
-    if (dir > 0) currentBetAmount += amt;
+    if(dir > 0) currentBetAmount += amt;
     else currentBetAmount -= amt;
+    
+    let callAmt = (gameState ? gameState.currentBet : 0) - myBet;
+    let actualMin = Math.max(minRaise, callAmt + 0.2);
+    if(currentBetAmount < actualMin) currentBetAmount = actualMin;
+    if(currentBetAmount > myStack) currentBetAmount = myStack;
+    
     updateRaiseUI();
     snd_chip();
 }
 
-// ... rest of game logic continues here ...
+function updateRaiseUI() {
+    document.getElementById('raiseBtn').innerText = `BET £${currentBetAmount.toFixed(2)}`;
+}
+
+function cookieAccept(){
+    document.getElementById('cookieOverlay').style.display = 'none';
+    document.getElementById('loginOverlay').style.display = 'flex';
+}
+function cookieDeny(){
+    window.location.href = "https://www.google.com";
+}
+
+function connect() {
+    let protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${window.location.host}`);
+    ws.onopen = () => {
+        send({type:'join', roomId: roomNum, name: myName, id: myId});
+    };
+    ws.onmessage = (e) => {
+        let data = JSON.parse(e.data);
+        handleMsg(data);
+    };
+    ws.onclose = () => {
+        showMsg("Connection lost. Reconnecting...");
+        setTimeout(connect, 2000);
+    };
+}
+
+function send(obj) {
+    if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function handleMsg(data) {
+    switch(data.type) {
+        case 'joined':
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('lobbyOverlay').style.display = 'flex';
+            document.getElementById('lobbyRoomId').innerText = roomNum;
+            isHost = data.isHost;
+            break;
+        case 'lobby_update':
+            updateLobby(data.players, data.pending);
+            break;
+        case 'game_start':
+            document.getElementById('lobbyOverlay').style.display = 'none';
+            document.getElementById('gameUI').style.display = 'block';
+            init3D();
+            break;
+        case 'game_update':
+            gameState = data.state;
+            updateUI();
+            break;
+        case 'msg':
+            showMsg(data.text, data.duration);
+            break;
+        case 'chat':
+            addChat(data.name, data.msg);
+            break;
+    }
+}
+
+function updateLobby(plist, pending) {
+    let html = plist.map(p => `
+        <div class="player-row">
+            <span>${p.name} ${p.isHost ? '<span class="host-badge">HOST</span>' : ''}</span>
+            <span class="chips">£${p.stack.toFixed(2)}</span>
+        </div>
+    `).join('');
+    document.getElementById('playerList').innerHTML = html;
+    
+    if(isHost) {
+        document.getElementById('startBtn').style.display = plist.length >= 2 ? 'block' : 'none';
+        if(pending && pending.length > 0) {
+            document.getElementById('pendingSection').style.display = 'block';
+            document.getElementById('pendingItems').innerHTML = pending.map(p => `
+                <div class="pending-row">
+                    <span>${p.name}</span>
+                    <div>
+                        <button class="btn-sm btn-approve" onclick="approve('${p.id}', true)">Allow</button>
+                        <button class="btn-sm btn-reject" onclick="approve('${p.id}', false)">Deny</button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            document.getElementById('pendingSection').style.display = 'none';
+        }
+    }
+}
+
+function approve(id, allow) {
+    send({type:'approve', targetId: id, allow: allow});
+}
+
+function updateUI() {
+    if(!gameState) return;
+    const me = gameState.players.find(p => p.id === myId);
+    if(!me) return;
+    
+    myStack = me.stack;
+    myBet = me.bet;
+    isMyTurn = gameState.turnIndex === gameState.players.indexOf(me);
+    
+    document.getElementById('phase').innerText = gameState.phase.toUpperCase();
+    document.getElementById('pot').innerText = `POT: £${gameState.pot.toFixed(2)}`;
+    document.getElementById('myInfo').innerText = `Stack £${myStack.toFixed(2)}`;
+    
+    if(isMyTurn && gameState.phase !== 'showdown') {
+        document.getElementById('actionPanel').style.display = 'flex';
+        document.getElementById('drumWidget').style.display = 'flex';
+        let callAmt = gameState.currentBet - myBet;
+        document.getElementById('callBtn').innerText = callAmt > 0 ? `CALL £${callAmt.toFixed(2)}` : 'CHECK';
+        document.getElementById('callBtn').style.display = 'block';
+        document.getElementById('raiseBtn').style.display = 'block';
+        document.getElementById('allInBtn').style.display = 'block';
+        document.getElementById('foldBtn').style.display = 'block';
+        
+        minRaise = (gameState.lastRaise || 0.40);
+        if(currentBetAmount < (callAmt + minRaise)) {
+            currentBetAmount = callAmt + minRaise;
+        }
+        updateRaiseUI();
+    } else {
+        document.getElementById('actionPanel').style.display = 'none';
+    }
+}
+
+function init3D() {
+    canvas = document.getElementById('c');
+    engine = new BABYLON.Engine(canvas, true);
+    scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color4(0.1, 0.05, 0.02, 1);
+    
+    camera = new BABYLON.ArcRotateCamera("cam", -Math.PI/2, Math.PI/4, 10, BABYLON.Vector3.Zero(), scene);
+    camera.attachControl(canvas, true);
+    
+    let light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+    light.intensity = 0.8;
+    
+    let table = BABYLON.MeshBuilder.CreateCylinder("table", {diameter: 8, height: 0.2}, scene);
+    let tableMat = new BABYLON.StandardMaterial("tableMat", scene);
+    tableMat.diffuseColor = new BABYLON.Color3(0.1, 0.3, 0.15);
+    table.material = tableMat;
+    
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener('resize', () => engine.resize());
+}
+
+function showMsg(txt, dur = 3000) {
+    let m = document.getElementById('msg');
+    m.innerText = txt;
+    m.style.display = 'block';
+    setTimeout(() => { m.style.display = 'none'; }, dur);
+}
+
+function addChat(name, msg) {
+    let log = document.getElementById('chatLog');
+    let div = document.createElement('div');
+    div.innerHTML = `<strong>${name}:</strong> ${msg}`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+}
+
+function toggleChat() {
+    let inner = document.getElementById('chatInner');
+    inner.style.display = inner.style.display === 'block' ? 'none' : 'block';
+}
+
+function toggle2D() {
+    viewMode = viewMode === '3d' ? '2d' : '3d';
+    document.getElementById('view2d').style.display = viewMode === '2d' ? 'block' : 'none';
+    document.getElementById('toggleViewLabel').innerText = viewMode === '2d' ? '→3D' : '→2D';
+}
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+    }
+}
 </script>
 </body>
 </html>
