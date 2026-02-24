@@ -139,12 +139,115 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
 #spectatorBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:16px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none;z-index:50}
 #pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
-#pauseBanner::after{content:'PAUSED \2014 any player can resume';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,200,0,0.25);font-size:clamp(20px,3.5vw,52px);font-weight:bold;letter-spacing:3px;white-space:nowrap;pointer-events:none}
+/* ── 2D/3D Toggle button — fixed top-right, always reachable ── */
+#toggleViewBtn{
+  position:fixed;top:12px;right:12px;z-index:9999;
+  width:52px;height:52px;border-radius:50%;
+  border:2px solid #c8a020;
+  background:rgba(10,5,2,0.92);
+  color:#ffd700;font-size:22px;line-height:1;
+  cursor:pointer;display:none;
+  box-shadow:0 0 0 3px rgba(200,160,32,0.25),0 4px 18px rgba(0,0,0,0.7);
+  -webkit-tap-highlight-color:transparent;
+  transition:background 0.2s,box-shadow 0.2s;
+}
+#toggleViewBtn:active{background:rgba(200,160,32,0.3);box-shadow:0 0 0 5px rgba(200,160,32,0.4)}
+#toggleViewBtn.mode2d{background:rgba(200,160,32,0.18);border-color:#ffd700;box-shadow:0 0 0 3px rgba(200,160,32,0.5),0 4px 18px rgba(0,0,0,0.7)}
+
+/* ── 2D table view ── */
+#view2d{
+  display:none;position:fixed;inset:0;
+  background:#1a0d05;overflow:hidden;
+  z-index:90;
+}
+#table2d{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:min(90vw,540px);height:min(56vw,340px);
+  background:radial-gradient(ellipse at center,#0d3a18 0%,#072010 60%,#041408 100%);
+  border-radius:50%;
+  border:4px solid #1a5a28;
+  box-shadow:0 0 0 6px #0a2a10, 0 0 60px rgba(0,0,0,0.8),inset 0 0 40px rgba(0,0,0,0.5);
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+}
+#table2dInner{position:relative;width:100%;height:100%;}
+#pot2d{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;
+}
+#pot2d .pot-label{color:#c8a060;font-size:10px;letter-spacing:2px;text-transform:uppercase}
+#pot2d .pot-val{color:#ffd700;font-size:20px;font-weight:bold;text-shadow:0 0 12px rgba(200,160,32,0.6)}
+#community2d{
+  position:absolute;top:50%;left:50%;transform:translate(-55%,-16px);
+  display:flex;gap:4px;
+}
+.c2d-card{
+  width:28px;height:40px;border-radius:4px;
+  background:#fff;border:1px solid #ccc;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:bold;line-height:1.1;text-align:center;
+  flex-direction:column;box-shadow:0 2px 6px rgba(0,0,0,0.5);
+}
+.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;color:transparent}
+.c2d-card.red{color:#cc2020}
+.c2d-card.black{color:#111}
+.p2d-seat{
+  position:absolute;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;
+  min-width:72px;
+}
+.p2d-name{
+  font-size:10px;font-weight:bold;color:#e0d0a0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:80px;margin:0 auto;
+  background:rgba(0,0,0,0.7);border-radius:4px;padding:1px 5px;
+}
+.p2d-name.me{color:#ffd700;background:rgba(200,160,32,0.2)}
+.p2d-name.folded{color:#666;text-decoration:line-through}
+.p2d-stack{font-size:9px;color:#80cfff;margin-top:2px}
+.p2d-bet{font-size:9px;color:#40e860;margin-top:1px}
+.p2d-cards{display:flex;gap:2px;justify-content:center;margin-top:3px}
+.p2d-card{
+  width:20px;height:28px;border-radius:3px;
+  background:#fff;border:1px solid #aaa;
+  display:flex;align-items:center;justify-content:center;
+  font-size:8px;font-weight:bold;line-height:1;
+  flex-direction:column;box-shadow:0 1px 4px rgba(0,0,0,0.5);
+}
+.p2d-card.back{background:#1a3a8a;border-color:#2a4aaa}
+.p2d-card.red{color:#cc2020}
+.p2d-card.black{color:#111}
+.p2d-card.folded{background:#444;border-color:#333;opacity:0.5}
+.p2d-token{
+  display:inline-block;font-size:8px;font-weight:bold;
+  border-radius:3px;padding:1px 3px;margin:1px;
+}
+.p2d-token.dealer{background:#c8a020;color:#000}
+.p2d-token.sb{background:#1a6a1a;color:#fff}
+.p2d-token.bb{background:#1a1a8a;color:#fff}
+.p2d-token.toact{background:#cc2020;color:#fff;animation:p2dPulse 0.8s ease-in-out infinite}
+@keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.p2d-waiting{color:#888;font-size:9px;font-style:italic}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<!-- ── Cookie & UAT Notice — must be accepted before login screen shows ── -->
+
+<!-- ── Emergency 2D/3D toggle — always visible top-right ── -->
+<button id="toggleViewBtn" onclick="toggle2D()" title="Switch 2D/3D view">🎲</button>
+
+<!-- ── 2D fallback view ── -->
+<div id="view2d">
+  <div id="table2d">
+    <div id="table2dInner">
+      <div id="community2d"></div>
+      <div id="pot2d">
+        <div class="pot-label">POT</div>
+        <div class="pot-val" id="pot2dVal">£0.00</div>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="cookieOverlay" class="overlay">
   <div class="panel">
     <h2>🍪 Cookie Notice</h2>
@@ -349,6 +452,7 @@ const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7'
 const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
 let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
 let occupiedSeats=[];
+let is2D=false; // 2D/3D toggle state
 function updateOccupiedSeats(seats){
   occupiedSeats=seats.map((s,i)=>s?i:null).filter(i=>i!==null);
 }
@@ -537,6 +641,7 @@ function animChipArc(chips,srcPos,dstBase,staggerMs,baseY,cb){
     setTimeout(()=>{scene.beginAnimation(chip,0,22,false,1.4,()=>{snd_chip();done++;if(done===chips.length&&cb)cb();});},i*staggerMs);
   });}
 function sweepBetsToPot(cb){
+  if(is2D){if(cb)setTimeout(cb,60);return;}
   const all=[];seatBetChips.forEach(arr=>all.push(...arr));
   seatBetChips=Array.from({length:NP},()=>[]);
   if(!all.length){if(cb)setTimeout(cb,60);return;}
@@ -549,6 +654,7 @@ function sweepBetsToPot(cb){
     chip.animations=[a];
     setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.6,()=>{snd_chip();potChips.push(chip);done++;if(done===all.length&&cb)cb();});},i*28);});}
 function chipsFlyToWinner(winSeat,cb){
+  if(is2D){if(cb)cb();return;}
   const wp=seatPos(vs(winSeat));wp.y+=0.8;
   const all=[...potChips];seatBetChips.forEach(arr=>all.push(...arr));
   potChips=[];seatBetChips=Array.from({length:NP},()=>[]);
@@ -708,6 +814,145 @@ function applyState(st){
   if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
   document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);
   document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');
+  if(is2D) render2D(st);
+}
+
+// ── 2D/3D toggle ─────────────────────────────────────────────────────────────
+function toggle2D(){
+  is2D=!is2D;
+  const btn=document.getElementById('toggleViewBtn');
+  const canvas=document.getElementById('c');
+  const view2d=document.getElementById('view2d');
+  const slider=document.getElementById('tableSlider');
+  if(is2D){
+    canvas.style.display='none';
+    view2d.style.display='block';
+    if(slider)slider.style.display='none';
+    btn.textContent='🎲';
+    btn.classList.add('mode2d');
+    btn.title='Switch to 3D view';
+    if(lastState)render2D(lastState);
+  } else {
+    canvas.style.display='block';
+    view2d.style.display='none';
+    if(slider)slider.style.display='';
+    btn.textContent='📋';
+    btn.classList.remove('mode2d');
+    btn.title='Switch to 2D view';
+    // Re-apply state to refresh 3D labels
+    if(lastState)applyState(lastState);
+  }
+}
+
+function render2D(st){
+  if(!st||!st.players)return;
+  const inner=document.getElementById('table2dInner');
+  // Remove old seat divs, keep community and pot
+  inner.querySelectorAll('.p2d-seat').forEach(el=>el.remove());
+
+  // Pot
+  document.getElementById('pot2dVal').textContent='\u00a3'+((st.pot||0)/100).toFixed(2);
+
+  // Community cards
+  const comm=st.community||[];
+  const commEl=document.getElementById('community2d');
+  commEl.innerHTML='';
+  for(let i=0;i<5;i++){
+    const div=document.createElement('div');
+    div.className='c2d-card';
+    if(i<comm.length&&comm[i]&&comm[i]!=='back'){
+      const c=comm[i];
+      const isRed=(c.s==='♥'||c.s==='♦');
+      div.classList.add(isRed?'red':'black');
+      div.innerHTML='<span>'+c.r+'</span><span>'+c.s+'</span>';
+    } else if(i<comm.length){
+      div.classList.add('back');
+    } else {
+      div.style.visibility='hidden';
+    }
+    commEl.appendChild(div);
+  }
+
+  // Seat positions — ellipse around the table
+  // table2d is min(90vw,540px) wide, min(56vw,340px) tall
+  // We position as percentage of container
+  const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);
+  const n=seated.length||2;
+  const tableEl=document.getElementById('table2d');
+  const tw=tableEl.offsetWidth||300;
+  const th=tableEl.offsetHeight||180;
+  const rx=46; // % of width radius
+  const rz=40; // % of height radius
+
+  seated.forEach((srvSeat,idx)=>{
+    const p=st.players[srvSeat];
+    if(!p)return;
+    const vSeat=vs(srvSeat);
+    const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;
+    const px=50+rx*Math.cos(angle);
+    const py=50+rz*Math.sin(angle);
+
+    const div=document.createElement('div');
+    div.className='p2d-seat';
+    div.style.left=px+'%';
+    div.style.top=py+'%';
+
+    const isMe=(srvSeat===mySeat);
+    const isToAct=(st.toActSeat===srvSeat);
+    const isDealer=(st.dealerSeat===srvSeat);
+    const isSB=(st.sbSeat===srvSeat);
+    const isBB=(st.bbSeat===srvSeat);
+
+    // Name
+    const nameDiv=document.createElement('div');
+    nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');
+    nameDiv.textContent=p.name;
+    div.appendChild(nameDiv);
+
+    // Tokens
+    const tokens=document.createElement('div');
+    if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}
+    if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}
+    if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}
+    if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}
+    if(tokens.children.length)div.appendChild(tokens);
+
+    // Stack
+    const stackDiv=document.createElement('div');
+    stackDiv.className='p2d-stack';
+    stackDiv.textContent='\u00a3'+(p.chips/100).toFixed(2);
+    div.appendChild(stackDiv);
+
+    // Bet
+    if(p.bet>0){
+      const betDiv=document.createElement('div');
+      betDiv.className='p2d-bet';
+      betDiv.textContent='bet \u00a3'+(p.bet/100).toFixed(2);
+      div.appendChild(betDiv);
+    }
+
+    // Cards
+    if(p.cards&&p.cards.length){
+      const cardsDiv=document.createElement('div');
+      cardsDiv.className='p2d-cards';
+      p.cards.forEach(cd=>{
+        const c=document.createElement('div');
+        c.className='p2d-card';
+        if(p.folded) c.classList.add('folded');
+        else if(cd&&cd!=='back'){
+          const isRed=(cd.s==='♥'||cd.s==='♦');
+          c.classList.add(isRed?'red':'black');
+          c.innerHTML='<span>'+cd.r+'</span><span>'+cd.s+'</span>';
+        } else {
+          c.classList.add('back');
+        }
+        cardsDiv.appendChild(c);
+      });
+      div.appendChild(cardsDiv);
+    }
+
+    inner.appendChild(div);
+  });
 }
 
 function getOrCreateCommunityMesh(idx){
@@ -720,6 +965,7 @@ function getOrCreateCommunityMesh(idx){
 // FIX #2: startDealAnimation only deals cards to players in activeSeats.
 // No card mesh is created for seats not in the active list.
 function startDealAnimation(activeSeats,afterDone){
+  if(is2D){dealing=false;if(afterDone)afterDone();return;}
   dealing=true;
   for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}
   for(const m of communityCardMeshes){if(m)m.isVisible=false;}
@@ -868,6 +1114,9 @@ case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
 case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');
+  document.getElementById('toggleViewBtn').style.display='flex';
+  document.getElementById('toggleViewBtn').title='Switch to 2D view';
+  document.getElementById('toggleViewBtn').textContent='📋';
   // FIX #2: Show a brief fullscreen hint if the API is available on this device
   setTimeout(()=>{
     const fsBtn=document.getElementById('fsBtn');
@@ -912,7 +1161,7 @@ case 'newHand':{
     setTimeout(()=>{showBet(bbSeat,20);},280);
     if(lastState)applyState(lastState);
   });break;}
-case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');}if(!dealing)applyState(msg);break;
+case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');document.getElementById('toggleViewBtn').style.display='flex';}if(!dealing)applyState(msg);break;
 case 'playerAction':{
   const pname=msg.name||'Player';
   let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
@@ -1177,7 +1426,7 @@ function toggleAutoFold(){
   else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
 }
 function showBet(serverSeat,amount){
-  if(amount<=0)return;
+  if(amount<=0||is2D)return;
   const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);
   const existH=seatBetChips[serverSeat].length*0.060;
   const chips=buildChipStack(amount);
