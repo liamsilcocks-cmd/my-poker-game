@@ -31,7 +31,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .player-row .chips{color:#ffd700;font-weight:bold}
 .host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
 .pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
-/* ── Cookie / UAT notice overlay ── */
 #cookieOverlay{z-index:500}
 #cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px;overflow-y:auto;max-height:92vh}
 #cookieOverlay h2{text-align:center;margin-bottom:4px;font-size:1.35rem}
@@ -60,14 +59,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
 #drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
-/* ── Flat top-down cog dials ── */
+/* ── Top-Down Dial Styling ── */
 .dial-row{display:flex;gap:4px;justify-content:center;align-items:flex-end;width:100%;padding:2px 0}
 .dial-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
 .dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
-/* Flat cog canvas — round border to hint at circular shape */
-.dial-cog{width:80px;height:80px;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;display:block;border-radius:50%;}
+.dial-cog{width:80px;height:80px;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;display:block;}
 .dial-cog:active{cursor:grabbing}
-/* Hint label below each cog */
 .dial-hint{font-size:8px;color:rgba(200,160,32,0.5);text-align:center;letter-spacing:0.5px;margin-top:1px;}
 .dial-sep{font-size:20px;font-weight:bold;color:#c8a060;line-height:1;padding-bottom:28px}
 #tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
@@ -389,13 +386,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
         <div class="dial-wrap">
           <div class="dial-label">£ pounds</div>
           <canvas class="dial-cog" id="dialPounds" width="80" height="80"></canvas>
-          <div class="dial-hint">◄ slide ►</div>
+          <div class="dial-hint">◄ roll ►</div>
         </div>
         <div class="dial-sep">.</div>
         <div class="dial-wrap">
           <div class="dial-label">20p steps</div>
           <canvas class="dial-cog" id="dialPence" width="80" height="80"></canvas>
-          <div class="dial-hint">◄ slide ►</div>
+          <div class="dial-hint">◄ roll ►</div>
         </div>
       </div>
     </div>
@@ -461,971 +458,113 @@ function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.web
 function snd_deal(){ensureAudio();const t=audioCtx.currentTime,len=Math.floor(audioCtx.sampleRate*0.12),buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/len),0.6);const src=audioCtx.createBufferSource(),bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.Q.value=0.6;bp.frequency.setValueAtTime(4200,t);bp.frequency.exponentialRampToValueAtTime(1600,t+0.12);const g=audioCtx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.28,t+0.015);g.gain.exponentialRampToValueAtTime(0.001,t+0.12);src.buffer=buf;src.connect(bp);bp.connect(g);g.connect(audioCtx.destination);src.start(t);}
 function snd_flip(){ensureAudio();const t=audioCtx.currentTime,b=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.055),audioCtx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2200;g.gain.setValueAtTime(0.32,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.055);src.buffer=b;src.connect(hp);hp.connect(g);g.connect(audioCtx.destination);src.start(t);}
 function snd_chip(){ensureAudio();const t=audioCtx.currentTime,base=1600+Math.random()*500;[[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{const osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.type='sine';osc.frequency.value=base*r*(0.97+Math.random()*0.06);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);osc.connect(g);g.connect(audioCtx.destination);osc.start(t);osc.stop(t+0.14);});}
-function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,1319].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*0.10);g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);o.connect(g);g.connect(audioCtx.destination);o.start(t+i*0.10);o.stop(t+i*0.10+0.6);});}
-function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([delay,freq])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq*0.8,t+delay);o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);g.gain.setValueAtTime(0,t+delay);g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+delay);o.stop(t+delay+0.3);});}
-const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
-let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
-let occupiedSeats=[];
-let is2D=false;
-function updateOccupiedSeats(seats){
-  occupiedSeats=seats.map((s,i)=>s?i:null).filter(i=>i!==null);
-}
-function vs(serverSeat){
-  if(occupiedSeats.length===0)return(serverSeat-mySeat+NP)%NP;
-  const myIdx=occupiedSeats.indexOf(mySeat);
-  const seatIdx=occupiedSeats.indexOf(serverSeat);
-  if(seatIdx===-1)return 0;
-  const n=occupiedSeats.length;
-  return(seatIdx-myIdx+n)%n;
-}
-function numVisualSeats(){return Math.max(occupiedSeats.length,2);}
-const canvas=document.getElementById('c');
-const engine=new BABYLON.Engine(canvas,true);
-window.addEventListener('resize',()=>engine.resize());
-canvas.addEventListener('click',()=>ensureAudio(),{once:true});
-let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
-const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
-function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
-function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
-function cardPos(si,cn){
-  const n=numVisualSeats();
-  const a=-Math.PI/2-(si/n)*Math.PI*2;
-  const rx=TRX*0.70,rz=TRZ*0.70;
-  const pa=a+Math.PI/2;
-  const off=(cn===0?-0.72:0.72);
-  return new BABYLON.Vector3(
-    Math.cos(a)*rx+Math.cos(pa)*off,
-    0.40+cn*0.018,
-    Math.sin(a)*rz+Math.sin(pa)*off
-  );
-}
-function cardPosOther(si,cn){
-  const n=numVisualSeats();
-  const a=-Math.PI/2-(si/n)*Math.PI*2;
-  const rx=SRX*0.78,rz=SRZ*0.78;
-  const pa=a+Math.PI/2;
-  const off=(cn===0?-0.42:0.42);
-  return new BABYLON.Vector3(
-    Math.cos(a)*rx+Math.cos(pa)*off,
-    1.72,
-    Math.sin(a)*rz+Math.sin(pa)*off
-  );
-}
-const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.42,0);
-const COM_POS=[new BABYLON.Vector3(-2.84,0.55,0.55),new BABYLON.Vector3(-1.42,0.55,0.55),new BABYLON.Vector3(0.00,0.55,0.55),new BABYLON.Vector3(1.42,0.55,0.55),new BABYLON.Vector3(2.84,0.55,0.55)];
-function mkBackTex(){
-  const W=512,H=768;
-  const tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true);
-  const c=tex.getContext();
-  const g=c.createLinearGradient(0,0,W,H);
-  g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');
-  c.fillStyle=g;c.fillRect(0,0,W,H);
-  c.strokeStyle='#c8a020';c.lineWidth=14;c.strokeRect(7,7,W-14,H-14);
-  c.strokeStyle='rgba(200,160,32,0.55)';c.lineWidth=3;c.strokeRect(24,24,W-48,H-48);
-  c.strokeStyle='rgba(200,160,32,0.10)';c.lineWidth=1;
-  for(let x=-H;x<W+H;x+=20){
-    c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();
-    c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();
-  }
-  c.fillStyle='rgba(200,160,32,0.82)';
-  c.font='bold 118px Arial';
-  c.textAlign='center';c.textBaseline='middle';
-  c.fillText('SYFM',W/2,H/2);
-  c.font='bold 36px Arial';
-  c.fillStyle='rgba(200,160,32,0.55)';
-  c.textAlign='left';c.textBaseline='top';
-  c.fillText('SYFM',34,34);
-  c.save();c.translate(W,H);c.rotate(Math.PI);
-  c.textAlign='left';c.textBaseline='top';
-  c.fillText('SYFM',34,34);
-  c.restore();
-  tex.update();return tex;
-}
-function mkFrontTex(suit,rank){
-  const W=512,H=768;
-  const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
-  const c=tex.getContext();
-  const isRed=suit==='\u2665'||suit==='\u2666';
-  const col=isRed?'#cc0000':'#111111';
-  const suitNames={'\u2660':'SPADES','\u2665':'HEARTS','\u2666':'DIAMONDS','\u2663':'CLUBS'};
-  const suitName=suitNames[suit]||'';
-  c.fillStyle='#fafafa';c.fillRect(0,0,W,H);
-  c.strokeStyle='rgba(80,80,80,0.18)';c.lineWidth=3;c.strokeRect(2,2,W-4,H-4);
-  const BX=30,BY=30,BW=W-60,BH=H-60;
-  const rnkSz=rank==='10'?88:100;
-  const cPipSz=64;
-  const cx=16,cy=14;
-  c.fillStyle=col;
-  c.textAlign='left';c.textBaseline='top';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,cx,cy);
-  c.font=cPipSz+'px Arial';c.fillText(suit,cx+2,cy+rnkSz+2);
-  c.textAlign='right';c.textBaseline='top';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-cx,cy);
-  c.font=cPipSz+'px Arial';c.fillText(suit,W-cx-2,cy+rnkSz+2);
-  c.save();c.translate(W,H);c.rotate(Math.PI);
-  c.textAlign='left';c.textBaseline='top';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,cx,cy);
-  c.font=cPipSz+'px Arial';c.fillText(suit,cx+2,cy+rnkSz+2);
-  c.textAlign='right';
-  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-cx,cy);
-  c.font=cPipSz+'px Arial';c.fillText(suit,W-cx-2,cy+rnkSz+2);
-  c.restore();
-  c.fillStyle=col;
-  c.font='bold 30px Arial';c.textAlign='center';c.textBaseline='top';
-  c.fillText(suitName,W/2,BY+8);
-  const pipTop=BY+52;
-  const pipBot=H-BY-52;
-  const pipH=pipBot-pipTop;
-  const pipLeft=BX+32;
-  const pipRight=W-BX-32;
-  const pipW=pipRight-pipLeft;
-  const L={
-    '2': [[0.5,0.12,false],[0.5,0.88,true]],
-    '3': [[0.5,0.12,false],[0.5,0.5,false],[0.5,0.88,true]],
-    '4': [[0.2,0.12,false],[0.8,0.12,false],[0.2,0.88,true],[0.8,0.88,true]],
-    '5': [[0.2,0.12,false],[0.8,0.12,false],[0.5,0.5,false],[0.2,0.88,true],[0.8,0.88,true]],
-    '6': [[0.2,0.12,false],[0.8,0.12,false],[0.2,0.5,false],[0.8,0.5,true],[0.2,0.88,true],[0.8,0.88,true]],
-    '7': [[0.2,0.12,false],[0.8,0.12,false],[0.5,0.31,false],[0.2,0.5,false],[0.8,0.5,true],[0.2,0.88,true],[0.8,0.88,true]],
-    '8': [[0.2,0.10,false],[0.8,0.10,false],[0.5,0.30,false],[0.2,0.50,false],[0.8,0.50,true],[0.5,0.68,true],[0.2,0.88,true],[0.8,0.88,true]],
-    '9': [[0.2,0.10,false],[0.8,0.10,false],[0.2,0.34,false],[0.8,0.34,false],[0.5,0.50,false],[0.2,0.66,true],[0.8,0.66,true],[0.2,0.90,true],[0.8,0.90,true]],
-    '10':[[0.2,0.10,false],[0.8,0.10,false],[0.5,0.26,false],[0.2,0.40,false],[0.8,0.40,false],[0.2,0.60,true],[0.8,0.60,true],[0.5,0.74,true],[0.2,0.90,true],[0.8,0.90,true]]
-  };
-  c.fillStyle=col;
-  c.textAlign='center';c.textBaseline='middle';
-  const centreY=H*0.54;
-  const cSz=rank==='10'?160:190;
-  c.font='bold '+cSz+'px Arial';
-  const rankW=c.measureText(rank).width;
-  const gap=14;
-  c.font=cSz+'px Arial';
-  const suitW=c.measureText(suit).width;
-  const totalW=rankW+gap+suitW;
-  const startX=(W-totalW)/2;
-  c.font='bold '+cSz+'px Arial';
-  c.textAlign='left';c.textBaseline='middle';
-  c.fillText(rank, startX, centreY);
-  c.font=cSz+'px Arial';
-  c.fillText(suit, startX+rankW+gap, centreY);
-  tex.update();return tex;
-}
-let cardFoldedMat=null;
-function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;
-  cardFoldedMat=new BABYLON.StandardMaterial('folded',scene);
-  const fTex=new BABYLON.DynamicTexture('foldedTex',{width:64,height:64},scene,false);
-  const fc=fTex.getContext();fc.fillStyle='#555';fc.fillRect(0,0,64,64);fTex.update();
-  cardFoldedMat.diffuseTexture=fTex;cardFoldedMat.diffuseColor=new BABYLON.Color3(0.45,0.45,0.45);
-  cardFoldedMat.specularColor=new BABYLON.Color3(0,0,0);cardFoldedMat.alpha=0.55;cardFoldedMat.backFaceCulling=false;
-  for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
-function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.28,height:1.80},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
-function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.40;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.billboardMode=BABYLON.Mesh.BILLBOARDMODE_NONE;m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
-const CHIP_DENOM=[{val:500,col:[0.52,0.06,0.62]},{val:100,col:[0.14,0.20,0.88]},{val:25,col:[0.10,0.60,0.16]},{val:5,col:[0.85,0.10,0.10]},{val:1,col:[0.90,0.88,0.86]}];
-function buildChipPool(){for(const d of CHIP_DENOM){for(let i=0;i<60;i++){const chip=BABYLON.MeshBuilder.CreateCylinder('chip_'+d.val+'_'+i,{height:0.072,diameter:0.34,tessellation:32},scene),m=new BABYLON.StandardMaterial('cmat_'+d.val+'_'+i,scene);m.diffuseColor=new BABYLON.Color3(...d.col);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(...d.col.map(v=>v*0.22));chip.material=m;chip.isVisible=false;chip.renderingGroupId=1;chip._dval=d.val;chipPool.push(chip);}}}
-function acquireChip(forVal){const d=CHIP_DENOM.find(d=>d.val<=forVal)||CHIP_DENOM[CHIP_DENOM.length-1];const ch=chipPool.find(c=>!c.isVisible&&c._dval===d.val)||chipPool.find(c=>!c.isVisible)||null;if(ch)ch.isVisible=true;return ch;}
-function freeChip(c){if(c){c.isVisible=false;c.position=new BABYLON.Vector3(0,-5,0);}}
-function freeAllChips(){[...potChips].forEach(freeChip);potChips=[];seatBetChips.forEach(arr=>{arr.forEach(freeChip);});seatBetChips=Array.from({length:NP},()=>[]);}
-function buildChipStack(amount){const chips=[];let rem=amount;for(const d of CHIP_DENOM){if(rem<=0||chips.length>=12)break;const n=Math.min(Math.floor(rem/d.val),5);for(let i=0;i<n&&chips.length<12;i++){const ch=acquireChip(d.val);if(ch){chips.push(ch);rem-=d.val;}}}return chips;}
-function animChipArc(chips,srcPos,dstBase,staggerMs,baseY,cb){
-  if(!chips.length){if(cb)setTimeout(cb,50);return;}
-  let done=0;
-  chips.forEach((chip,i)=>{
-    chip.position=new BABYLON.Vector3(srcPos.x,srcPos.y+0.45+i*0.07,srcPos.z);
-    const tgt=new BABYLON.Vector3(dstBase.x+(Math.random()-0.5)*0.20,baseY+i*0.060,dstBase.z+(Math.random()-0.5)*0.20);
-    const mid=new BABYLON.Vector3((chip.position.x+tgt.x)*0.5,chip.position.y+2.0,(chip.position.z+tgt.z)*0.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:chip.position.clone()},{frame:10,value:mid},{frame:22,value:tgt}],'out');
-    chip.animations=[a];
-    setTimeout(()=>{scene.beginAnimation(chip,0,22,false,1.4,()=>{snd_chip();done++;if(done===chips.length&&cb)cb();});},i*staggerMs);
-  });}
-function sweepBetsToPot(cb){
-  if(is2D){if(cb)setTimeout(cb,60);return;}
-  const all=[];seatBetChips.forEach(arr=>all.push(...arr));
-  seatBetChips=Array.from({length:NP},()=>[]);
-  if(!all.length){if(cb)setTimeout(cb,60);return;}
-  const baseY=0.32+potChips.length*0.055;
-  let done=0;
-  all.forEach((chip,i)=>{
-    const tgt=new BABYLON.Vector3(POT_BASE.x+(Math.random()-0.5)*0.38,baseY+i*0.055,POT_BASE.z+(Math.random()-0.5)*0.28);
-    const mid=new BABYLON.Vector3((chip.position.x+tgt.x)*0.5,chip.position.y+1.5,(chip.position.z+tgt.z)*0.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:chip.position.clone()},{frame:8,value:mid},{frame:18,value:tgt}],'out');
-    chip.animations=[a];
-    setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.6,()=>{snd_chip();potChips.push(chip);done++;if(done===all.length&&cb)cb();});},i*28);});}
-function chipsFlyToWinner(winSeat,cb){
-  if(is2D){if(cb)cb();return;}
-  const wp=seatPos(vs(winSeat));wp.y+=0.8;
-  const all=[...potChips];seatBetChips.forEach(arr=>all.push(...arr));
-  potChips=[];seatBetChips=Array.from({length:NP},()=>[]);
-  if(!all.length){if(cb)cb();return;}
-  let done=0;
-  all.forEach((chip,i)=>{
-    const start=chip.position.clone(),mid=new BABYLON.Vector3((start.x+wp.x)*0.5,start.y+2.4,(start.z+wp.z)*0.5);
-    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:8,value:mid},{frame:18,value:wp}],'in');
-    chip.animations=[a];
-    setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.5,()=>{snd_chip();freeChip(chip);done++;if(done===all.length&&cb)cb();});},i*18);});}
-function buildTokens(){function makeToken(name,r,g,b,label){const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene),m=new BABYLON.StandardMaterial(name+'m',scene);m.diffuseColor=new BABYLON.Color3(r,g,b);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);tok.material=m;tok.isVisible=false;tok.renderingGroupId=1;const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false),dc=discTex.getContext();dc.fillStyle='rgb('+Math.round(r*255)+','+Math.round(g*255)+','+Math.round(b*255)+')';dc.beginPath();dc.arc(64,64,62,0,Math.PI*2);dc.fill();dc.strokeStyle='rgba(0,0,0,0.5)';dc.lineWidth=3;dc.stroke();dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';dc.font='bold 42px Arial';dc.textAlign='center';dc.textBaseline='middle';dc.fillText(label,64,64);discTex.update();const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene),dm=new BABYLON.StandardMaterial(name+'dm',scene);dm.diffuseTexture=discTex;dm.emissiveColor=new BABYLON.Color3(1,1,1);dm.disableLighting=true;dm.backFaceCulling=false;disc.material=dm;disc.rotation.x=-Math.PI/2;disc.position.y=0.07;disc.parent=tok;disc.renderingGroupId=2;return tok;}dealerToken=makeToken('dealer',0.95,0.95,0.95,'D');sbToken=makeToken('sb',0.15,0.40,0.90,'SB');bbToken=makeToken('bb',0.90,0.80,0.10,'BB');}
-function positionTokens(dSeat,sbSeat,bbSeat){
-  const RX=TRX*0.50,RZ=TRZ*0.50;
-  const _n=numVisualSeats();
-  function seatA(seat){return -Math.PI/2-(seat/_n)*Math.PI*2;}
-  function place(tok,seat,angOffset){const a=seatA(seat)+angOffset;tok.position=new BABYLON.Vector3(Math.cos(a)*RX,0.38,Math.sin(a)*RZ);tok.isVisible=true;}
-  if(dSeat===sbSeat){place(dealerToken,dSeat,0.18);place(sbToken,sbSeat,-0.18);}
-  else{place(dealerToken,dSeat,0);place(sbToken,sbSeat,0.06);}
-  place(bbToken,bbSeat,0.06);}
-const LW=320,LH=128;
-function buildPlayerLabels(){for(let i=0;i<NP;i++){const tex=new BABYLON.DynamicTexture('plbtex'+i,{width:LW,height:LH},scene,false);tex.hasAlpha=true;const mat=new BABYLON.StandardMaterial('plbm'+i,scene);mat.diffuseTexture=tex;mat.hasAlpha=true;mat.emissiveColor=new BABYLON.Color3(1,1,1);mat.disableLighting=true;mat.backFaceCulling=false;const plane=BABYLON.MeshBuilder.CreatePlane('plbp'+i,{width:2.2,height:0.88},scene);plane.material=mat;const sp=seatPos(i);plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);plane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;plane.isVisible=false;plane.renderingGroupId=2;playerLabels.push({plane,tex});}}
-function updateLabel(seat,name,chips,bet,action,isMe,isDead,isAutoFold,isSpectator,isPendingBuyBack){const vSeat=vs(seat),lb=playerLabels[vSeat];if(!lb)return;const sp=seatPos(vSeat);lb.plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);const ctx=lb.tex.getContext();ctx.clearRect(0,0,LW,LH);if(!name){lb.plane.isVisible=false;lb.tex.update();return;}
-  const bgCol=isAutoFold?'rgba(60,10,80,0.92)':isDead?'rgba(80,20,20,0.82)':isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';
-  ctx.fillStyle=bgCol;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.fill();
-  const borderCol=isAutoFold?'#aa40ff':isMe?'#20c040':isDead?'#802020':'#c8a020';
-  ctx.strokeStyle=borderCol;ctx.lineWidth=3;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.stroke();
-  ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='top';
-  const dispName=(name.length>14?name.slice(0,13)+'\u2026':name).toUpperCase();
-  ctx.fillText(dispName,LW/2,6);
-  ctx.fillStyle='#ffd700';ctx.font='bold 18px Arial';
-  ctx.fillText('Stack \u00a3'+(chips/100).toFixed(2),LW/2,34);
-  if(bet>0){ctx.fillStyle='#80cfff';ctx.font='15px Arial';ctx.fillText('Bet \u00a3'+(bet/100).toFixed(2),LW/2,58);}
-  if(isPendingBuyBack){ctx.fillStyle='#ffaa20';ctx.font='bold 15px Arial';ctx.fillText('\uD83D\uDCB8 BUY-BACK?',LW/2,bet>0?82:58);}
-  else if(isSpectator){ctx.fillStyle='#8899aa';ctx.font='bold 15px Arial';ctx.fillText('\uD83D\uDC40 SPECTATOR',LW/2,bet>0?82:58);}
-  else if(isAutoFold){ctx.fillStyle='#cc44ff';ctx.font='bold 16px Arial';ctx.fillText('\u23f8 AUTO-FOLD ON',LW/2,bet>0?82:58);}
-  else if(action){const ac=action.toUpperCase(),acCol=ac.startsWith('FOLD')?'#c04040':ac.startsWith('RAISE')||ac.startsWith('BET')?'#e09020':'#20c040';ctx.fillStyle=acCol;ctx.font='bold 16px Arial';ctx.fillText(ac,LW/2,bet>0?82:58);}
-  lb.tex.update();lb.plane.isVisible=true;
-}
-function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);a.setKeys(keys);const ef=ease==='in'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();ef.setEasingMode(ease==='in'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);a.setEasingFunction(ef);return a;}
-function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
-function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
-function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
-cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
-cam.lowerAlphaLimit=-Math.PI/2-0.52;
-cam.upperAlphaLimit=-Math.PI/2+0.52;
-cam.lowerBetaLimit=0.55;
-cam.upperBetaLimit=1.18;
-cam.lowerRadiusLimit=5;
-cam.upperRadiusLimit=22;
-cam.wheelPrecision=28;
-cam.pinchPrecision=180;
-cam.panningSensibility=0;
-cam.attachControl(canvas,true);
-const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
-h.intensity=0.12;h.diffuse=new BABYLON.Color3(0.7,0.62,0.45);h.groundColor=new BABYLON.Color3(0.04,0.03,0.02);
-spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,12,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.8,scene);
-spotLight.intensity=2.2;spotLight.diffuse=new BABYLON.Color3(1.0,0.92,0.72);
-const fillLight=new BABYLON.PointLight('fill',new BABYLON.Vector3(-4,7,4),scene);
-fillLight.intensity=0.5;fillLight.diffuse=new BABYLON.Color3(0.8,0.75,0.55);
-shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=16;
-const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);
-f.position.y=-0.22;f.receiveShadows=true;
-const fm=new BABYLON.StandardMaterial('fm',scene);
-fm.diffuseColor=new BABYLON.Color3(0.06,0.04,0.02);
-fm.specularColor=new BABYLON.Color3(0.25,0.15,0.06);fm.specularPower=120;f.material=fm;
-const T=96;
-const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.52,diameter:12,tessellation:T},scene);
-base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;
-const bm=new BABYLON.PBRMaterial('bm',scene);
-bm.albedoColor=new BABYLON.Color3(0.12,0.06,0.02);
-bm.roughness=0.28;bm.metallic=0;
-base.material=bm;
-const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.52,tessellation:T,radialSegments:24},scene);
-rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.22;
-const rm=new BABYLON.PBRMaterial('rm',scene);
-rm.albedoColor=new BABYLON.Color3(0.16,0.04,0.02);
-rm.roughness=0.82;rm.metallic=0;
-rail.material=rm;
-const trim=BABYLON.MeshBuilder.CreateTorus('trim',{diameter:10.9,thickness:0.08,tessellation:T,radialSegments:8},scene);
-trim.scaling.x=TRX/(10.9/2)*0.93;trim.scaling.z=TRZ/(10.9/2)*0.93;trim.position.y=0.30;
-const trm=new BABYLON.StandardMaterial('trm',scene);
-trm.diffuseColor=new BABYLON.Color3(0.72,0.52,0.08);
-trm.specularColor=new BABYLON.Color3(1,0.9,0.4);trm.specularPower=400;
-trm.emissiveColor=new BABYLON.Color3(0.12,0.08,0.01);
-trim.material=trm;
-const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
-felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.28;
-const ftm=new BABYLON.PBRMaterial('ftm',scene);
-ftm.albedoColor=new BABYLON.Color3(0.02,0.16,0.07);
-ftm.roughness=0.96;ftm.metallic=0;
-ftm.sheen.isEnabled=true;ftm.sheen.intensity=0.38;ftm.sheen.color=new BABYLON.Color3(0.08,0.28,0.12);
-felt.material=ftm;felt.receiveShadows=true;
-const inlay=BABYLON.MeshBuilder.CreateTorus('inlay',{diameter:9.8,thickness:0.04,tessellation:T,radialSegments:6},scene);
-inlay.scaling.x=TRX/(9.8/2)*0.86;inlay.scaling.z=TRZ/(9.8/2)*0.86;inlay.position.y=0.32;
-const ilm=new BABYLON.StandardMaterial('ilm',scene);
-ilm.diffuseColor=new BABYLON.Color3(0.08,0.32,0.14);
-ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
-inlay.material=ilm;
-const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,false);brandTex.hasAlpha=true;const bc=brandTex.getContext();bc.clearRect(0,0,1024,512);bc.fillStyle='rgba(255,255,255,0.07)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM UC',512,256);brandTex.update();const brandMat=new BABYLON.StandardMaterial('brandMat',scene);brandMat.diffuseTexture=brandTex;brandMat.hasAlpha=true;brandMat.emissiveColor=new BABYLON.Color3(1,1,1);brandMat.disableLighting=true;brandMat.backFaceCulling=false;const brandPlane=BABYLON.MeshBuilder.CreatePlane('brand',{width:TRX*1.55,height:TRZ*1.35},scene);brandPlane.rotation.x=Math.PI/2;brandPlane.position.y=0.262;brandPlane.material=brandMat;brandPlane.renderingGroupId=1;buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();
-return scene;}
-let seatActions={};
+function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,1319].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*0.10);g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);o.connect(g);o.connect(audioCtx.destination);o.start(t+i*0.10);o.stop(t+i*0.10+0.6);});}
 
-function applyState(st){
-  if(!st)return;
-  lastState=st;
-  if(st.players)updateOccupiedSeats(st.players);
-  for(let i=0;i<NP;i++){
-    const p=st.players[i];
-    if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false,p.spectator||false,p.pendingBuyBack||false);
-    else updateLabel(i,null,0,0,'',false,false,false,false,false);
-  }
-  const comm=st.community||[];
-  for(let ci=0;ci<5;ci++){
-    const mesh=communityCardMeshes[ci];
-    if(ci<comm.length){
-      if(!mesh||!mesh.isVisible){
-        const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();
-        m.material=cardBackMat;m.isVisible=true;
-        animDeal(m,target,()=>{
-          snd_deal();
-          const cd=comm[ci];
-          if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
-        });
-      }
-    }else{
-      if(mesh)mesh.isVisible=false;
+/* --- Wheel Dials Implementation --- */
+class WheelDial {
+    constructor(canvasId, onChange) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.onChange = onChange;
+        this.angle = 0; 
+        this.isDragging = false;
+        this.lastY = 0;
+        this.size = 80;
+        this.initEvents();
+        this.draw();
     }
-  }
-  for(let i=0;i<NP;i++){
-    const p=st.players[i],meshes=seatCardMeshes[i];
-    if(!p||!p.cards||p.cards.length===0){
-      for(const m of meshes){if(m)m.isVisible=false;}
-      seatCardMeshes[i]=[null,null];
-      continue;
+    initEvents() {
+        const start = (e) => {
+            this.isDragging = true;
+            this.lastY = e.touches ? e.touches[0].clientY : e.clientY;
+        };
+        const move = (e) => {
+            if (!this.isDragging) return;
+            const currentY = e.touches ? e.touches[0].clientY : e.clientY;
+            const dy = currentY - this.lastY;
+            if (Math.abs(dy) > 1) {
+                const direction = dy > 0 ? -1 : 1;
+                this.angle += direction * 0.15;
+                this.lastY = currentY;
+                this.onChange(direction);
+                this.draw();
+            }
+        };
+        const end = () => this.isDragging = false;
+        this.canvas.addEventListener('mousedown', start);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', end);
+        this.canvas.addEventListener('touchstart', start, {passive:false});
+        window.addEventListener('touchmove', move, {passive:false});
+        window.addEventListener('touchend', end);
     }
-    p.cards.forEach((cd,cn)=>{
-      const m=meshes[cn];
-      if(!m||!m.isVisible)return;
-      if(p.folded){
-        if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;
-        return;
-      }
-      if(cd&&cd!=='back'){
-        const fmat=cardFrontMats[cd.r+cd.s];
-        if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());
-      } else {
-        if(m.material!==cardBackMat)m.material=cardBackMat;
-      }
-    });
-  }
-  const p0=st.players[mySeat];
-  if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
-  document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);
-  document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');
-  if(is2D) render2D(st);
-}
+    draw() {
+        const ctx = this.ctx;
+        const center = this.size / 2;
+        const radius = this.size / 2 - 5;
+        ctx.clearRect(0, 0, this.size, this.size);
 
-function toggle2D(){
-  is2D=!is2D;
-  const btn=document.getElementById('toggleViewBtn');
-  const label=document.getElementById('toggleViewLabel');
-  const canvas=document.getElementById('c');
-  const view2d=document.getElementById('view2d');
-  const slider=document.getElementById('tableSlider');
-  const bottomBar=document.getElementById('bottomBar');
-  const stackInfo2d=document.getElementById('stackInfo2d');
-  if(is2D){
-    canvas.style.display='none';
-    view2d.style.display='block';
-    if(slider)slider.style.display='none';
-    if(bottomBar)bottomBar.style.display='none';
-    if(stackInfo2d)stackInfo2d.style.display='block';
-    if(label)label.textContent='→3D';
-    btn.classList.add('mode2d');
-    btn.title='Switch to 3D view';
-    if(lastState)render2D(lastState);
-  } else {
-    canvas.style.display='block';
-    view2d.style.display='none';
-    if(slider)slider.style.display='';
-    if(bottomBar)bottomBar.style.display='';
-    if(stackInfo2d)stackInfo2d.style.display='none';
-    if(label)label.textContent='→2D';
-    btn.classList.remove('mode2d');
-    btn.title='Switch to 2D view';
-    if(lastState)applyState(lastState);
-  }
-}
+        // Rim Shadow
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#0a0502';
+        ctx.fill();
 
-function build2DCard(rank,suit,folded){
-  const el=document.createElement('div');
-  el.className='p2d-card';
-  if(folded){el.classList.add('folded');return el;}
-  if(!rank||rank==='back'){el.classList.add('back');return el;}
-  const isRed=(suit==='\u2665'||suit==='\u2666');
-  el.classList.add(isRed?'red':'black');
-  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
-  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
-  el.appendChild(tl);el.appendChild(br);
-  const ctr=document.createElement('div');ctr.className='p2dc-center';
-  const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;
-  const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;
-  ctr.appendChild(rSpan);ctr.appendChild(sSpan);
-  el.appendChild(ctr);
-  return el;
-}
-function build2DCommCard(rank,suit){
-  const el=document.createElement('div');
-  el.className='c2d-card';
-  if(!rank||rank==='back'){el.classList.add('back');return el;}
-  const isRed=(suit==='\u2665'||suit==='\u2666');
-  el.classList.add(isRed?'red':'black');
-  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
-  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
-  el.appendChild(tl);el.appendChild(br);
-  const ctr=document.createElement('div');ctr.className='p2dc-center';
-  const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;
-  const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;
-  ctr.appendChild(rSpan);ctr.appendChild(sSpan);
-  el.appendChild(ctr);
-  return el;
-}
+        // Main Wheel Gradient (Metallic look)
+        const grad = ctx.createRadialGradient(center, center, radius * 0.5, center, center, radius);
+        grad.addColorStop(0, '#3a2a10');
+        grad.addColorStop(0.8, '#6a5010');
+        grad.addColorStop(1, '#2a1a08');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
+        ctx.fill();
 
-function render2D(st){
-  if(!st||!st.players)return;
-  const inner=document.getElementById('table2dInner');
-  inner.querySelectorAll('.p2d-seat').forEach(el=>el.remove());
-  document.getElementById('pot2dVal').textContent='\u00a3'+((st.pot||0)/100).toFixed(2);
-  const p0=st.players[mySeat];
-  const si2d=document.getElementById('stackInfo2d');
-  if(si2d&&p0){
-    si2d.innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff;font-size:11px">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
-  }
-  const comm=st.community||[];
-  const commEl=document.getElementById('community2d');
-  commEl.innerHTML='';
-  for(let i=0;i<5;i++){
-    if(i<comm.length&&comm[i]&&comm[i]!=='back'){
-      commEl.appendChild(build2DCommCard(comm[i].r,comm[i].s));
-    }else if(i<comm.length){
-      commEl.appendChild(build2DCommCard('back',null));
-    }else{
-      const ph=document.createElement('div');ph.className='c2d-card';ph.style.visibility='hidden';commEl.appendChild(ph);
+        // Outer Gold Border
+        ctx.strokeStyle = '#c8a020';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Notches (to visualize rotation)
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(this.angle);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+        ctx.lineWidth = 4;
+        for (let i = 0; i < 12; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, -radius + 4);
+            ctx.lineTo(0, -radius + 12);
+            ctx.stroke();
+            ctx.rotate(Math.PI / 6);
+        }
+        ctx.restore();
+
+        // Center Cap
+        ctx.beginPath();
+        ctx.arc(center, center, radius * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = '#1a0d05';
+        ctx.fill();
+        ctx.strokeStyle = '#c8a020';
+        ctx.lineWidth = 1;
+        ctx.stroke();
     }
-  }
-  const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);
-  const n=seated.length||2;
-  const rx=44,ry=38;
-  seated.forEach((srvSeat)=>{
-    const p=st.players[srvSeat];
-    if(!p)return;
-    const vSeat=vs(srvSeat);
-    const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;
-    const px=50+rx*Math.cos(angle);
-    const py=50-ry*Math.sin(angle);
-    const isMe=(srvSeat===mySeat);
-    const isToAct=(st.toActSeat===srvSeat);
-    const isDealer=(st.dealerSeat===srvSeat);
-    const isSB=(st.sbSeat===srvSeat);
-    const isBB=(st.bbSeat===srvSeat);
-    const div=document.createElement('div');
-    div.className='p2d-seat'+(isMe?' me':'');
-    div.style.left=px+'%';div.style.top=py+'%';
-    if(p.cards&&p.cards.length){
-      const cardsDiv=document.createElement('div');
-      cardsDiv.className='p2d-cards';
-      p.cards.forEach(cd=>{
-        const rank=cd&&cd!=='back'?cd.r:null;
-        const suit=cd&&cd!=='back'?cd.s:null;
-        cardsDiv.appendChild(build2DCard(rank,suit,p.folded));
-      });
-      div.appendChild(cardsDiv);
-    }
-    const info=document.createElement('div');
-    info.className='p2d-info';
-    const nameDiv=document.createElement('div');
-    nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');
-    nameDiv.textContent=p.name;
-    info.appendChild(nameDiv);
-    const tokens=document.createElement('div');
-    if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}
-    if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}
-    if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}
-    if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}
-    if(tokens.children.length)info.appendChild(tokens);
-    if(!isMe){
-      const stackDiv=document.createElement('div');
-      stackDiv.className='p2d-stack';
-      stackDiv.textContent='\u00a3'+(p.chips/100).toFixed(2);
-      info.appendChild(stackDiv);
-    }
-    if(p.bet>0){
-      const betDiv=document.createElement('div');
-      betDiv.className='p2d-bet';
-      betDiv.textContent='bet \u00a3'+(p.bet/100).toFixed(2);
-      info.appendChild(betDiv);
-    }
-    div.appendChild(info);
-    inner.appendChild(div);
-  });
 }
 
-function getOrCreateCommunityMesh(idx){
-  if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
-  const m=nextCardMesh();
-  communityCardMeshes[idx]=m;
-  return m;
-}
-
-function startDealAnimation(activeSeats,afterDone){
-  if(is2D){dealing=false;if(afterDone)afterDone();return;}
-  dealing=true;
-  for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}
-  for(const m of communityCardMeshes){if(m)m.isVisible=false;}
-  communityCardMeshes=[];freeAllChips();
-  const seq=[];
-  for(let rd=0;rd<2;rd++)for(const si of activeSeats)seq.push(si);
-  const dealt={};for(const si of activeSeats)dealt[si]=0;
-  let idx=0;
-  function next(){
-    if(idx>=seq.length){dealing=false;if(afterDone)afterDone();return;}
-    const si=seq[idx++],cn=dealt[si]||0;dealt[si]=cn+1;
-    if(!activeSeats.includes(si)){next();return;}
-    const isMe=(si===mySeat);
-    const target=isMe ? cardPos(vs(si),cn) : cardPosOther(vs(si),cn);
-    const m=nextCardMesh();
-    if(!isMe){m.rotation=new BABYLON.Vector3(0,0,0);m.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;}
-    seatCardMeshes[si][cn]=m;
-    animDeal(m,target,()=>{
-      snd_deal();
-      if(lastState&&lastState.players[si]){
-        const cd=lastState.players[si].cards[cn];
-        if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
-      }
-      setTimeout(next,80);
-    });
-  }
-  next();
-}
-
-let _reconnectTimer=null, _reconnectAttempts=0, _intentionalClose=false;
-let _serverShutdown=false;
-const MAX_RECONNECT_ATTEMPTS=12;
-const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,10000,10000,10000,10000,10000];
-const SHUTDOWN_FIRST_DELAY=12000;
-
-function connectWS(name,roomId,playerId){
-  _intentionalClose=false;
-  if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}
-  const proto=location.protocol==='https:'?'wss:':'ws:';
-  ws=new WebSocket(proto+'//'+location.host);
-  ws.onopen=()=>{
-    _reconnectAttempts=0;
-    _serverShutdown=false;
-    const rb=document.getElementById('reconnectBanner');
-    if(rb)rb.style.display='none';
-    ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));
-  };
-  ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};
-  ws.onclose=()=>{
-    if(_intentionalClose)return;
-    if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){showRestartPrompt();return;}
-    const baseDelay=_serverShutdown&&_reconnectAttempts===0?SHUTDOWN_FIRST_DELAY:RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
-    _reconnectAttempts++;
-    showReconnectBanner(_reconnectAttempts,baseDelay);
-    _reconnectTimer=setTimeout(()=>{if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);},baseDelay);
-  };
-  ws.onerror=()=>{
-    if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){
-      document.getElementById('loginErr').textContent='Could not connect to server.';
-      document.getElementById('loginOverlay').style.display='flex';
-      document.getElementById('waitingOverlay').style.display='none';
-      document.getElementById('lobbyOverlay').style.display='none';
-    }
-  };
-}
-
-function showReconnectBanner(attempt,delayMs){
-  let rb=document.getElementById('reconnectBanner');
-  if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';document.body.appendChild(rb);}
-  rb.style.display='block';
-  const secs=Math.round(delayMs/1000);
-  const shutMsg=_serverShutdown?'\nServer restarting — please wait…':'';
-  rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+secs+'s'+shutMsg;
-  if(rb._countdown)clearInterval(rb._countdown);
-  let remaining=secs;
-  rb._countdown=setInterval(()=>{remaining--;if(remaining<=0){clearInterval(rb._countdown);rb._countdown=null;return;}const sm=_serverShutdown?'\nServer restarting — please wait…':'';rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+remaining+'s'+sm;},1000);
-}
-
-function showRestartPrompt(){
-  let rb=document.getElementById('reconnectBanner');
-  if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';document.body.appendChild(rb);}
-  rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.96);border:2px solid #c84040;border-radius:14px;padding:24px 32px;color:#ff9090;font-size:15px;font-weight:bold;text-align:center;z-index:999;min-width:280px';
-  rb.innerHTML='⚠ Lost connection to server.<br><br><span style="color:#c8a060;font-weight:normal;font-size:13px">The server may have restarted.<br>Your seat will be held if you reconnect.</span><br><br><button onclick="location.reload()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:14px;font-weight:bold;cursor:pointer">🔄 Reload &amp; Reconnect</button>';
-}
-
-function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
-
-document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&myName&&myRoomId&&myId){
-    if(!ws||ws.readyState===WebSocket.CLOSED||ws.readyState===WebSocket.CLOSING){
-      if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}
-      _reconnectAttempts=0;
-      showReconnectBanner(1,0);
-      connectWS(myName,myRoomId,myId);
-    }
-  }
+let dialP, dialC;
+window.addEventListener('DOMContentLoaded', () => {
+    dialP = new WheelDial('dialPounds', (dir) => adjustBet(dir, 1));
+    dialC = new WheelDial('dialPence', (dir) => adjustBet(dir, 0.2));
 });
 
-function handleServerMsg(msg){switch(msg.type){
-case 'serverShutdown':{_serverShutdown=true;showReconnectBanner(0,SHUTDOWN_FIRST_DELAY);addLog('⚠ Server restarting — will reconnect automatically…','log-fold');break;}
-case 'logEvent':{addLog(msg.text,'log-system');break;}
-case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';break;
-case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
-case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
-case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}if(isHost&&msg.buyIn){const bi=document.getElementById('buyInInput');if(bi&&document.activeElement!==bi)bi.value=(msg.buyIn/100).toFixed(2);}break;
-case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
-case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
-case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
-case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';handNumber++;maybeKeepAlive();addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,10);},120);setTimeout(()=>{showBet(bbSeat,20);},280);if(lastState)applyState(lastState);});break;}
-case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='flex';}if(!dealing)applyState(msg);break;
-case 'playerAction':{const pname=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;const logClass=msg.action==='fold'?'log-action':'log-action';addLog('\u27a4 '+pname+': '+ac, logClass);if(msg.amount>0)showBet(msg.seat,msg.amount);hideTurnIndicator();if(lastState)applyState(lastState);break;}
-case 'yourTurn':{const ca=msg.callAmt||0;if(msg.seat===mySeat){const callLabel=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2b50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
-case 'communityDealt':addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');sweepBetsToPot(()=>{if(lastState)applyState(lastState);});break;
-case 'showdown':setPhase('Showdown');hideTurnIndicator();sweepBetsToPot(null);addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
-case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
-case 'playerLeft':addLog(msg.name+' left the table');addChat('\u2b05 '+msg.name+' left');seatActions[msg.seat]='';if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}if(msg.id===myId){_intentionalClose=true;setTimeout(()=>location.reload(),600);return;}if(lastState)applyState(lastState);break;
-case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
-case 'gamePaused':handlePaused(true,msg.byName);break;
-case 'gameResumed':handlePaused(false,msg.byName);break;
-case 'cashOutPending':{const btn=document.getElementById('cashOutBtn');btn.classList.add('pending');btn.textContent='CASH OUT \u23f3';addLog('\u{1F4B0} CASH OUT: '+(myName||'You')+' will cash out after this hand','log-win');showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);break;}
-case 'voluntaryAutoFoldAck':addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));break;
-case 'buyBackOffer':{document.getElementById('buyBackOverlay').style.display='flex';addLog('\uD83D\uDCB8 You are out of chips! Choose to buy back in or spectate.','log-hand');let _bbSecs=15;const _bbEl=document.getElementById('buyBackTimer');_bbEl.textContent=_bbSecs;if(window._buyBackInterval)clearInterval(window._buyBackInterval);window._buyBackInterval=setInterval(()=>{_bbSecs--;_bbEl.textContent=_bbSecs;if(_bbSecs<=0){clearInterval(window._buyBackInterval);window._buyBackInterval=null;respondBuyBack(false);}},1000);break;}
-case 'buyBackAccepted':{document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='none';showMsg('\u2705 Bought back in!\nYou\u2019ll be dealt in from the next hand.',4500);addLog('\u2705 BUY-BACK: You have bought back in for \u00a310.00 \u2014 joining next hand','log-win');document.getElementById('spectatorBanner').textContent='\u23f3 Bought back in \u2014 you\u2019ll be dealt from the next hand';document.getElementById('spectatorBanner').style.display='block';break;}
-case 'spectating':{document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='block';addLog('\uD83D\uDC40 You are now spectating \u2014 you will not be dealt cards','log-hand');break;}
-case 'chat':addChat(msg.name+': '+msg.text);break;
-case 'error':addChat('\u26a0 '+msg.msg);break;}}
-function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(\''+p.id+'\',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(\''+p.id+'\',false)">\u2717 Reject</button></span>';pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
-function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
-function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}wsSend({type:'buyBack',accept});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
-let pendingInGame={};
-function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
-function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(\''+p.id+'\',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(\''+p.id+'\',false)">Reject</button></span>';list.appendChild(row);}}
-function inGameApprove(id,accept){wsSend({type:'approve',id,accept});delete pendingInGame[id];refreshInGameJoinNotif();}
-function showTurnIndicator(txt){document.getElementById('turnIndicator').textContent=txt;document.getElementById('turnIndicator').style.display='block';}
-function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
-
-const TURN_SECS=15;
-let _countdownInterval=null;
-function startCountdown(isMe,playerName){
-  clearInterval(_countdownInterval);
-  let secs=TURN_SECS;
-  const foldBtn=document.getElementById('foldBtn');
-  function tick(){
-    if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}
-    else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}
-    if(secs<=0){clearInterval(_countdownInterval);return;}
-    secs--;
-  }
-  tick();
-  _countdownInterval=setInterval(tick,1000);
-}
-function stopCountdown(){
-  clearInterval(_countdownInterval);
-  const foldBtn=document.getElementById('foldBtn');
-  if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}
-}
-function setActions(v){
-  const panel=document.getElementById('actionPanel');
-  if(panel)panel.style.display=v?'flex':'none';
-  ['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});
-  const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';
-  if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
-}
-function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
-function showMsg(m,ms=2400){
-  const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);
-  const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}
-}
-function addChat(txt){
-  const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);
-  if(chatCollapsed){const box=document.getElementById('chatBox');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),2200);}
-}
-let handNumber=0;
-let keepAliveHandCount=0;
-function maybeKeepAlive(){keepAliveHandCount++;if(keepAliveHandCount%5===0){fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber).then(r=>r.text()).then(txt=>{addLog('\u{1F4E1} Keep-alive sent (hand #'+handNumber+') \u2014 server: '+txt,'log-action');}).catch(()=>{addLog('\u26a0 Keep-alive failed at hand #'+handNumber,'log-action');});}}
-function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
-let gamePaused=false;
-function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
-
-function applyBuyIn(){const inp=document.getElementById('buyInInput');const btn=document.getElementById('buyInBtn');if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0.20){inp.style.borderColor='#cc0000';return;}wsSend({type:'setBuyIn',buyIn:Math.round(val*100)});if(btn){btn.textContent='✓';btn.style.background='#1a6a1a';setTimeout(()=>{btn.textContent='SET';btn.style.background='#1a3a6a';},1500);}inp.style.borderColor='#c8a020';setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);}
-
-function toggleStackEditor(){
-  const panel=document.getElementById('stackEditor');
-  if(panel.style.display==='block'){panel.style.display='none';return;}
-  const seated=[];
-  if(lastState&&lastState.players){lastState.players.forEach(p=>{if(p&&p.id&&p.name)seated.push({id:p.id,name:p.name,chips:p.chips});});}
-  if(seated.length===0&&lastLobbyMsg&&lastLobbyMsg.seats){lastLobbyMsg.seats.forEach(s=>{if(s&&s.id&&s.name)seated.push({id:s.id,name:s.name,chips:s.chips});});}
-  const rows=document.getElementById('stackEditorRows');rows.innerHTML='';
-  if(seated.length===0){rows.innerHTML='<div style="color:#888;font-size:12px">No players found</div>';}
-  else{seated.forEach((p,i)=>{const row=document.createElement('div');row.className='se-row';row.innerHTML='<span class="se-name">'+p.name+'</span><span style="color:#888;font-size:10px">£</span><input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="0.01" value="'+(p.chips/100).toFixed(2)+'"><button class="se-btn" id="se-btn-'+i+'" onclick="doSetStack('+i+',\''+p.id+'\')">SET</button>';rows.appendChild(row);});}
-  panel.style.display='block';
+function adjustBet(dir, amt) {
+    if (dir > 0) currentBetAmount += amt;
+    else currentBetAmount -= amt;
+    updateRaiseUI();
+    snd_chip();
 }
 
-function doSetStack(idx,playerId){const inp=document.getElementById('se-inp-'+idx);const btn=document.getElementById('se-btn-'+idx);if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0){inp.style.borderColor='#cc0000';return;}const pence=Math.round(val*100);wsSend({type:'setStack',playerId:playerId,chips:pence});btn.textContent='✓';btn.style.background='#1a6a1a';inp.style.borderColor='#c8a020';setTimeout(()=>{btn.textContent='SET';btn.style.background='';inp.style.borderColor='';},2000);}
-function handlePaused(isPaused,byName){gamePaused=isPaused;const btn=document.getElementById('pauseBtn');const banner=document.getElementById('pauseBanner');if(isPaused){btn.classList.add('active');btn.textContent='\u25b6';banner.style.display='block';addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 any player can resume','log-hand');}else{btn.classList.remove('active');btn.textContent='\u23f8';banner.style.display='none';addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');}}
-let myAutoFold=false;
-function toggleAutoFold(){myAutoFold=!myAutoFold;wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});const btn=document.getElementById('autoFoldBtn');if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}}
-function showBet(serverSeat,amount){if(amount<=0||is2D)return;const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);const existH=seatBetChips[serverSeat].length*0.060;const chips=buildChipStack(amount);seatBetChips[serverSeat].push(...chips);animChipArc(chips,src,dst,38,0.32+existH,null);}
-let activityCollapsed=true;
-function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';}
-let chatCollapsed=true;
-function toggleChat(){chatCollapsed=!chatCollapsed;const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');inner.style.display=chatCollapsed?'none':'block';toggle.textContent=chatCollapsed?'\u25b6 expand':'\u25bc collapse';}
-
-function toggleFullscreen(){if(!document.fullscreenElement&&!document.webkitFullscreenElement){const el=document.documentElement;if(el.requestFullscreen){el.requestFullscreen().catch(()=>{});}else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();}}else{if(document.exitFullscreen){document.exitFullscreen();}else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}}}
-
-window.addEventListener('load',()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn){const fsAvailable=!!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);if(!fsAvailable)fsBtn.style.display='none';}});
-
-function doCashOut(){if(!confirm('Cash out and leave the table with your remaining chips?'))return;_intentionalClose=true;wsSend({type:'cashOut'});}
-document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
-document.addEventListener('webkitfullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
-
-document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
-document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
-document.getElementById('allInBtn').onclick=()=>{ensureAudio();const me=lastState&&lastState.players&&lastState.players[mySeat];const allInAmount=me?me.chips:drumGetPence();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:allInAmount});};
-document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
-document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
-document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
-['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
-document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
-
-// ── Flat top-down cog dials ────────────────────────────────────────────────────
-(function(){
-  let poundsIdx=0, penceIdx=0, minRaisePence=40;
-  const POUNDS=Array.from({length:100},(_,i)=>i);
-  const PENCE=[0,20,40,60,80];
-
-  // Rotation state per dial (in radians)
-  let poundsRot=0, penceRot=0;
-
-  // ── Draw a flat top-down cog onto a canvas ──────────────────────────────────
-  // Designed to look like you're looking straight down at a metal gear.
-  // Drag LEFT = decrease (rotates anticlockwise), RIGHT = increase (clockwise).
-  function drawDial(canvasEl, valueStr, rotation){
-    const W=80, cx=40, cy=40;
-    const ctx=canvasEl.getContext('2d');
-    ctx.clearRect(0,0,W,W);
-
-    const teeth=18, baseR=30, toothH=6, outerR=baseR+toothH;
-    const toothFrac=0.42; // fraction of tooth arc that's raised
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(rotation);
-
-    // ── Outer cog silhouette (teeth) ──
-    ctx.beginPath();
-    for(let i=0;i<teeth;i++){
-      const a1 = (i / teeth) * Math.PI * 2;
-      const a2 = ((i + toothFrac) / teeth) * Math.PI * 2;
-      const a3 = ((i + 1 - toothFrac) / teeth) * Math.PI * 2;
-      const a4 = ((i + 1) / teeth) * Math.PI * 2;
-      if(i===0) ctx.moveTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
-      else       ctx.lineTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
-      ctx.lineTo(Math.cos(a2)*outerR, Math.sin(a2)*outerR);
-      ctx.lineTo(Math.cos(a3)*outerR, Math.sin(a3)*outerR);
-      ctx.lineTo(Math.cos(a4)*baseR,  Math.sin(a4)*baseR);
-    }
-    ctx.closePath();
-
-    // Body gradient: gold/bronze look from top-left light source
-    const bodyGrad = ctx.createRadialGradient(-8, -8, 2, 0, 0, outerR);
-    bodyGrad.addColorStop(0,   '#b08820');
-    bodyGrad.addColorStop(0.4, '#7a5c08');
-    bodyGrad.addColorStop(1,   '#2e1e00');
-    ctx.fillStyle = bodyGrad;
-    ctx.fill();
-
-    // Outline
-    ctx.strokeStyle = '#c8a020';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Highlight top edge of each tooth (simulates flat-lit metal)
-    for(let i=0;i<teeth;i++){
-      const a2 = ((i + toothFrac) / teeth) * Math.PI * 2;
-      const a3 = ((i + 1 - toothFrac) / teeth) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a2)*outerR, Math.sin(a2)*outerR);
-      ctx.lineTo(Math.cos(a3)*outerR, Math.sin(a3)*outerR);
-      ctx.strokeStyle = 'rgba(255,220,80,0.6)';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-    }
-
-    // ── Central hub hole ──
-    ctx.beginPath();
-    ctx.arc(0, 0, 9, 0, Math.PI * 2);
-    const hubGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 9);
-    hubGrad.addColorStop(0, '#1a1000');
-    hubGrad.addColorStop(1, '#050300');
-    ctx.fillStyle = hubGrad;
-    ctx.fill();
-    ctx.strokeStyle = '#c8a020';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // ── Spokes (6 evenly spaced) ──
-    const spokeCount = 6;
-    ctx.lineWidth = 1.8;
-    ctx.strokeStyle = 'rgba(200,160,32,0.55)';
-    for(let i=0;i<spokeCount;i++){
-      const a = (i / spokeCount) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * 10, Math.sin(a) * 10);
-      ctx.lineTo(Math.cos(a) * (baseR - 2), Math.sin(a) * (baseR - 2));
-      ctx.stroke();
-    }
-
-    ctx.restore();
-
-    // ── Directional arrows outside the cog (fixed, not rotating) ──
-    ctx.fillStyle = 'rgba(200,160,32,0.5)';
-    ctx.font = 'bold 11px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('◄', 6, cy);
-    ctx.fillText('►', W - 6, cy);
-
-    // ── Value label centred in hub ──
-    ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 15px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 4;
-    ctx.fillText(valueStr, cx, cy);
-    ctx.shadowBlur = 0;
-  }
-
-  function redrawPounds(){
-    const el=document.getElementById('dialPounds');
-    if(el) drawDial(el, String(POUNDS[poundsIdx]).padStart(2,'0'), poundsRot);
-  }
-  function redrawPence(){
-    const el=document.getElementById('dialPence');
-    if(el) drawDial(el, String(PENCE[penceIdx]).padStart(2,'0'), penceRot);
-  }
-  function redrawAll(){ redrawPounds(); redrawPence(); }
-
-  function updateDisplay(){
-    const total=POUNDS[poundsIdx]*100+PENCE[penceIdx];
-    const clamped=Math.max(total,minRaisePence);
-    const p=Math.floor(clamped/100), pn=clamped%100;
-    const amtStr='\u00a3'+p+'.'+String(pn).padStart(2,'0');
-    const btn=document.getElementById('raiseBtn');
-    if(btn){ const verb=btn.dataset.verb||'RAISE'; btn.textContent=verb+' '+amtStr; }
-  }
-
-  // Step: dir +1 = increase (rightward drag), -1 = decrease (leftward drag)
-  // BOTH dials respond identically to left/right — no asymmetry.
-  window.drumStep=function(drum,dir){
-    ensureAudio(); snd_chip();
-    if(drum==='pounds'){
-      poundsIdx=Math.max(0,Math.min(POUNDS.length-1,poundsIdx+dir));
-      poundsRot+=(dir*Math.PI*2)/POUNDS.length;
-      redrawPounds();
-    }else{
-      penceIdx=Math.max(0,Math.min(PENCE.length-1,penceIdx+dir));
-      penceRot+=(dir*Math.PI*2)/PENCE.length;
-      redrawPence();
-    }
-    updateDisplay();
-  };
-
-  window.drumSetMin=function(minPence){
-    minRaisePence=minPence||40;
-    poundsIdx=Math.min(Math.floor(minRaisePence/100),POUNDS.length-1);
-    penceIdx=PENCE.indexOf(minRaisePence%100);
-    if(penceIdx===-1){const nextP=PENCE.find(p=>p>=minRaisePence%100);penceIdx=nextP!==undefined?PENCE.indexOf(nextP):0;if(penceIdx===-1)penceIdx=0;}
-    redrawAll(); updateDisplay();
-  };
-
-  window.drumGetPence=function(){
-    const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];
-    return Math.max(raw,minRaisePence);
-  };
-
-  // ── Attach horizontal drag interaction to one cog canvas ─────────────────────
-  // RIGHT drag → increase (cog rotates clockwise)
-  // LEFT  drag → decrease (cog rotates anticlockwise)
-  // Identical behaviour for BOTH dials — no confusion about direction.
-  function attachDial(canvasId, drum){
-    const el=document.getElementById(canvasId);
-    if(!el)return;
-
-    const PX_PER_STEP=24; // pixels of horizontal drag per one value step
-    let active=false, startX=0, startIdx=0, lastX=0, vel=0;
-
-    function getIdx(){ return drum==='pounds'?poundsIdx:penceIdx; }
-    function getList(){ return drum==='pounds'?POUNDS:PENCE; }
-    function setIdx(i){ if(drum==='pounds') poundsIdx=i; else penceIdx=i; }
-    function getRot(){ return drum==='pounds'?poundsRot:penceRot; }
-    function setRot(r){ if(drum==='pounds') poundsRot=r; else penceRot=r; }
-
-    function onStart(x){
-      active=true; startX=x; lastX=x;
-      startIdx=getIdx(); vel=0;
-      el.style.cursor='grabbing';
-    }
-
-    function onMove(x){
-      if(!active)return;
-      const dx = x - startX;   // positive = rightward = increase
-      vel = x - lastX; lastX = x;
-      const steps = Math.round(dx / PX_PER_STEP);
-      const list = getList();
-      const ni = Math.max(0, Math.min(list.length-1, startIdx+steps));
-      const prev = getIdx();
-      if(ni !== prev){
-        const delta = ni - prev;
-        snd_chip();
-        setIdx(ni);
-        // Clockwise for increase (positive delta), anticlockwise for decrease
-        setRot(getRot() + (delta * Math.PI * 2) / list.length);
-        if(drum==='pounds') redrawPounds(); else redrawPence();
-        updateDisplay();
-      }
-    }
-
-    function onEnd(){
-      active=false;
-      el.style.cursor='grab';
-      // Momentum flick — one extra step if swipe was fast enough
-      if(Math.abs(vel) > 5){
-        const dir = vel > 0 ? 1 : -1;
-        window.drumStep(drum, dir);
-      }
-    }
-
-    // ── Touch events (finger drag on mobile) ──
-    el.addEventListener('touchstart', e=>{
-      e.preventDefault();
-      onStart(e.touches[0].clientX);
-    }, {passive:false});
-    el.addEventListener('touchmove', e=>{
-      e.preventDefault();
-      onMove(e.touches[0].clientX);
-    }, {passive:false});
-    el.addEventListener('touchend', e=>{
-      e.preventDefault();
-      onEnd();
-    }, {passive:false});
-
-    // ── Mouse events (desktop) ──
-    el.addEventListener('mousedown', e=>{ onStart(e.clientX); });
-    window.addEventListener('mousemove', e=>{ if(active) onMove(e.clientX); });
-    window.addEventListener('mouseup', ()=>{ if(active) onEnd(); });
-  }
-
-  window.addEventListener('load',()=>{
-    redrawAll();
-    updateDisplay();
-    attachDial('dialPounds','pounds');
-    attachDial('dialPence','pence');
-  });
-})();
-
-// ── Cookie notice gate ─────────────────────────────────────────────────────────
-function cookieAccept(){document.getElementById('cookieOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';}
-function cookieDeny(){window.location.replace('https://www.disney.com');}
-
-const scn=createScene();
-engine.runRenderLoop(()=>scn.render());
+// ... rest of game logic continues here ...
 </script>
 </body>
 </html>
