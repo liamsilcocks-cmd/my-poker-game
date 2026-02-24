@@ -194,6 +194,7 @@ function getOrCreateRoom(roomId) {
       actionTimer: null, handNum: 0,
       paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT,
       actionTimerStarted: 0,
+      buyIn: START_CHIPS,   // per-room buy-in amount, host can change in lobby
       _emptyTimer: null   // TTL timer — set by scheduleRoomCleanup
     });
   }
@@ -215,6 +216,7 @@ function broadcastAll(room, msg) {
 function lobbySnapshot(room) {
   return {
     type: 'lobby', roomId: room.id, hostId: room.hostId, gameActive: room.gameActive,
+    buyIn: room.buyIn,
     seats: room.seats.map(s => s ? { id: s.id, name: s.name, chips: s.chips, seat: s.seat } : null),
     pending: room.pendingJoins.map(p => ({ id: p.id, name: p.name }))
   };
@@ -388,7 +390,7 @@ wss.on('connection', ws => {
         // ── Brand-new player ──────────────────────────────────────────────────
         const hasSeatedPlayers = room.seats.some(s => s !== null);
         if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
-          room.seats[0] = mkPlayer(ws, myId, name, 0);
+          room.seats[0] = mkPlayer(ws, myId, name, 0, room);
           room.hostId = myId;
           svrLog(`NEW ROOM — ${name} created room ${myRoomId} as host, assigned seat 0`);
           writeLog(room, `HOST JOINED: ${name} created room ${myRoomId} | ${buyInTag(room.seats[0])}`);
@@ -448,7 +450,7 @@ wss.on('connection', ws => {
               broadcastAll(room, lobbySnapshot(room));
               return;
             }
-            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat);
+            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat, room);
             send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
             writeLog(room, `SEATED: ${p.name} assigned Seat ${seat+1} | ${buyInTag(room.seats[seat])}`);
             svrLog(`APPROVE — ${p.name} seated in room ${myRoomId} seat ${seat+1}`);
@@ -512,17 +514,17 @@ wss.on('connection', ws => {
         p._onBuyBackResolved = null;
 
         if (msg.accept) {
-          p.chips = START_CHIPS;
+          p.chips = room.buyIn;
           p.pendingBuyBack = false;
           p.spectator = false;
           p.buyInCount = (p.buyInCount || 1) + 1;
-          p.buyInTotal = (p.buyInTotal || START_CHIPS) + START_CHIPS;
+          p.buyInTotal = (p.buyInTotal || room.buyIn) + room.buyIn;
           // Keep sittingOut=true so they don't get action prompts mid-hand.
           // startNewHand() clears sittingOut for all players at hand start.
           p.sittingOut = true;
-          writeLog(room, `BUY-BACK: ${p.name} has bought back in for \u00a3${(START_CHIPS/100).toFixed(2)} \u2014 will join next hand | ${buyInTag(p)}`);
-          logEvent(room, `\u2705 ${p.name} bought back in for \u00a3${(START_CHIPS/100).toFixed(2)} \u2014 joining next hand | ${buyInTag(p)}`);
-          send(p.ws, { type: 'buyBackAccepted', chips: START_CHIPS });
+          writeLog(room, `BUY-BACK: ${p.name} has bought back in for \u00a3${(room.buyIn/100).toFixed(2)} \u2014 will join next hand | ${buyInTag(p)}`);
+          logEvent(room, `\u2705 ${p.name} bought back in for \u00a3${(room.buyIn/100).toFixed(2)} \u2014 joining next hand | ${buyInTag(p)}`);
+          send(p.ws, { type: 'buyBackAccepted', chips: room.buyIn });
         } else {
           p.pendingBuyBack = false;
           p.sittingOut = true;
@@ -608,6 +610,19 @@ wss.on('connection', ws => {
         if (!s) return;
         writeLog(room, `CHAT: ${s.name}: ${(msg.text||'').slice(0,120)}`);
         broadcastAll(room, { type: 'chat', name: s.name, text: (msg.text || '').slice(0, 120) });
+        break;
+      }
+
+      case 'setBuyIn': {
+        const room = rooms.get(myRoomId);
+        if (!room) return;
+        if (room.hostId !== myId) return;
+        const newBuyIn = Math.max(20, Math.round(Number(msg.buyIn))); // minimum 20p
+        room.buyIn = newBuyIn;
+        writeLog(room, `BUY-IN CHANGED: host set buy-in to \u00a3${(newBuyIn/100).toFixed(2)}`);
+        svrLog(`BUY-IN CHANGED — room ${myRoomId} \u00a3${(newBuyIn/100).toFixed(2)}`);
+        logEvent(room, `\uD83D\uDCB0 Buy-in amount set to \u00a3${(newBuyIn/100).toFixed(2)} by host`);
+        broadcastAll(room, lobbySnapshot(room));
         break;
       }
 
@@ -721,13 +736,14 @@ function executeCashOut(room, s) {
   scheduleRoomCleanup(room);
 }
 
-function mkPlayer(ws, id, name, seat) {
+function mkPlayer(ws, id, name, seat, room) {
+  const startChips = room ? room.buyIn : START_CHIPS;
   return {
-    ws, id, name, chips: START_CHIPS, seat, cards: [], bet: 0,
+    ws, id, name, chips: startChips, seat, cards: [], bet: 0,
     folded: false, disconnected: false, autoFold: false,
     pendingCashOut: false, _disconnectTimer: null,
-    buyInCount: 1,               // counts from 1 — the initial £10 buy-in
-    buyInTotal: START_CHIPS      // running total spent buying in (pence)
+    buyInCount: 1,
+    buyInTotal: startChips
   };
 }
 
@@ -911,7 +927,7 @@ function startNewHand(room) {
     community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath
   };
 
-  room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; } });
+  room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; s.totalBet = 0; } });
 
   const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
   const dsIdx = active.indexOf(dealStartSeat);
@@ -949,8 +965,8 @@ function startNewHand(room) {
     '╚' + '═'.repeat(62) + '╝\n\n'
   );
 
-  room.seats[sbSeat].chips -= SB; room.seats[sbSeat].bet = SB;
-  room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB;
+  room.seats[sbSeat].chips -= SB; room.seats[sbSeat].bet = SB; room.seats[sbSeat].totalBet = SB;
+  room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB; room.seats[bbSeat].totalBet = BB;
   room.G.pot = SB + BB;
 
   // FIX #2: Cards are dealt ONLY to active players — no other seat gets cards
@@ -1146,7 +1162,7 @@ function handleAction(room, seat, action, amount) {
 
   } else if (action === 'check' || action === 'call') {
     const ca = Math.min(G.currentBet - p.bet, p.chips);
-    p.chips -= ca; p.bet += ca; G.pot += ca;
+    p.chips -= ca; p.bet += ca; p.totalBet = (p.totalBet||0) + ca; G.pot += ca;
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
     writeLog(room,
@@ -1164,6 +1180,7 @@ function handleAction(room, seat, action, amount) {
     const prevCurrentBet = G.currentBet;
     p.chips -= raiseFromStack;
     p.bet   += raiseFromStack;
+    p.totalBet = (p.totalBet||0) + raiseFromStack;
     G.pot   += raiseFromStack;
     G.currentBet = Math.max(G.currentBet, p.bet);
     if (G.currentBet > prevCurrentBet) G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
@@ -1348,50 +1365,137 @@ function finish(room, winners, label) {
   if (!winners || winners.length === 0) return;
   clearActionTimer(room);
 
-  const pot = room.G.pot;
-  room.G.pot = 0;
+  const G = room.G;
+  const totalPot = G.pot;
+  G.pot = 0;
 
-  if (winners.length === 1) {
-    const winner = winners[0];
-    winner.chips += pot;
-    broadcastAll(room, { type: 'winner', seat: winner.seat, name: winner.name, amount: pot, label });
-    broadcastState(room);
-    writeLog(room, '');
-    writeLog(room, '┌─ HAND RESULT ─────────────────────────────────────────┐');
-    writeLog(room, `│  ${winner.name} wins £${(pot/100).toFixed(2)} (${label})`.padEnd(63) + '│');
-  } else {
-    const perPlayer  = Math.floor(pot / winners.length);
-    const remainder  = pot - perPlayer * winners.length;
-    const sorted     = [...winners].sort((a, b) => a.seat - b.seat);
+  // ── Side-pot calculation ─────────────────────────────────────────────────
+  // Every seated player (folded or not) has a totalBet — what they put in.
+  // We calculate how much of the pot each player is eligible to win.
+  //
+  // Algorithm:
+  //   Sort all contributors by totalBet ascending.
+  //   For each level, the "main pot" at that level is:
+  //     min(totalBet[i], totalBet[everyone]) * number_of_contributors_at_this_level
+  //   Eligible winners at each level = winners who contributed >= this level.
+  //   Award each pot level to the best hand among eligible winners.
+  //
+  // Folded players contribute chips to the pot but are never eligible to win.
 
-    sorted.forEach((w, i) => {
-      const share = perPlayer + (i === 0 ? remainder : 0);
-      w.chips += share;
-    });
+  const allSeats = room.seats.filter(Boolean);
 
-    const names  = sorted.map(w => w.name).join(' & ');
-    const shares = sorted.map(w => `£${(perPlayer/100).toFixed(2)}`).join(' / ');
+  // Gather contributors — everyone who put chips in this hand
+  const contributors = allSeats
+    .filter(s => (s.totalBet||0) > 0)
+    .sort((a, b) => (a.totalBet||0) - (b.totalBet||0));
 
-    sorted.forEach((w, i) => {
-      const share = perPlayer + (i === 0 ? remainder : 0);
-      broadcastAll(room, {
-        type: 'winner',
-        seat: w.seat,
-        name: w.name,
-        amount: share,
-        label: `Split pot — ${label}`
+  // Build pot levels
+  const potLevels = []; // { amount, eligibleIds }
+  let alreadyTaken = 0;
+
+  for (let i = 0; i < contributors.length; i++) {
+    const cap = contributors[i].totalBet;
+    if (cap <= alreadyTaken) continue;
+    const levelContrib = cap - alreadyTaken;
+    // Each contributor at this level puts in levelContrib (capped by their totalBet)
+    const participantCount = contributors.filter(c => (c.totalBet||0) >= cap).length;
+    // Also count contributors below this cap for the portion they already contributed
+    const belowCount = contributors.filter(c => (c.totalBet||0) < cap).length;
+    // Pot for this level = levelContrib * number of people who contributed >= cap
+    // + any remaining from people below (already accounted in previous levels)
+    const levelPot = levelContrib * (contributors.length - i);
+    // Eligible to win this level: unfolded players whose totalBet >= cap
+    const eligibleIds = new Set(
+      allSeats
+        .filter(s => !s.folded && (s.totalBet||0) >= cap)
+        .map(s => s.id)
+    );
+    potLevels.push({ amount: levelPot, eligibleIds, cap });
+    alreadyTaken = cap;
+  }
+
+  // Sanity: if pot levels don't add up to totalPot (rounding), add remainder to last level
+  const levelTotal = potLevels.reduce((sum, l) => sum + l.amount, 0);
+  if (levelTotal !== totalPot && potLevels.length > 0) {
+    potLevels[potLevels.length - 1].amount += (totalPot - levelTotal);
+  }
+
+  writeLog(room, '');
+  writeLog(room, '┌─ HAND RESULT ─────────────────────────────────────────┐');
+
+  let totalAwarded = 0;
+  const awardLog = [];
+
+  potLevels.forEach((level, li) => {
+    if (level.amount <= 0) return;
+
+    // Find winners eligible for this pot level
+    const eligibleWinners = winners.filter(w => level.eligibleIds.has(w.id));
+
+    if (eligibleWinners.length === 0) {
+      // No eligible winner (e.g. the only all-in player lost) — return to eligible unfolded players
+      // Give to the best eligible unfolded player
+      const eligible = allSeats.filter(s => !s.folded && level.eligibleIds.has(s.id));
+      if (eligible.length > 0) {
+        eligible[0].chips += level.amount;
+        awardLog.push(`│  ${eligible[0].name} wins £${(level.amount/100).toFixed(2)} (returned — no eligible winner)`.padEnd(63) + '│');
+        totalAwarded += level.amount;
+      }
+      return;
+    }
+
+    if (eligibleWinners.length === 1) {
+      const w = eligibleWinners[0];
+      w.chips += level.amount;
+      const potLabel = potLevels.length > 1 ? (li === 0 ? 'main pot' : `side pot ${li}`) : 'pot';
+      awardLog.push(`│  ${w.name} wins £${(level.amount/100).toFixed(2)} — ${label} (${potLabel})`.padEnd(63) + '│');
+      totalAwarded += level.amount;
+    } else {
+      // Split among eligible winners
+      const perPlayer = Math.floor(level.amount / eligibleWinners.length);
+      const remainder = level.amount - perPlayer * eligibleWinners.length;
+      const sorted = [...eligibleWinners].sort((a, b) => a.seat - b.seat);
+      sorted.forEach((w, i) => {
+        const share = perPlayer + (i === 0 ? remainder : 0);
+        w.chips += share;
+        totalAwarded += share;
       });
-    });
+      const potLabel = potLevels.length > 1 ? (li === 0 ? 'main pot' : `side pot ${li}`) : 'pot';
+      awardLog.push(`│  🤝 ${sorted.map(w=>w.name).join(' & ')} split £${(level.amount/100).toFixed(2)} — ${label} (${potLabel})`.padEnd(63) + '│');
+    }
+  });
 
-    broadcastState(room);
-    writeLog(room, '');
-    writeLog(room, '┌─ HAND RESULT (SPLIT POT) ─────────────────────────────┐');
-    writeLog(room, `│  🤝 ${names} split £${(pot/100).toFixed(2)} (${label})`.padEnd(63) + '│');
-    writeLog(room, `│  Each receives: ${shares}`.padEnd(63) + '│');
-    if (remainder > 0) {
-      writeLog(room, `│  Odd chip (£${(remainder/100).toFixed(2)}) goes to ${sorted[0].name} (earliest seat)`.padEnd(63) + '│');
+  // Return any un-matchable chips to the player who over-contributed
+  // (e.g. the bigger stack went all-in for more than the smaller stack could match)
+  const returned = totalPot - totalAwarded;
+  if (returned > 0) {
+    // Find the player with the largest totalBet who is still in (not folded)
+    const overContributor = allSeats
+      .filter(s => !s.folded)
+      .sort((a, b) => (b.totalBet||0) - (a.totalBet||0))[0];
+    if (overContributor) {
+      overContributor.chips += returned;
+      awardLog.push(`│  £${(returned/100).toFixed(2)} returned to ${overContributor.name} (unmatched all-in)`.padEnd(63) + '│');
     }
   }
+
+  // Broadcast individual winner messages
+  potLevels.forEach((level, li) => {
+    if (level.amount <= 0) return;
+    const eligibleWinners = winners.filter(w => level.eligibleIds.has(w.id));
+    if (eligibleWinners.length === 1) {
+      broadcastAll(room, { type: 'winner', seat: eligibleWinners[0].seat, name: eligibleWinners[0].name, amount: level.amount, label });
+    } else if (eligibleWinners.length > 1) {
+      const perPlayer = Math.floor(level.amount / eligibleWinners.length);
+      const remainder = level.amount - perPlayer * eligibleWinners.length;
+      eligibleWinners.sort((a,b)=>a.seat-b.seat).forEach((w,i) => {
+        broadcastAll(room, { type: 'winner', seat: w.seat, name: w.name, amount: perPlayer+(i===0?remainder:0), label: `Split — ${label}` });
+      });
+    }
+  });
+
+  awardLog.forEach(line => writeLog(room, line));
+  broadcastState(room);
 
   writeLog(room, '├─ CHIP COUNTS AFTER HAND ──────────────────────────────┤');
   room.seats.filter(Boolean).sort((a,b) => b.chips - a.chips).forEach(s => {
@@ -1433,7 +1537,7 @@ function finish(room, winners, label) {
       s.sittingOut = true;
       writeLog(room, `BUST: ${s.name} (Seat ${s.seat+1}) is out of chips — offering buy-back (15s) | ${buyInTag(s)}`);
       logEvent(room, `\ud83d\udcb8 ${s.name} is out of chips \u2014 buy-back offer sent | ${buyInTag(s)}`);
-      send(s.ws, { type: 'buyBackOffer', chips: START_CHIPS });
+      send(s.ws, { type: 'buyBackOffer', chips: room.buyIn });
 
       if (s._buyBackTimer) clearTimeout(s._buyBackTimer);
       s._buyBackTimer = setTimeout(() => {
