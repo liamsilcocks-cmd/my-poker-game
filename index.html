@@ -1096,7 +1096,10 @@ case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
 case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
-case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';handNumber++;maybeKeepAlive();addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,10);},120);setTimeout(()=>{showBet(bbSeat,20);},280);if(lastState)applyState(lastState);});break;}
+case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
+  // Always reset raise dials to BB (40p) at start of new hand
+  if(window.drumReset) window.drumReset(msg.bb || 40);
+  handNumber++;maybeKeepAlive();addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,10);},120);setTimeout(()=>{showBet(bbSeat,20);},280);if(lastState)applyState(lastState);});break;}
 case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);
   // Note starting chips for each seated player (only recorded once per player)
   if(msg.players)msg.players.forEach(p=>{if(p&&p.id&&p.chips>0)noteStartChips(p.id,p.chips);});
@@ -1338,20 +1341,36 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     }
   }
 
-  // ── drumSetMin — FIX: only reset indices if current selection is below new min.
-  // This prevents every yourTurn message from wiping the user's chosen value.
+  // ── snapToValue — set both dials to represent a specific pence value ─────────
+  // Finds the closest valid PENCE step for the pence component.
+  function snapToValue(totalPence){
+    const p = Math.max(0, totalPence);
+    poundsIdx = Math.min(Math.floor(p / 100), POUNDS.length - 1);
+    // Find the nearest PENCE entry for the sub-pound remainder
+    const rem = p % 100;
+    let best = 0;
+    for(let i = 0; i < PENCE.length; i++){
+      if(PENCE[i] <= rem) best = i;
+    }
+    penceIdx = best;
+    renderAll();
+  }
+
+  // ── drumReset — called at NEW HAND start. Always resets dials to the minimum.
+  window.drumReset = function(minPence){
+    minRaisePence = Math.max(minPence || 40, 20);
+    snapToValue(minRaisePence);
+    updateDisplay();
+  };
+
+  // ── drumSetMin — called each yourTurn during a hand.
+  // Only snaps the dials UP if the user has somehow gone below the minimum;
+  // otherwise leaves whatever value the user already chose alone.
   window.drumSetMin = function(minPence){
-    minRaisePence = Math.max(minPence || 40, 20); // never below 1 BB
-    const currentVal = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
+    minRaisePence = Math.max(minPence || 40, 20);
+    const currentVal = POUNDS[poundsIdx] * 100 + PENCE[penceIdx];
     if(currentVal < minRaisePence){
-      // Snap up to minimum
-      poundsIdx = Math.min(Math.floor(minRaisePence/100), POUNDS.length-1);
-      const minPen = minRaisePence % 100;
-      let pi = PENCE.indexOf(minPen);
-      if(pi < 0) pi = PENCE.findIndex(p => p >= minPen);
-      if(pi < 0) pi = 0;
-      penceIdx = pi;
-      renderAll();
+      snapToValue(minRaisePence);
     }
     updateDisplay();
   };
