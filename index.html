@@ -1286,10 +1286,10 @@ function doCashOut(){if(!confirm('Cash out and leave the table with your remaini
 document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 document.addEventListener('webkitfullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 
-document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
-document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
+document.getElementById('callBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
+document.getElementById('raiseBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
 document.getElementById('allInBtn').onclick=()=>{ensureAudio();const me=lastState&&lastState.players&&lastState.players[mySeat];const allInAmount=me?me.chips:drumGetPence();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:allInAmount});};
-document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
+document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
 document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
@@ -1388,6 +1388,12 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
   window.drumGetPence = function(){
     const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
     return Math.max(raw, minRaisePence);
+  };
+
+  // ── drumClearDrag — call when any action is sent.
+  // Ensures the NEXT drumSetMin (new betting round) always resets to new minimum.
+  window.drumClearDrag = function(){
+    _userDraggedSinceLastMin = false;
   };
 
   // ── drumStep — step one tick (used sparingly) ───────────────────────────────
