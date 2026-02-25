@@ -1,8 +1,9 @@
+<!-- poker.html | Last edited: 2026-02-25 12:38 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SYFM Poker">
@@ -49,7 +50,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .btn-deny:hover{opacity:.8}
 #gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
 #gameUI > *{pointer-events:auto}
-#topBar{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
+#topBar{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
@@ -60,24 +61,38 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
 #drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
-/* ── Cog dial CSS (replaces drum-* styles) ── */
-.dial-row{display:flex;gap:4px;justify-content:center;align-items:flex-end;width:100%;padding:2px 0}
-.dial-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+/* ── Scroll wheel dials ── */
+.dial-row{display:flex;gap:6px;justify-content:center;align-items:center;width:100%;padding:2px 0}
+.dial-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1}
 .dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
-.dial-cog{width:76px;height:76px;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;display:block}
-.dial-cog:active{cursor:grabbing}
-.dial-sep{font-size:20px;font-weight:bold;color:#c8a060;line-height:1;padding-bottom:28px}
+.dial-wheel{
+  width:72px;height:96px;
+  overflow:hidden;position:relative;
+  border-radius:10px;
+  background:linear-gradient(180deg,#0a0600 0%,#1a1000 30%,#1a1000 70%,#0a0600 100%);
+  border:2px solid #c8a020;
+  cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;
+  box-shadow:inset 0 0 18px rgba(0,0,0,0.8),0 0 8px rgba(200,160,32,0.2);
+}
+.dial-wheel:active{cursor:grabbing}
+/* The centre selection bar */
+.dial-wheel::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:32px;background:rgba(200,160,32,0.12);border-top:1px solid rgba(200,160,32,0.5);border-bottom:1px solid rgba(200,160,32,0.5);pointer-events:none;z-index:2}
+/* Fade top & bottom */
+.dial-wheel::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,6,0,0.85) 0%,transparent 35%,transparent 65%,rgba(10,6,0,0.85) 100%);pointer-events:none;z-index:3}
+.dial-inner{position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;align-items:center;will-change:transform}
+.dial-item{height:32px;line-height:32px;text-align:center;font-weight:bold;width:100%;flex-shrink:0}
+.dial-item.selected{font-size:22px;color:#ffd700}
+.dial-item.adj1{font-size:16px;color:rgba(200,160,32,0.55)}
+.dial-item.adj2{font-size:13px;color:rgba(200,160,32,0.25)}
+.dial-sep{font-size:22px;font-weight:bold;color:#c8a060;line-height:1;align-self:center;margin-top:18px}
 #tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
 #tableSlider label{font-size:11px;color:#c8a060}
 #tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
 #tablePan::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
 #tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
-#bottomBar{position:absolute;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
+#bottomBar{position:fixed;bottom:calc(52px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
 #myInfo{font-size:14px;font-weight:bold;color:#ffd700;line-height:1.5;letter-spacing:0.5px}
-
-/* ── FIX #1: Fullscreen button — shown on ALL platforms including Android.
-   Only hidden on iOS (which doesn't support the Fullscreen API at all).    ── */
-#controlBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:112}
+#controlBar{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:1000}
 .cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;line-height:1;cursor:pointer;color:#fff;background:#1a4a7a}
 .cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
 .cbtn-cashout{padding:9px 11px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
@@ -93,16 +108,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .se-input:focus{outline:none;border-color:#c8a020}
 .se-btn{padding:4px 8px;border-radius:5px;border:none;background:#4a6a00;color:#fff;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
 .se-btn:active{background:#6a9a00}
-/* FIX #1: Show fullscreen button everywhere except iOS Safari (no API support) */
 .cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent;display:block}
-/* Hide only on iOS Safari using the -webkit-touch-callout trick */
 @supports (-webkit-touch-callout:none) and (not (display:-webkit-box)){
-  /* This targets iOS Safari specifically */
   .cbtn-fs{display:none!important}
 }
-
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
-#sideBoxes{position:absolute;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
+#sideBoxes{position:fixed;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
 #chatBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #3a2a10;overflow:hidden}
 #chatBox.flash #chatHeader{animation:chatFlash 0.6s ease 3}
 @keyframes chatFlash{0%{background:transparent}50%{background:rgba(200,160,32,0.35)}100%{background:transparent}}
@@ -133,7 +144,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
 #spectatorBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:16px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none;z-index:50}
 #pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
-/* ── 2D/3D Toggle button — fixed top-right, always reachable ── */
 #toggleViewBtn{
   position:fixed;top:12px;right:12px;z-index:9999;
   height:44px;padding:0 14px;border-radius:22px;
@@ -148,8 +158,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 }
 #toggleViewBtn:active{background:rgba(200,160,32,0.3);box-shadow:0 0 0 5px rgba(200,160,32,0.4)}
 #toggleViewBtn.mode2d{background:rgba(200,160,32,0.18);border-color:#ffd700;box-shadow:0 0 0 3px rgba(200,160,32,0.5),0 4px 18px rgba(0,0,0,0.7)}
-
-/* ── 2D table view ── */
 #view2d{
   display:none;position:fixed;inset:0;
   background:#1a0d05;overflow:hidden;
@@ -165,7 +173,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   box-shadow:0 0 0 6px #0a2a10,0 0 60px rgba(0,0,0,0.8),inset 0 0 40px rgba(0,0,0,0.5);
 }
 #table2dInner{position:relative;width:100%;height:100%;}
-/* Centre column: pot label sits above community cards */
 #table2dCenter{
   position:absolute;top:50%;left:50%;
   transform:translate(-50%,-52%);
@@ -175,9 +182,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 #pot2d{text-align:center;}
 #pot2d .pot-label{color:#c8a060;font-size:9px;letter-spacing:2px;text-transform:uppercase}
 #pot2d .pot-val{color:#ffd700;font-size:17px;font-weight:bold;text-shadow:0 0 10px rgba(200,160,32,0.7)}
-/* Community cards strip — allow overflow so doubled cards fit */
 #community2d{display:flex;gap:4px;overflow:visible;}
-/* Community card — doubled in size */
 .c2d-card{
   position:relative;
   width:72px;height:102px;border-radius:7px;
@@ -188,13 +193,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
 .c2d-card.red{color:#cc2020;}
 .c2d-card.black{color:#111;}
-/* Seat container */
 .p2d-seat{
   position:absolute;transform:translate(-50%,-50%);
   display:flex;flex-direction:row;align-items:center;gap:5px;
   pointer-events:none;
 }
-/* Info block: name, tokens, bet (not stack — that lives above pause) */
 .p2d-info{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:74px;}
 .p2d-name{
   font-size:10px;font-weight:bold;color:#e0d0a0;
@@ -206,7 +209,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .p2d-name.folded{color:#555;text-decoration:line-through}
 .p2d-stack{font-size:9px;color:#80cfff;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
 .p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
-/* Player hole cards */
 .p2d-cards{display:flex;gap:4px;}
 .p2d-card{
   position:relative;
@@ -215,18 +217,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   box-shadow:0 2px 8px rgba(0,0,0,0.5);
   flex-shrink:0;
 }
-/* My cards — 1/3 bigger */
 .p2d-seat.me .p2d-card{width:90px;height:126px;border-radius:9px;box-shadow:0 3px 14px rgba(0,0,0,0.6);}
 .p2d-card.back,.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
 .p2d-card.red,.c2d-card.red{color:#cc2020;}
 .p2d-card.black,.c2d-card.black{color:#111;}
 .p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5;}
-/* Card face anatomy — corners and centre */
 .p2dc-tl{position:absolute;top:3px;left:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;}
 .p2dc-br{position:absolute;bottom:3px;right:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;transform:rotate(180deg);}
 .c2d-card .p2dc-tl,.c2d-card .p2dc-br{font-size:13px;}
 .p2d-seat.me .p2d-card .p2dc-tl,.p2d-seat.me .p2d-card .p2dc-br{font-size:14px;}
-/* Centre: rank + suit side by side */
 .p2dc-center{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
   display:flex;align-items:center;gap:3px;
@@ -238,7 +237,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .c2d-card .p2dc-center .p2dc-suit{font-size:36px;}
 .p2d-seat.me .p2d-card .p2dc-center .p2dc-rank{font-size:36px;}
 .p2d-seat.me .p2d-card .p2dc-center .p2dc-suit{font-size:36px;}
-/* Stack info badge — fixed above pause button in 2D mode */
 #stackInfo2d{
   position:fixed;
   bottom:calc(56px + env(safe-area-inset-bottom,0px));
@@ -261,12 +259,88 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .p2d-token.toact{background:#cc2020;color:#fff;animation:p2dPulse 0.8s ease-in-out infinite}
 @keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .p2d-waiting{color:#888;font-size:9px;font-style:italic}
+
+/* ── Android / narrow screen fixes ───────────────────────────────────────────
+   On narrow phones the left-side action panel can be obscured by the 3D canvas.
+   Move it to the bottom on narrow screens. Also fix panel scaling on small screens. */
+@media screen and (max-width: 480px) {
+  .panel{padding:20px 18px;min-width:0;width:94%;}
+  .panel h1{font-size:1.6rem;}
+  .panel input[type=text],.panel input[type=number]{font-size:1rem;padding:10px 12px;}
+  .btn-gold{font-size:1rem;padding:12px;}
+}
+
+/* On mobile: move action panel from left-centre to bottom-left,
+   shrink slightly so it doesn't eat the whole screen */
+@media screen and (max-height: 700px), screen and (max-width: 500px) {
+  #actionPanel{
+    top:auto !important;
+    bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;
+    transform:none !important;
+    left:0 !important;
+    right:auto !important;
+    width:160px !important;
+    padding:6px 8px !important;
+    gap:5px !important;
+    max-height:calc(100vh - 120px);
+    overflow-y:auto;
+    border-radius:0 12px 12px 0 !important;
+  }
+  .abtn{padding:9px 6px !important;font-size:13px !important;}
+  #drumWidget{gap:2px !important;}
+  .dial-wheel{width:60px !important;height:80px !important;}
+  .dial-item.selected{font-size:18px !important;}
+  .dial-item.adj1{font-size:13px !important;}
+  .dial-sep{font-size:18px !important;margin-top:14px !important;}
+}
+
+/* Ensure toggle view and control bar always visible on Android */
+#toggleViewBtn{
+  /* Force above any canvas overlap */
+  isolation:isolate;
+}
+/* On small screens: move 2D/3D toggle to bottom-left so Safari address bar
+   can't hide it. topBar goes back to top as normal. */
+@media screen and (max-width: 500px) {
+  #toggleViewBtn{
+    /* Move to bottom-left — always visible, thumb-reachable, avoids Safari chrome */
+    top:auto !important;
+    bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;
+    right:auto !important;
+    left:calc(4px + env(safe-area-inset-left,0px)) !important;
+    font-size:11px !important;
+    padding:0 10px !important;
+    height:36px !important;
+    border-radius:18px !important;
+    z-index:1001 !important;
+  }
+  #topBar{
+    top:calc(8px + env(safe-area-inset-top,0px)) !important;
+    font-size:11px;
+  }
+  #phase{font-size:11px !important;}
+  #pot{font-size:13px !important;}
+  #controlBar{
+    bottom:calc(4px + env(safe-area-inset-bottom,0px)) !important;
+    right:calc(4px + env(safe-area-inset-right,0px)) !important;
+    gap:3px !important;
+  }
+  .cbtn-pause,.cbtn-cashout,.cbtn-autofold,.cbtn-fs{
+    padding:7px 8px !important;
+    font-size:11px !important;
+  }
+  #sideBoxes{
+    width:160px !important;
+    top:104px !important;
+    right:4px !important;
+  }
+  #tableSlider{display:none !important;}
+}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 
-<!-- ── Emergency 2D/3D toggle — always visible top-right ── -->
 <button id="toggleViewBtn" onclick="toggle2D()" title="Switch to 2D view">
   <svg width="18" height="18" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
     <circle cx="18" cy="18" r="16" fill="#2a1a00" stroke="#c8a020" stroke-width="3"/>
@@ -279,7 +353,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   <span id="toggleViewLabel">→2D</span>
 </button>
 
-<!-- ── 2D fallback view ── -->
 <div id="view2d">
   <div id="table2d">
     <div id="table2dInner">
@@ -365,7 +438,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   </div>
 </div>
 
-<!-- Buy-back offer overlay — FIX #5: works for any player count -->
 <div id="buyBackOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h2>💸 Out of Chips!</h2>
@@ -403,25 +475,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="roomBadge">ROOM &mdash;</div>
   </div>
   <div id="actionPanel">
-    <!-- FIX #4: callBtn text set dynamically — "CHECK" when no bet to call -->
     <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
-    <!-- Drum wheels sit under the CHECK button, above the raise/bet button -->
     <div id="drumWidget">
       <div class="dial-row">
         <div class="dial-wrap">
-          <div class="dial-label">£ pounds</div>
-          <canvas class="dial-cog" id="dialPounds" width="76" height="76"></canvas>
+          <div class="dial-label">pounds £</div>
+          <div class="dial-wheel" id="dialPounds"><div class="dial-inner" id="dialPoundsInner"></div></div>
         </div>
         <div class="dial-sep">.</div>
         <div class="dial-wrap">
-          <div class="dial-label">20p steps</div>
-          <canvas class="dial-cog" id="dialPence" width="76" height="76"></canvas>
+          <div class="dial-label">pence</div>
+          <div class="dial-wheel" id="dialPence"><div class="dial-inner" id="dialPenceInner"></div></div>
         </div>
       </div>
     </div>
-    <!-- Raise/Bet label is set dynamically inside the button via updateDisplay() -->
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET £0.40</button>
-    <!-- ALL IN button — always bets the player's entire stack -->
     <button class="abtn abtn-allin" id="allInBtn" style="display:none">ALL IN</button>
     <button class="abtn abtn-fold" id="foldBtn" style="display:none">FOLD</button>
   </div>
@@ -434,9 +502,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <input type="range" id="tablePan" min="-3" max="3" step="0.1" value="0.5">
     <label>▼</label>
   </div>
-  <!-- FIX #1: Fullscreen button — no longer unconditionally hidden on touch devices.
-       CSS now only hides it on iOS Safari (which lacks the Fullscreen API).
-       Android Chrome supports fullscreen fine and will show the button.       -->
   <div id="stackEditor">
     <h4>🔧 Host Controls</h4>
     <div class="se-row" style="margin-bottom:10px;border-bottom:1px solid #4a3a10;padding-bottom:10px">
@@ -476,6 +541,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       <div id="activityHeader" onclick="toggleActivityLog()">&#128203; LOG <span id="activityToggle">&#9654; expand</span></div>
       <div id="activityLog"></div>
     </div>
+    <!-- Eliminated players — permanently visible once someone is out -->
+    <div id="eliminatedBox" style="background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #6a2010;overflow:hidden;display:none">
+      <div id="eliminatedHeader" onclick="toggleEliminated()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#e07050;font-size:11px;font-weight:bold;user-select:none">
+        &#128683; <span id="eliminatedHdr">OUT (0)</span> <span id="eliminatedToggle">&#9654; expand</span>
+      </div>
+      <div id="eliminatedList" style="display:none;padding:4px 8px 6px;border-top:1px solid #4a1a10"></div>
+    </div>
+    <!-- Permanent ledger -->
+    <div id="ledgerBox" style="background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #1a3a5a;overflow:hidden">
+      <div id="ledgerHeader" onclick="toggleLedger()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#60a8c8;font-size:11px;font-weight:bold;user-select:none">
+        &#128196; LEDGER <span id="ledgerToggle">&#9654; expand</span>
+      </div>
+      <div id="ledgerLog" style="display:none;max-height:140px;overflow-y:auto;padding:4px 8px 6px;border-top:1px solid #1a3a5a"></div>
+    </div>
   </div>
 </div>
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -492,7 +571,7 @@ const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7'
 const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
 let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
 let occupiedSeats=[];
-let is2D=false; // 2D/3D toggle state
+let is2D=false;
 function updateOccupiedSeats(seats){
   occupiedSeats=seats.map((s,i)=>s?i:null).filter(i=>i!==null);
 }
@@ -616,12 +695,10 @@ function mkFrontTex(suit,rank){
     '9': [[0.2,0.10,false],[0.8,0.10,false],[0.2,0.34,false],[0.8,0.34,false],[0.5,0.50,false],[0.2,0.66,true],[0.8,0.66,true],[0.2,0.90,true],[0.8,0.90,true]],
     '10':[[0.2,0.10,false],[0.8,0.10,false],[0.5,0.26,false],[0.2,0.40,false],[0.8,0.40,false],[0.2,0.60,true],[0.8,0.60,true],[0.5,0.74,true],[0.2,0.90,true],[0.8,0.90,true]]
   };
-  // Centre: rank + suit side by side, large, same style for all cards
   c.fillStyle=col;
   c.textAlign='center';c.textBaseline='middle';
   const centreY=H*0.54;
-  // Measure and draw rank + gap + suit as a unit centred on card
-  const cSz=rank==='10'?160:190; // font size for centre
+  const cSz=rank==='10'?160:190;
   c.font='bold '+cSz+'px Arial';
   const rankW=c.measureText(rank).width;
   const gap=14;
@@ -780,9 +857,6 @@ const brandTex=new BABYLON.DynamicTexture('brand',{width:1024,height:512},scene,
 return scene;}
 let seatActions={};
 
-// FIX #2: applyState only shows cards the server has told us to show.
-// The server sends 'back' for hidden cards, real card data only for the owner.
-// We never flip up a card unless the server explicitly says it's revealed.
 function applyState(st){
   if(!st)return;
   lastState=st;
@@ -823,12 +897,10 @@ function applyState(st){
         if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;
         return;
       }
-      // FIX #2: Only flip to face-up if server sent actual card data (not 'back')
       if(cd&&cd!=='back'){
         const fmat=cardFrontMats[cd.r+cd.s];
         if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());
       } else {
-        // Ensure other players' cards stay face-down
         if(m.material!==cardBackMat)m.material=cardBackMat;
       }
     });
@@ -840,7 +912,6 @@ function applyState(st){
   if(is2D) render2D(st);
 }
 
-// ── 2D/3D toggle ─────────────────────────────────────────────────────────────
 function toggle2D(){
   is2D=!is2D;
   const btn=document.getElementById('toggleViewBtn');
@@ -873,7 +944,6 @@ function toggle2D(){
   }
 }
 
-// Build a 2D player hole card DOM element
 function build2DCard(rank,suit,folded){
   const el=document.createElement('div');
   el.className='p2d-card';
@@ -891,7 +961,6 @@ function build2DCard(rank,suit,folded){
   el.appendChild(ctr);
   return el;
 }
-// Build a community card DOM element (same design, community sizing via CSS)
 function build2DCommCard(rank,suit){
   const el=document.createElement('div');
   el.className='c2d-card';
@@ -913,18 +982,12 @@ function render2D(st){
   if(!st||!st.players)return;
   const inner=document.getElementById('table2dInner');
   inner.querySelectorAll('.p2d-seat').forEach(el=>el.remove());
-
-  // Pot
   document.getElementById('pot2dVal').textContent='\u00a3'+((st.pot||0)/100).toFixed(2);
-
-  // My stack above pause button
   const p0=st.players[mySeat];
   const si2d=document.getElementById('stackInfo2d');
   if(si2d&&p0){
     si2d.innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff;font-size:11px">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
   }
-
-  // Community cards
   const comm=st.community||[];
   const commEl=document.getElementById('community2d');
   commEl.innerHTML='';
@@ -937,12 +1000,9 @@ function render2D(st){
       const ph=document.createElement('div');ph.className='c2d-card';ph.style.visibility='hidden';commEl.appendChild(ph);
     }
   }
-
-  // Seats — me always bottom
   const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);
   const n=seated.length||2;
   const rx=44,ry=38;
-
   seated.forEach((srvSeat)=>{
     const p=st.players[srvSeat];
     if(!p)return;
@@ -950,18 +1010,14 @@ function render2D(st){
     const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;
     const px=50+rx*Math.cos(angle);
     const py=50-ry*Math.sin(angle);
-
     const isMe=(srvSeat===mySeat);
     const isToAct=(st.toActSeat===srvSeat);
     const isDealer=(st.dealerSeat===srvSeat);
     const isSB=(st.sbSeat===srvSeat);
     const isBB=(st.bbSeat===srvSeat);
-
     const div=document.createElement('div');
     div.className='p2d-seat'+(isMe?' me':'');
     div.style.left=px+'%';div.style.top=py+'%';
-
-    // Cards
     if(p.cards&&p.cards.length){
       const cardsDiv=document.createElement('div');
       cardsDiv.className='p2d-cards';
@@ -972,8 +1028,6 @@ function render2D(st){
       });
       div.appendChild(cardsDiv);
     }
-
-    // Info block beside cards
     const info=document.createElement('div');
     info.className='p2d-info';
     const nameDiv=document.createElement('div');
@@ -986,7 +1040,6 @@ function render2D(st){
     if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}
     if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}
     if(tokens.children.length)info.appendChild(tokens);
-    // Stack for opponents only — mine is above pause button
     if(!isMe){
       const stackDiv=document.createElement('div');
       stackDiv.className='p2d-stack';
@@ -1004,7 +1057,6 @@ function render2D(st){
   });
 }
 
-
 function getOrCreateCommunityMesh(idx){
   if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
   const m=nextCardMesh();
@@ -1012,8 +1064,6 @@ function getOrCreateCommunityMesh(idx){
   return m;
 }
 
-// FIX #2: startDealAnimation only deals cards to players in activeSeats.
-// No card mesh is created for seats not in the active list.
 function startDealAnimation(activeSeats,afterDone){
   if(is2D){dealing=false;if(afterDone)afterDone();return;}
   dealing=true;
@@ -1027,7 +1077,6 @@ function startDealAnimation(activeSeats,afterDone){
   function next(){
     if(idx>=seq.length){dealing=false;if(afterDone)afterDone();return;}
     const si=seq[idx++],cn=dealt[si]||0;dealt[si]=cn+1;
-    // FIX #2: Guard — only deal to active seats
     if(!activeSeats.includes(si)){next();return;}
     const isMe=(si===mySeat);
     const target=isMe ? cardPos(vs(si),cn) : cardPosOther(vs(si),cn);
@@ -1038,9 +1087,7 @@ function startDealAnimation(activeSeats,afterDone){
       snd_deal();
       if(lastState&&lastState.players[si]){
         const cd=lastState.players[si].cards[cn];
-        // FIX #2: Only reveal face if server sent actual card data
         if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
-        // else: stays face-down (back material)
       }
       setTimeout(next,80);
     });
@@ -1048,12 +1095,10 @@ function startDealAnimation(activeSeats,afterDone){
   next();
 }
 
-// ── WebSocket with auto-reconnect ────────────────────────────────────────────
 let _reconnectTimer=null, _reconnectAttempts=0, _intentionalClose=false;
-let _serverShutdown=false; // set when server sends explicit shutdown notice
+let _serverShutdown=false;
 const MAX_RECONNECT_ATTEMPTS=12;
 const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,10000,10000,10000,10000,10000];
-// After a known server shutdown we wait longer before first retry (Render cold-start ~10-20s)
 const SHUTDOWN_FIRST_DELAY=12000;
 
 function connectWS(name,roomId,playerId){
@@ -1071,19 +1116,11 @@ function connectWS(name,roomId,playerId){
   ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};
   ws.onclose=()=>{
     if(_intentionalClose)return;
-    if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){
-      showRestartPrompt();
-      return;
-    }
-    // If server told us it was shutting down, wait longer for cold-start
-    const baseDelay=_serverShutdown&&_reconnectAttempts===0
-      ? SHUTDOWN_FIRST_DELAY
-      : RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
+    if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){showRestartPrompt();return;}
+    const baseDelay=_serverShutdown&&_reconnectAttempts===0?SHUTDOWN_FIRST_DELAY:RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
     _reconnectAttempts++;
     showReconnectBanner(_reconnectAttempts,baseDelay);
-    _reconnectTimer=setTimeout(()=>{
-      if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);
-    },baseDelay);
+    _reconnectTimer=setTimeout(()=>{if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);},baseDelay);
   };
   ws.onerror=()=>{
     if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){
@@ -1095,31 +1132,18 @@ function connectWS(name,roomId,playerId){
   };
 }
 
-// Show the reconnect banner with attempt count and countdown
 function showReconnectBanner(attempt,delayMs){
   let rb=document.getElementById('reconnectBanner');
-  if(!rb){
-    rb=document.createElement('div');
-    rb.id='reconnectBanner';
-    rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';
-    document.body.appendChild(rb);
-  }
+  if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';document.body.appendChild(rb);}
   rb.style.display='block';
   const secs=Math.round(delayMs/1000);
   const shutMsg=_serverShutdown?'\nServer restarting — please wait…':'';
   rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+secs+'s'+shutMsg;
-  // Live countdown
   if(rb._countdown)clearInterval(rb._countdown);
   let remaining=secs;
-  rb._countdown=setInterval(()=>{
-    remaining--;
-    if(remaining<=0){clearInterval(rb._countdown);rb._countdown=null;return;}
-    const sm=_serverShutdown?'\nServer restarting — please wait…':'';
-    rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+remaining+'s'+sm;
-  },1000);
+  rb._countdown=setInterval(()=>{remaining--;if(remaining<=0){clearInterval(rb._countdown);rb._countdown=null;return;}const sm=_serverShutdown?'\nServer restarting — please wait…':'';rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+remaining+'s'+sm;},1000);
 }
 
-// Called when all reconnect attempts exhausted — show a hard reload prompt
 function showRestartPrompt(){
   let rb=document.getElementById('reconnectBanner');
   if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';document.body.appendChild(rb);}
@@ -1141,171 +1165,67 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 function handleServerMsg(msg){switch(msg.type){
-case 'serverShutdown':{
-  // Server is shutting down cleanly (SIGTERM from Render).
-  // Set flag so reconnect logic waits longer and shows the right message.
-  _serverShutdown=true;
-  showReconnectBanner(0, SHUTDOWN_FIRST_DELAY);
-  addLog('⚠ Server restarting — will reconnect automatically…','log-fold');
-  break;}
-case 'logEvent':{
-  // System event from server — goes to activity log only, never the chat box
-  addLog(msg.text,'log-system');
-  break;}
-case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';
-  document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';
-  break;
+case 'serverShutdown':{_serverShutdown=true;showReconnectBanner(0,SHUTDOWN_FIRST_DELAY);addLog('⚠ Server restarting — will reconnect automatically…','log-fold');break;}
+case 'logEvent':{addLog(msg.text,'log-system');break;}
+case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
-case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}
-  // Keep buy-in input in sync with server value
-  if(isHost&&msg.buyIn){const bi=document.getElementById('buyInInput');if(bi&&document.activeElement!==bi)bi.value=(msg.buyIn/100).toFixed(2);}
-  break;
+case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}if(isHost&&msg.buyIn){const bi=document.getElementById('buyInInput');if(bi&&document.activeElement!==bi)bi.value=(msg.buyIn/100).toFixed(2);}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
-case 'gameStarting':document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');
-  {const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}
-  // FIX #2: Show a brief fullscreen hint if the API is available on this device
-  setTimeout(()=>{
-    const fsBtn=document.getElementById('fsBtn');
-    if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){
-      const hint=document.createElement('div');
-      hint.id='fsHint';
-      hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';
-      hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';
-      // Draw an arrow pointing down-right toward the button
-      document.body.appendChild(hint);
-      // Add the fade keyframe dynamically if not already present
-      if(!document.getElementById('fsHintStyle')){
-        const st=document.createElement('style');
-        st.id='fsHintStyle';
-        st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';
-        document.head.appendChild(st);
-      }
-      setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);
-    }
-  },800);
-  break;
-case 'newHand':{
-  seatActions={};showMsg('');setActions(false);hideTurnIndicator();
-  document.getElementById('waitingMsg').style.display='none';
-  // Clear/reset spectator banner — if we bought back in, we're now being dealt in
-  const specBanner=document.getElementById('spectatorBanner');
-  specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';
-  specBanner.style.display='none';
-  const coBtn=document.getElementById('cashOutBtn');
-  coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
-  handNumber++;
-  addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');
-  addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));
-  positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));
-  const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;
-  const rawSeats=msg.activeSeats||[];
-  const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;
-  const dsIdx=rawSeats.indexOf(dealStartSeat);
-  const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;
-  startDealAnimation(dealSeats,()=>{
-    setTimeout(()=>{showBet(sbSeat,10);},120);
-    setTimeout(()=>{showBet(bbSeat,20);},280);
-    if(lastState)applyState(lastState);
-  });break;}
-case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='flex';}if(!dealing)applyState(msg);break;
-case 'playerAction':{
-  const pname=msg.name||'Player';
-  let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);
-  if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';
-  seatActions[msg.seat]=ac;
-  const logClass=msg.action==='fold'?'log-action':'log-action';
-  addLog('\u27a4 '+pname+': '+ac, logClass);
-  if(msg.amount>0)showBet(msg.seat,msg.amount);
-  hideTurnIndicator();if(lastState)applyState(lastState);break;}
-// FIX #4: yourTurn — set callBtn label correctly based on callAmt
-// callAmt === 0 means no bet to call → show CHECK, not CALL £0.00
-case 'yourTurn':{
-  const ca=msg.callAmt||0;
-  if(msg.seat===mySeat){
-    const callLabel = ca > 0 ? 'CALL \u00a3'+(ca/100).toFixed(2) : 'CHECK';
-    document.getElementById('callBtn').textContent = callLabel;
-    // Store BET vs RAISE so updateDisplay() can label the button correctly
-    const raiseBtn=document.getElementById('raiseBtn');
-    if(raiseBtn) raiseBtn.dataset.verb = msg.firstBet ? 'BET' : 'RAISE';
-    drumSetMin(msg.minRaise||40); // this calls updateDisplay() which sets button text
-    setActions(true);showMsg('\u2b50 Your turn!',0);
-    document.getElementById('waitingMsg').style.display='none';
-    startCountdown(true,'You');
-  }else{
-    setActions(false);showMsg('');
-    const actingPlayer=lastState&&lastState.players[msg.seat];
-    const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);
-    startCountdown(false,actingName);
-  }break;}
-case 'communityDealt':
-  addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');
-  sweepBetsToPot(()=>{if(lastState)applyState(lastState);});
-  break;
-case 'showdown':setPhase('Showdown');hideTurnIndicator();
-  sweepBetsToPot(null);
-  addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
+case 'gameStarting':startKeepAliveTimer();document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
+case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
+  // Always reset raise dials to BB (40p) at start of new hand
+  if(window.drumReset) window.drumReset(msg.bb || 40);
+  handNumber++;addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,10);},120);setTimeout(()=>{showBet(bbSeat,20);},280);if(lastState)applyState(lastState);});break;}
+case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);
+  // Note starting chips for each seated player (only recorded once per player)
+  if(msg.players)msg.players.forEach(p=>{if(p&&p.id&&p.chips>0)noteStartChips(p.id,p.chips);});
+  if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='flex';}if(!dealing)applyState(msg);break;
+case 'playerAction':{const pname=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;const logClass=msg.action==='fold'?'log-action':'log-action';addLog('\u27a4 '+pname+': '+ac, logClass);if(msg.amount>0)showBet(msg.seat,msg.amount);hideTurnIndicator();if(lastState)applyState(lastState);break;}
+case 'yourTurn':{const ca=msg.callAmt||0;if(msg.seat===mySeat){const callLabel=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2b50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
+case 'communityDealt':addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');sweepBetsToPot(()=>{if(lastState)applyState(lastState);});break;
+case 'showdown':setPhase('Showdown');hideTurnIndicator();sweepBetsToPot(null);addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
-case 'playerLeft':
-  addLog(msg.name+' left the table');
-  addChat('\u2b05 '+msg.name+' left');
-  seatActions[msg.seat]='';
+case 'playerLeft':addLog(msg.name+' left the table');addChat('\u2b05 '+msg.name+' left');seatActions[msg.seat]='';
   if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}
+  // Record elimination if player left with 0 chips
+  if(msg.chips===0&&msg.id&&msg.name&&_startChips[msg.id]){
+    recordElimination(msg.id,msg.name,_startChips[msg.id],0);
+    document.getElementById('eliminatedBox').style.display='block';
+  } else if(msg.chips!==undefined&&msg.id&&_startChips[msg.id]){
+    // Player cashed out — log their result in ledger
+    const net=msg.chips-_startChips[msg.id];
+    addLedgerEvent('\uD83D\uDCB0 '+msg.name+' cashed out \u00a3'+(msg.chips/100).toFixed(2)+' (net '+(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2)+')');
+  }
   if(msg.id===myId){_intentionalClose=true;setTimeout(()=>location.reload(),600);return;}
   if(lastState)applyState(lastState);
   break;
 case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
 case 'gamePaused':handlePaused(true,msg.byName);break;
 case 'gameResumed':handlePaused(false,msg.byName);break;
-case 'cashOutPending':{
-  const btn=document.getElementById('cashOutBtn');
-  btn.classList.add('pending');
-  btn.textContent='CASH OUT \u23f3';
-  addLog('\u{1F4B0} CASH OUT: '+(myName||'You')+' will cash out after this hand','log-win');
-  showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);
-  break;}
-case 'voluntaryAutoFoldAck':
-  addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));
-  break;
-// FIX #5: buyBackOffer — shown to any busted player regardless of player count
-case 'buyBackOffer':{
-  document.getElementById('buyBackOverlay').style.display='flex';
-  addLog('\uD83D\uDCB8 You are out of chips! Choose to buy back in or spectate.','log-hand');
-  let _bbSecs=15;
-  const _bbEl=document.getElementById('buyBackTimer');
-  _bbEl.textContent=_bbSecs;
-  if(window._buyBackInterval)clearInterval(window._buyBackInterval);
-  window._buyBackInterval=setInterval(()=>{
-    _bbSecs--;
-    _bbEl.textContent=_bbSecs;
-    if(_bbSecs<=0){clearInterval(window._buyBackInterval);window._buyBackInterval=null;respondBuyBack(false);}
-  },1000);
-  break;}
-case 'buyBackAccepted':{
-  document.getElementById('buyBackOverlay').style.display='none';
-  document.getElementById('spectatorBanner').style.display='none';
-  showMsg('\u2705 Bought back in!\nYou\u2019ll be dealt in from the next hand.',4500);
-  addLog('\u2705 BUY-BACK: You have bought back in for \u00a310.00 \u2014 joining next hand','log-win');
-  // Show spectator banner until next hand starts
-  document.getElementById('spectatorBanner').textContent='\u23f3 Bought back in \u2014 you\u2019ll be dealt from the next hand';
-  document.getElementById('spectatorBanner').style.display='block';
-  break;}
+case 'cashOutPending':{const btn=document.getElementById('cashOutBtn');btn.classList.add('pending');btn.textContent='CASH OUT \u23f3';addLog('\u{1F4B0} CASH OUT: '+(myName||'You')+' will cash out after this hand','log-win');showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);break;}
+case 'voluntaryAutoFoldAck':addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));break;
+case 'buyBackOffer':{document.getElementById('buyBackOverlay').style.display='flex';addLog('\uD83D\uDCB8 You are out of chips! Choose to buy back in or spectate.','log-hand');let _bbSecs=15;const _bbEl=document.getElementById('buyBackTimer');_bbEl.textContent=_bbSecs;if(window._buyBackInterval)clearInterval(window._buyBackInterval);window._buyBackInterval=setInterval(()=>{_bbSecs--;_bbEl.textContent=_bbSecs;if(_bbSecs<=0){clearInterval(window._buyBackInterval);window._buyBackInterval=null;respondBuyBack(false);}},1000);break;}
+case 'buyBackAccepted':{document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='none';showMsg('\u2705 Bought back in!\nYou\u2019ll be dealt in from the next hand.',4500);addLog('\u2705 BUY-BACK: You have bought back in for \u00a310.00 \u2014 joining next hand','log-win');document.getElementById('spectatorBanner').textContent='\u23f3 Bought back in \u2014 you\u2019ll be dealt from the next hand';document.getElementById('spectatorBanner').style.display='block';break;}
 case 'spectating':{
   document.getElementById('buyBackOverlay').style.display='none';
   document.getElementById('spectatorBanner').style.display='block';
   addLog('\uD83D\uDC40 You are now spectating \u2014 you will not be dealt cards','log-hand');
+  // Record self as eliminated if chips=0
+  if(lastState&&lastState.players&&lastState.players[mySeat]){
+    const me=lastState.players[mySeat];
+    if(me&&me.chips===0&&_startChips[me.id]){
+      recordElimination(me.id,me.name,_startChips[me.id],0);
+      document.getElementById('eliminatedBox').style.display='block';
+    }
+  }
   break;}
 case 'chat':addChat(msg.name+': '+msg.text);break;
 case 'error':addChat('\u26a0 '+msg.msg);break;}}
 function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(\''+p.id+'\',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(\''+p.id+'\',false)">\u2717 Reject</button></span>';pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
 function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
-function respondBuyBack(accept){
-  if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}
-  wsSend({type:'buyBack',accept});
-  document.getElementById('buyBackOverlay').style.display='none';
-  if(!accept) document.getElementById('spectatorBanner').style.display='block';
-}
+function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}wsSend({type:'buyBack',accept});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
 let pendingInGame={};
 function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
 function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(\''+p.id+'\',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(\''+p.id+'\',false)">Reject</button></span>';list.appendChild(row);}}
@@ -1314,22 +1234,14 @@ function showTurnIndicator(txt){document.getElementById('turnIndicator').textCon
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
 
 const TURN_SECS=15;
-// ── Countdown ─────────────────────────────────────────────────────────────────
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){
   clearInterval(_countdownInterval);
   let secs=TURN_SECS;
   const foldBtn=document.getElementById('foldBtn');
   function tick(){
-    if(isMe){
-      if(foldBtn){
-        foldBtn.textContent='FOLD '+secs+'s';
-        foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';
-        foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';
-      }
-    }else{
-      showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');
-    }
+    if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}
+    else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}
     if(secs<=0){clearInterval(_countdownInterval);return;}
     secs--;
   }
@@ -1344,431 +1256,317 @@ function stopCountdown(){
 function setActions(v){
   const panel=document.getElementById('actionPanel');
   if(panel)panel.style.display=v?'flex':'none';
-  ['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el)el.style.display=v?'block':'none';
-  });
-  const dw=document.getElementById('drumWidget');
-  if(dw)dw.style.display=v?'flex':'none';
-  if(!v){
-    const foldBtn=document.getElementById('foldBtn');
-    if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}
-  }
+  ['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});
+  const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';
+  if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
 }
 function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){
-  const el=document.getElementById('msg');
-  el.textContent=m;el.style.display=m?'block':'none';
-  if(ms>0)setTimeout(()=>el.style.display='none',ms);
-  // Mirror into 2D overlay
-  const el2=document.getElementById('msg2d');
-  if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}
+  const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);
+  const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}
 }
 function addChat(txt){
-  const log=document.getElementById('chatLog'),div=document.createElement('div');
-  div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;
-  while(log.children.length>60)log.removeChild(log.firstChild);
-  if(chatCollapsed){
-    const box=document.getElementById('chatBox');
-    box.classList.remove('flash');
-    void box.offsetWidth;
-    box.classList.add('flash');
-    setTimeout(()=>box.classList.remove('flash'),2200);
-  }
+  const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);
+  if(chatCollapsed){const box=document.getElementById('chatBox');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),2200);}
 }
 let handNumber=0;
-// Time-based keep-alive: every 5 min from every connected client independently.
-// Replaces old hand-count approach which failed if hands were slow or host went spectator.
-setInterval(()=>{
-  if(myRoomId&&ws&&ws.readyState===1){
-    fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber)
-      .then(r=>r.text()).then(txt=>{
-        addLog('\u{1F4E1} Keep-alive sent to Frankfurt server — hand #'+handNumber,'log-system');
-      }).catch(()=>{
-        addLog('\u26a0 Keep-alive failed at hand #'+handNumber,'log-action');
-      });
-  }
-}, 5*60*1000);
+
+// ── Universal keep-alive: ALL clients ping every 4 minutes ───────────────────
+// Keeps Render.com alive and confirms clients are connected, regardless of
+// hand number or whose turn it is. Starts 30s after game begins.
+function sendKeepAlive(){
+  if(!myRoomId||!myId)return;
+  fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber)
+    .then(r=>r.text())
+    .then(txt=>{addLog('\uD83D\uDCE1 Keep-alive sent \u2014 server: '+txt,'log-action');})
+    .catch(()=>{addLog('\u26A0 Keep-alive ping failed','log-action');});
+}
+function startKeepAliveTimer(){
+  if(window._keepAliveTimer)return;
+  window._keepAliveTimer=setInterval(sendKeepAlive, 4*60*1000);
+  setTimeout(sendKeepAlive, 30000);
+}
 function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
+
+// ── Game Ledger — permanent record that survives the whole session ─────────────
+// Tracks: eliminated players (with net result), host stack adjustments, buy-ins.
+// Shown in a collapsible panel below the activity log.
+const _ledger=[];
+function addLedgerEvent(txt){
+  _ledger.push({t:new Date().toLocaleTimeString(),msg:txt});
+  refreshLedger();
+}
+function refreshLedger(){
+  const el=document.getElementById('ledgerLog');
+  if(!el)return;
+  el.innerHTML='';
+  _ledger.slice().reverse().forEach(e=>{
+    const d=document.createElement('div');
+    d.style.cssText='padding:3px 0;border-bottom:1px solid rgba(200,160,32,0.1);font-size:10px;color:#e0c060;';
+    d.innerHTML='<span style="color:#888;font-size:9px">'+e.t+'</span> '+e.msg;
+    el.appendChild(d);
+  });
+}
+
+// ── Eliminated player registry — never removed, always visible ───────────────
+const _eliminated={}; // id → {name, buyIn, finalChips, netPL}
+function recordElimination(id,name,startChips,finalChips){
+  if(_eliminated[id])return; // already recorded
+  const net=finalChips-startChips;
+  const netStr=(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2);
+  _eliminated[id]={name,startChips,finalChips,net};
+  const msg='\uD83D\uDCCA '+name+' eliminated — net: '+netStr+' (started \u00a3'+(startChips/100).toFixed(2)+', left with \u00a3'+(finalChips/100).toFixed(2)+')';
+  addLog(msg,'log-fold');
+  addLedgerEvent('\uD83D\uDCCF '+msg);
+  refreshEliminatedBadge();
+}
+function refreshEliminatedBadge(){
+  const el=document.getElementById('eliminatedList');
+  if(!el)return;
+  el.innerHTML='';
+  Object.values(_eliminated).forEach(p=>{
+    const net=p.net;
+    const d=document.createElement('div');
+    d.style.cssText='padding:4px 6px;background:rgba(200,160,32,0.07);border-radius:5px;margin:3px 0;font-size:10px;color:#c8a060;';
+    d.innerHTML='<b style="color:#ffd700">'+p.name+'</b> &nbsp;net: <span style="color:'+(net>=0?'#40e870':'#e05050')+'">'+(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2)+'</span>';
+    el.appendChild(d);
+  });
+  const hdr=document.getElementById('eliminatedHdr');
+  if(hdr)hdr.textContent='OUT ('+ Object.keys(_eliminated).length+')';
+}
+
+// Track starting chips per player to compute net P&L on elimination
+const _startChips={};
+function noteStartChips(id,chips){if(!_startChips[id])_startChips[id]=chips;}
+
 let gamePaused=false;
 function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
 
-// ── Host stack editor ─────────────────────────────────────────────────────────
-function applyBuyIn(){
-  const inp=document.getElementById('buyInInput');
-  const btn=document.getElementById('buyInBtn');
-  if(!inp)return;
-  const val=parseFloat(inp.value);
-  if(isNaN(val)||val<0.20){inp.style.borderColor='#cc0000';return;}
-  wsSend({type:'setBuyIn',buyIn:Math.round(val*100)});
-  if(btn){btn.textContent='✓';btn.style.background='#1a6a1a';setTimeout(()=>{btn.textContent='SET';btn.style.background='#1a3a6a';},1500);}
-  inp.style.borderColor='#c8a020';
-  setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);
-}
+function applyBuyIn(){const inp=document.getElementById("buyInInput");const btn=document.getElementById("buyInBtn");if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0.20){inp.style.borderColor="#cc0000";return;}const pence=Math.round(val*100);wsSend({type:"setBuyIn",buyIn:pence});addLog("D83DDD27 HOST: Buy-in set to 00a3"+(pence/100).toFixed(2),"log-hand");addLedgerEvent("D83DDD27 Buy-in changed to 00a3"+(pence/100).toFixed(2));if(btn){btn.textContent="2713";btn.style.background="#1a6a1a";setTimeout(()=>{btn.textContent="SET";btn.style.background="#1a3a6a";},1500);}inp.style.borderColor="#c8a020";setTimeout(()=>{if(inp)inp.style.borderColor="";},1500);}
 
 function toggleStackEditor(){
   const panel=document.getElementById('stackEditor');
-  if(panel.style.display==='block'){
-    panel.style.display='none';
-    return;
-  }
-  // Build player list fresh every time panel opens
-  // Pull from every possible source
-  const seated = [];
-  // Try lastState first (mid-game)
-  if(lastState && lastState.players){
-    lastState.players.forEach(p=>{ if(p && p.id && p.name) seated.push({id:p.id, name:p.name, chips:p.chips}); });
-  }
-  // Fall back to lastLobbyMsg (pre-game)
-  if(seated.length===0 && lastLobbyMsg && lastLobbyMsg.seats){
-    lastLobbyMsg.seats.forEach(s=>{ if(s && s.id && s.name) seated.push({id:s.id, name:s.name, chips:s.chips}); });
-  }
-  const rows=document.getElementById('stackEditorRows');
-  rows.innerHTML='';
-  if(seated.length===0){
-    rows.innerHTML='<div style="color:#888;font-size:12px">No players found</div>';
-  } else {
-    seated.forEach((p,i)=>{
-      const row=document.createElement('div');
-      row.className='se-row';
-      row.innerHTML=
-        '<span class="se-name">'+p.name+'</span>'+
-        '<span style="color:#888;font-size:10px">£</span>'+
-        '<input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="0.01" value="'+(p.chips/100).toFixed(2)+'">'+
-        '<button class="se-btn" id="se-btn-'+i+'" onclick="doSetStack('+i+',\''+p.id+'\')">SET</button>';
-      rows.appendChild(row);
-    });
-  }
+  if(panel.style.display==='block'){panel.style.display='none';return;}
+  const seated=[];
+  if(lastState&&lastState.players){lastState.players.forEach(p=>{if(p&&p.id&&p.name)seated.push({id:p.id,name:p.name,chips:p.chips});});}
+  if(seated.length===0&&lastLobbyMsg&&lastLobbyMsg.seats){lastLobbyMsg.seats.forEach(s=>{if(s&&s.id&&s.name)seated.push({id:s.id,name:s.name,chips:s.chips});});}
+  const rows=document.getElementById('stackEditorRows');rows.innerHTML='';
+  if(seated.length===0){rows.innerHTML='<div style="color:#888;font-size:12px">No players found</div>';}
+  else{seated.forEach((p,i)=>{const row=document.createElement('div');row.className='se-row';row.innerHTML='<span class="se-name">'+p.name+'</span><span style="color:#888;font-size:10px">£</span><input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="0.01" value="'+(p.chips/100).toFixed(2)+'"><button class="se-btn" id="se-btn-'+i+'" onclick="doSetStack('+i+',\''+p.id+'\')">SET</button>';rows.appendChild(row);});}
   panel.style.display='block';
 }
 
-function doSetStack(idx, playerId){
-  const inp=document.getElementById('se-inp-'+idx);
-  const btn=document.getElementById('se-btn-'+idx);
-  if(!inp)return;
-  const val=parseFloat(inp.value);
-  if(isNaN(val)||val<0){ inp.style.borderColor='#cc0000'; return; }
-  const pence=Math.round(val*100);
-  console.log('setStack →', playerId, pence);
-  wsSend({type:'setStack', playerId:playerId, chips:pence});
-  btn.textContent='✓';
-  btn.style.background='#1a6a1a';
-  inp.style.borderColor='#c8a020';
-  setTimeout(()=>{ btn.textContent='SET'; btn.style.background=''; inp.style.borderColor=''; }, 2000);
-}
-function handlePaused(isPaused,byName){
-  gamePaused=isPaused;
-  const btn=document.getElementById('pauseBtn');
-  const banner=document.getElementById('pauseBanner');
-  if(isPaused){
-    btn.classList.add('active');
-    btn.textContent='\u25b6';
-    banner.style.display='block';
-    addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 any player can resume','log-hand');
-  } else {
-    btn.classList.remove('active');
-    btn.textContent='\u23f8';
-    banner.style.display='none';
-    addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');
-  }
-}
+function doSetStack(idx,playerId){const inp=document.getElementById("se-inp-"+idx);const btn=document.getElementById("se-btn-"+idx);if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0){inp.style.borderColor="#cc0000";return;}const pence=Math.round(val*100);const allP=[];if(lastState&&lastState.players)lastState.players.forEach(p=>{if(p&&p.name)allP.push(p);});if(!allP.length&&lastLobbyMsg&&lastLobbyMsg.seats)lastLobbyMsg.seats.forEach(s=>{if(s&&s.name)allP.push(s);});const pn=allP[idx]?allP[idx].name:"Player";wsSend({type:"setStack",playerId:playerId,chips:pence});addLog("D83DDD27 HOST ADJUSTMENT: "+pn+" stack set to £"+(pence/100).toFixed(2),"log-hand");addLedgerEvent("D83DDD27 Host set "+pn+" stack to £"+(pence/100).toFixed(2));btn.textContent="✓";btn.style.background="#1a6a1a";inp.style.borderColor="#c8a020";setTimeout(()=>{btn.textContent="SET";btn.style.background="";inp.style.borderColor="";},2000);}
+function handlePaused(isPaused,byName){gamePaused=isPaused;const btn=document.getElementById('pauseBtn');const banner=document.getElementById('pauseBanner');if(isPaused){btn.classList.add('active');btn.textContent='\u25b6';banner.style.display='block';addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 any player can resume','log-hand');}else{btn.classList.remove('active');btn.textContent='\u23f8';banner.style.display='none';addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');}}
 let myAutoFold=false;
-function toggleAutoFold(){
-  myAutoFold=!myAutoFold;
-  wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});
-  const btn=document.getElementById('autoFoldBtn');
-  if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}
-  else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}
-}
-function showBet(serverSeat,amount){
-  if(amount<=0||is2D)return;
-  const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);
-  const existH=seatBetChips[serverSeat].length*0.060;
-  const chips=buildChipStack(amount);
-  seatBetChips[serverSeat].push(...chips);
-  animChipArc(chips,src,dst,38,0.32+existH,null);}
+function toggleAutoFold(){myAutoFold=!myAutoFold;wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});const btn=document.getElementById('autoFoldBtn');if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}}
+function showBet(serverSeat,amount){if(amount<=0||is2D)return;const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);const existH=seatBetChips[serverSeat].length*0.060;const chips=buildChipStack(amount);seatBetChips[serverSeat].push(...chips);animChipArc(chips,src,dst,38,0.32+existH,null);}
 let activityCollapsed=true;
-function toggleActivityLog(){
-  activityCollapsed=!activityCollapsed;
-  const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');
-  logEl.style.display=activityCollapsed?'none':'flex';
-  toggle.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';
-}
+function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';}
 let chatCollapsed=true;
-function toggleChat(){
-  chatCollapsed=!chatCollapsed;
-  const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');
-  inner.style.display=chatCollapsed?'none':'block';
-  toggle.textContent=chatCollapsed?'\u25b6 expand':'\u25bc collapse';
-}
+function toggleChat(){chatCollapsed=!chatCollapsed;const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');inner.style.display=chatCollapsed?'none':'block';toggle.textContent=chatCollapsed?'\u25b6 expand':'\u25bc collapse';}
+let eliminatedCollapsed=true;
+function toggleEliminated(){eliminatedCollapsed=!eliminatedCollapsed;const el=document.getElementById('eliminatedList'),toggle=document.getElementById('eliminatedToggle');el.style.display=eliminatedCollapsed?'none':'block';toggle.textContent=eliminatedCollapsed?'\u25b6 expand':'\u25bc collapse';}
+let ledgerCollapsed=true;
+function toggleLedger(){ledgerCollapsed=!ledgerCollapsed;const el=document.getElementById('ledgerLog'),toggle=document.getElementById('ledgerToggle');el.style.display=ledgerCollapsed?'none':'block';toggle.textContent=ledgerCollapsed?'\u25b6 expand':'\u25bc collapse';}
 
-// FIX #1: toggleFullscreen works on Android (and desktop).
-// We also hide the button if the Fullscreen API is genuinely unavailable.
-function toggleFullscreen(){
-  if(!document.fullscreenElement && !document.webkitFullscreenElement){
-    const el=document.documentElement;
-    if(el.requestFullscreen){el.requestFullscreen().catch(()=>{});}
-    else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();}
-  } else {
-    if(document.exitFullscreen){document.exitFullscreen();}
-    else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}
-  }
-}
+function toggleFullscreen(){if(!document.fullscreenElement&&!document.webkitFullscreenElement){const el=document.documentElement;if(el.requestFullscreen){el.requestFullscreen().catch(()=>{});}else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();}}else{if(document.exitFullscreen){document.exitFullscreen();}else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}}}
 
-// FIX #1: Hide fullscreen button if the API is entirely unavailable on this device
-window.addEventListener('load',()=>{
-  const fsBtn=document.getElementById('fsBtn');
-  if(fsBtn){
-    const fsAvailable = !!(
-      document.documentElement.requestFullscreen ||
-      document.documentElement.webkitRequestFullscreen
-    );
-    if(!fsAvailable) fsBtn.style.display='none';
-  }
-});
+window.addEventListener('load',()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn){const fsAvailable=!!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);if(!fsAvailable)fsBtn.style.display='none';}});
 
-function doCashOut(){
-  if(!confirm('Cash out and leave the table with your remaining chips?'))return;
-  _intentionalClose=true;
-  wsSend({type:'cashOut'});
-}
+function doCashOut(){if(!confirm('Cash out and leave the table with your remaining chips?'))return;_intentionalClose=true;wsSend({type:'cashOut'});}
+document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
+document.addEventListener('webkitfullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 
-document.addEventListener('fullscreenchange',()=>{
-  const btn=document.getElementById('fsBtn');
-  if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';
-});
-document.addEventListener('webkitfullscreenchange',()=>{
-  const btn=document.getElementById('fsBtn');
-  if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';
-});
-
-document.getElementById('callBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
-document.getElementById('raiseBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
-document.getElementById('allInBtn').onclick=()=>{
-  ensureAudio();
-  // All-in = raise entire stack. Get stack from lastState.
-  const me = lastState && lastState.players && lastState.players[mySeat];
-  const allInAmount = me ? me.chips : drumGetPence();
-  setActions(false);showMsg('');
-  wsSend({type:'action',action:'raise',amount:allInAmount});
-};
-document.getElementById('foldBtn').onclick=()=>{ensureAudio();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
+document.getElementById('callBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
+document.getElementById('raiseBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
+document.getElementById('allInBtn').onclick=()=>{ensureAudio();const me=lastState&&lastState.players&&lastState.players[mySeat];const allInAmount=me?me.chips:drumGetPence();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:allInAmount});};
+document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
 document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
-document.getElementById('tablePan').addEventListener('input', function(){
-  if(cam) cam.target.y = parseFloat(this.value);
-});
+document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
-// ── Cog dial raise wheels ──────────────────────────────────────────────────────
+// ── Scroll wheel dials ─────────────────────────────────────────────────────────
 (function(){
-  let poundsIdx=0, penceIdx=0, minRaisePence=40;
-  const POUNDS=Array.from({length:100},(_,i)=>i);
-  const PENCE=[0,20,40,60,80];
+  const POUNDS = Array.from({length:100},(_,i)=>i);  // 0–99
+  const PENCE  = [0,20,40,60,80];                      // 20p steps
 
-  // Draw one cog dial onto a canvas element
-  function drawDial(canvasEl, valueStr, rotation){
-    const W=76, R=38, cx=38, cy=38;
-    const ctx=canvasEl.getContext('2d');
-    ctx.clearRect(0,0,W,W);
+  let poundsIdx = 0, penceIdx = 0, minRaisePence = 40;
 
-    // Outer cog — draw teeth
-    const teeth=16, toothH=5, baseR=R-toothH-1, outerR=R-1;
-    ctx.save();
-    ctx.translate(cx,cy);
-    ctx.rotate(rotation);
-
-    // Cog body
-    ctx.beginPath();
-    for(let i=0;i<teeth;i++){
-      const a1=(i/teeth)*Math.PI*2;
-      const a2=((i+0.35)/teeth)*Math.PI*2;
-      const a3=((i+0.65)/teeth)*Math.PI*2;
-      const a4=((i+1)/teeth)*Math.PI*2;
-      if(i===0) ctx.moveTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
-      else ctx.lineTo(Math.cos(a1)*baseR, Math.sin(a1)*baseR);
-      ctx.lineTo(Math.cos(a2)*outerR, Math.sin(a2)*outerR);
-      ctx.lineTo(Math.cos(a3)*outerR, Math.sin(a3)*outerR);
-      ctx.lineTo(Math.cos(a4)*baseR, Math.sin(a4)*baseR);
+  // ── Render a wheel — 3 ghost items above + selected + 3 below ──────────────
+  function renderDial(innerId, list, idx){
+    const inner = document.getElementById(innerId);
+    if(!inner) return;
+    inner.innerHTML = '';
+    for(let offset = -3; offset <= 3; offset++){
+      const i = idx + offset;
+      const div = document.createElement('div');
+      div.className = 'dial-item' +
+        (offset===0 ? ' selected' : Math.abs(offset)===1 ? ' adj1' : ' adj2');
+      div.textContent = (i>=0 && i<list.length)
+        ? String(list[i]).padStart(2,'0')
+        : '';
+      inner.appendChild(div);
     }
-    ctx.closePath();
-    const grad=ctx.createRadialGradient(0,0,0,0,0,baseR);
-    grad.addColorStop(0,'#3a2800');
-    grad.addColorStop(1,'#1a1200');
-    ctx.fillStyle=grad;
-    ctx.fill();
-    ctx.strokeStyle='#c8a020';
-    ctx.lineWidth=1.5;
-    ctx.stroke();
-
-    // Tick marks on inner face
-    for(let i=0;i<teeth;i++){
-      const a=(i/teeth)*Math.PI*2+Math.PI/teeth;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a)*(baseR-1), Math.sin(a)*(baseR-1));
-      ctx.lineTo(Math.cos(a)*(baseR-5), Math.sin(a)*(baseR-5));
-      ctx.strokeStyle='rgba(200,160,32,0.5)';
-      ctx.lineWidth=1;
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // Inner disc
-    ctx.beginPath();
-    ctx.arc(cx,cy,baseR-3,0,Math.PI*2);
-    const igrad=ctx.createRadialGradient(cx,cy-4,2,cx,cy,baseR-3);
-    igrad.addColorStop(0,'#2a1800');
-    igrad.addColorStop(1,'#0d0800');
-    ctx.fillStyle=igrad;
-    ctx.fill();
-    ctx.strokeStyle='rgba(200,160,32,0.3)';
-    ctx.lineWidth=1;
-    ctx.stroke();
-
-    // Value text
-    ctx.fillStyle='#ffd700';
-    ctx.font='bold 20px Arial';
-    ctx.textAlign='center';
-    ctx.textBaseline='middle';
-    ctx.fillText(valueStr,cx,cy);
+    // Each item 32px; wheel 96px tall; selected item centre at 48px
+    // inner.top = 48 - 3*32 - 16 = -64px
+    inner.style.top = '-64px';
   }
 
-  // Rotation state per dial
-  let poundsRot=0, penceRot=0;
-
-  function redrawPounds(){
-    const el=document.getElementById('dialPounds');
-    if(el) drawDial(el, String(POUNDS[poundsIdx]).padStart(2,'0'), poundsRot);
+  function renderAll(){
+    renderDial('dialPoundsInner', POUNDS, poundsIdx);
+    renderDial('dialPenceInner',  PENCE,  penceIdx);
   }
-  function redrawPence(){
-    const el=document.getElementById('dialPence');
-    if(el) drawDial(el, String(PENCE[penceIdx]).padStart(2,'0'), penceRot);
-  }
-  function redrawAll(){ redrawPounds(); redrawPence(); }
 
+  // ── Display — always show the RAW selected value (no silent clamping) ───────
+  // The button shows exactly what will be sent.
   function updateDisplay(){
-    const total=POUNDS[poundsIdx]*100+PENCE[penceIdx];
-    const clamped=Math.max(total,minRaisePence);
-    const p=Math.floor(clamped/100), pn=clamped%100;
-    const amtStr='\u00a3'+p+'.'+String(pn).padStart(2,'0');
-    const btn=document.getElementById('raiseBtn');
-    if(btn){ const verb=btn.dataset.verb||'RAISE'; btn.textContent=verb+' '+amtStr; }
+    // Use raw value; if below minimum, show minimum instead so user knows floor
+    const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
+    const val = Math.max(raw, minRaisePence);
+    const btn = document.getElementById('raiseBtn');
+    if(btn){
+      const verb = btn.dataset.verb || 'RAISE';
+      btn.textContent = verb + ' \u00a3' + Math.floor(val/100) + '.' + String(val%100).padStart(2,'0');
+    }
   }
 
-  // Step function (kept for any legacy calls)
-  window.drumStep=function(drum,dir){
+  // ── snapToValue — set both dials to represent a specific pence value ─────────
+  // Finds the closest valid PENCE step for the pence component.
+  function snapToValue(totalPence){
+    const p = Math.max(0, totalPence);
+    poundsIdx = Math.min(Math.floor(p / 100), POUNDS.length - 1);
+    // Find the nearest PENCE entry for the sub-pound remainder
+    const rem = p % 100;
+    let best = 0;
+    for(let i = 0; i < PENCE.length; i++){
+      if(PENCE[i] <= rem) best = i;
+    }
+    penceIdx = best;
+    renderAll();
+  }
+
+  // Tracks whether the user has dragged the wheels since the last yourTurn.
+  // If they haven't, drumSetMin always snaps to the new minimum (handles
+  // new betting rounds where minRaise drops back to BB after a flop/turn/river).
+  // If they have dragged, we respect their choice unless it's below the minimum.
+  let _userDraggedSinceLastMin = false;
+
+  // ── drumReset — called at NEW HAND start. Always resets dials to the minimum.
+  window.drumReset = function(minPence){
+    minRaisePence = Math.max(minPence || 40, 20);
+    _userDraggedSinceLastMin = false;
+    snapToValue(minRaisePence);
+    updateDisplay();
+  };
+
+  // ── drumSetMin — called each yourTurn during a hand.
+  // If the user hasn't touched the dials yet this turn, snap to new minimum.
+  // This correctly resets to BB at the start of each new betting round (flop etc).
+  // If the user already dragged, only bump up if they went below the minimum.
+  window.drumSetMin = function(minPence){
+    minRaisePence = Math.max(minPence || 40, 20);
+    const currentVal = POUNDS[poundsIdx] * 100 + PENCE[penceIdx];
+    if(!_userDraggedSinceLastMin || currentVal < minRaisePence){
+      snapToValue(minRaisePence);
+    }
+    _userDraggedSinceLastMin = false; // reset — next drag will re-enable preservation
+    updateDisplay();
+  };
+
+  // ── drumGetPence — return exactly what's selected (clamped to min floor) ────
+  window.drumGetPence = function(){
+    const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
+    return Math.max(raw, minRaisePence);
+  };
+
+  // ── drumClearDrag — call when any action is sent.
+  // Ensures the NEXT drumSetMin (new betting round) always resets to new minimum.
+  window.drumClearDrag = function(){
+    _userDraggedSinceLastMin = false;
+  };
+
+  // ── drumStep — step one tick (used sparingly) ───────────────────────────────
+  window.drumStep = function(drum, dir){
     ensureAudio(); snd_chip();
     if(drum==='pounds'){
-      poundsIdx=Math.max(0,Math.min(POUNDS.length-1,poundsIdx+dir));
-      poundsRot+=(dir*Math.PI*2)/16;
-      redrawPounds();
-    }else{
-      penceIdx=Math.max(0,Math.min(PENCE.length-1,penceIdx+dir));
-      penceRot+=(dir*Math.PI*2)/5;
-      redrawPence();
+      poundsIdx = Math.max(0, Math.min(POUNDS.length-1, poundsIdx+dir));
+      renderDial('dialPoundsInner', POUNDS, poundsIdx);
+    } else {
+      penceIdx = Math.max(0, Math.min(PENCE.length-1, penceIdx+dir));
+      renderDial('dialPenceInner', PENCE, penceIdx);
     }
     updateDisplay();
   };
 
-  window.drumSetMin=function(minPence){
-    minRaisePence=minPence||40;
-    poundsIdx=Math.min(Math.floor(minRaisePence/100),POUNDS.length-1);
-    penceIdx=PENCE.indexOf(minRaisePence%100);
-    if(penceIdx===-1){
-      const nextP=PENCE.find(p=>p>=minRaisePence%100);
-      penceIdx=nextP!==undefined?PENCE.indexOf(nextP):0;
-      if(penceIdx===-1)penceIdx=0;
-    }
-    redrawAll(); updateDisplay();
-  };
+  // ── attachWheel — drag UP = increase, drag DOWN = decrease ──────────────────
+  // startIdx is captured once per drag so the whole gesture is calculated
+  // from that anchor — no cumulative drift, no direction reversal.
+  // Momentum flick removed: on mobile it was misfiring and reverting values.
+  function attachWheel(wheelId, drum){
+    const el = document.getElementById(wheelId);
+    if(!el) return;
 
-  window.drumGetPence=function(){
-    const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];
-    return Math.max(raw,minRaisePence);
-  };
+    const PX_PER_STEP = 26; // px of drag per one value tick
+    let active = false, startY = 0, startIdx = 0;
 
-  // Attach drag-to-rotate to a canvas dial
-  function attachDial(canvasId, drum){
-    const el=document.getElementById(canvasId);
-    if(!el)return;
-    const PX_PER_STEP=28; // pixels of drag per value step
-    let active=false, startY=0, startIdx=0, lastY=0, vel=0, accumulated=0;
-
-    function getIdx(){ return drum==='pounds'?poundsIdx:penceIdx; }
-    function getList(){ return drum==='pounds'?POUNDS:PENCE; }
-    function setIdx(i){
-      if(drum==='pounds') poundsIdx=i;
-      else penceIdx=i;
-    }
-    function getRot(){ return drum==='pounds'?poundsRot:penceRot; }
-    function setRot(r){ if(drum==='pounds') poundsRot=r; else penceRot=r; }
+    function getIdx(){ return drum==='pounds' ? poundsIdx : penceIdx; }
+    function getList(){ return drum==='pounds' ? POUNDS : PENCE; }
+    function setIdx(i){ if(drum==='pounds') poundsIdx=i; else penceIdx=i; }
 
     function onStart(y){
-      active=true; startY=y; lastY=y;
-      startIdx=getIdx(); accumulated=0; vel=0;
-      el.style.cursor='grabbing';
+      active = true;
+      startY = y;
+      startIdx = getIdx();
+      _userDraggedSinceLastMin = true; // user is actively choosing — preserve their value
     }
+
     function onMove(y){
-      if(!active)return;
-      const dy=startY-y; // drag up = increase
-      vel=lastY-y; lastY=y;
-      const steps=Math.round(dy/PX_PER_STEP);
-      const list=getList();
-      const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));
-      const prev=getIdx();
-      if(ni!==prev){
-        const delta=ni-prev;
+      if(!active) return;
+      // Drag UP (y decreasing from startY) → increase value
+      const dy = startY - y;
+      const steps = Math.round(dy / PX_PER_STEP);
+      const list = getList();
+      const ni = Math.max(0, Math.min(list.length-1, startIdx + steps));
+      if(ni !== getIdx()){
         snd_chip();
         setIdx(ni);
-        setRot(getRot()+(delta*Math.PI*2)/list.length);
-        if(drum==='pounds') redrawPounds(); else redrawPence();
+        if(drum==='pounds') renderDial('dialPoundsInner', POUNDS, poundsIdx);
+        else                 renderDial('dialPenceInner',  PENCE,  penceIdx);
         updateDisplay();
       }
     }
-    function onEnd(){
-      active=false;
-      el.style.cursor='grab';
-      // Momentum: if velocity fast enough, add 1 more step
-      if(Math.abs(vel)>6){
-        const dir=vel>0?1:-1; // up = increase
-        window.drumStep(drum,-dir);
-      }
-    }
 
-    // Touch events
-    el.addEventListener('touchstart',e=>{
-      e.preventDefault();
-      onStart(e.touches[0].clientY);
-    },{passive:false});
-    el.addEventListener('touchmove',e=>{
-      e.preventDefault();
-      onMove(e.touches[0].clientY);
-    },{passive:false});
-    el.addEventListener('touchend',e=>{e.preventDefault();onEnd();},{passive:false});
+    function onEnd(){ active = false; }
 
-    // Mouse events (desktop)
-    el.addEventListener('mousedown',e=>{onStart(e.clientY);});
-    window.addEventListener('mousemove',e=>{if(active)onMove(e.clientY);});
-    window.addEventListener('mouseup',()=>{if(active)onEnd();});
+    // Unified pointer events — no synthetic mouse events on mobile
+    el.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      onStart(e.clientY);
+    }, {passive:false});
+    el.addEventListener('pointermove', e=>{
+      if(active){ e.preventDefault(); onMove(e.clientY); }
+    }, {passive:false});
+    el.addEventListener('pointerup',     ()=>{ onEnd(); });
+    el.addEventListener('pointercancel', ()=>{ onEnd(); });
   }
 
   window.addEventListener('load',()=>{
-    redrawAll();
+    renderAll();
     updateDisplay();
-    attachDial('dialPounds','pounds');
-    attachDial('dialPence','pence');
+    attachWheel('dialPounds', 'pounds');
+    attachWheel('dialPence',  'pence');
   });
 })();
-// ── Cookie notice gate ────────────────────────────────────────────────────────
-function cookieAccept() {
-  document.getElementById('cookieOverlay').style.display = 'none';
-  document.getElementById('loginOverlay').style.display  = 'flex';
-}
-function cookieDeny() {
-  // Redirect to Disney — no game access
-  window.location.replace('https://www.disney.com');
-}
+
+
+
+// ── Cookie notice gate ─────────────────────────────────────────────────────────
+function cookieAccept(){document.getElementById('cookieOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';}
+function cookieDeny(){window.location.replace('https://www.disney.com');}
 
 const scn=createScene();
 engine.runRenderLoop(()=>scn.render());
