@@ -1,3 +1,4 @@
+// server.js — SYFM Poker | Last edited: 2026-02-25 12:37
 'use strict';
 const http   = require('http');
 const { WebSocketServer } = require('ws');
@@ -14,7 +15,9 @@ const NP    = 9;
 const SB    = 10, BB = 20;
 const START_CHIPS = 1000;
 const ACTION_TIMEOUT = 15000;
-const ROOM_EMPTY_TTL_MS = 60_000;
+
+// A room with no connected players is destroyed after this much idle time.
+const ROOM_EMPTY_TTL_MS = 60_000; // 1 minute
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
 const LOGS_DIR = path.join(__dirname, 'logs');
@@ -48,16 +51,16 @@ function logBoth(room, text) {
   logEvent(room, text);
 }
 
+// FTP upload after hand finishes
 async function ftpUpload(localPath) {
   const host = process.env.FTP_HOST;
   const user = process.env.FTP_USER;
   const pass = process.env.FTP_PASS;
   const dir  = process.env.FTP_DIR || '/poker-logs';
-  if (!host || !user || !pass) { svrLog('FTP: env vars not set — upload skipped'); return; }
+  if (!host || !user || !pass) { svrLog('FTP: env vars not set \u2014 upload skipped'); return; }
   const client = new ftp.Client();
   client.ftp.verbose = false;
   const fname = path.basename(localPath);
-  svrLog(`FTP: connecting to ${host} to upload ${fname}`);
   try {
     await client.access({ host, user, password: pass, secure: false });
     try { await client.ensureDir(dir); } catch {}
@@ -122,6 +125,7 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 const rooms = new Map();
 
+// ── Room lifecycle ────────────────────────────────────────────────────────────
 function destroyRoom(room) {
   svrLog(`ROOM ${room.id} DESTROY`);
   clearActionTimer(room);
@@ -142,10 +146,16 @@ function scheduleRoomCleanup(room) {
   const hasConnected = room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
     || room.pendingJoins.some(p => p.ws?.readyState === 1);
   if (!hasConnected) {
+    svrLog(`ROOM ${room.id} EMPTY \u2014 scheduling cleanup in ${ROOM_EMPTY_TTL_MS/1000}s`);
     room._emptyTimer = setTimeout(() => {
       const stillEmpty = !room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
         && !room.pendingJoins.some(p => p.ws?.readyState === 1);
-      if (stillEmpty) destroyRoom(room);
+      if (stillEmpty) {
+        svrLog(`ROOM ${room.id} CLEANUP \u2014 TTL expired, destroying`);
+        destroyRoom(room);
+      } else {
+        svrLog(`ROOM ${room.id} CLEANUP \u2014 cancelled, player reconnected`);
+      }
     }, ROOM_EMPTY_TTL_MS);
   }
 }
@@ -252,6 +262,7 @@ function clearActionTimer(room) {
   }
 }
 
+// ─── Pause / Resume ───────────────────────────────────────────────────────────
 function pauseGame(room, byName) {
   if (room.paused) return;
   room.paused = true;
@@ -296,12 +307,16 @@ wss.on('connection', ws => {
         const room = getOrCreateRoom(myRoomId);
         svrLog(`JOIN \u2014 room ${myRoomId} | id=${myId} | name="${name}"`);
 
+        // ── Reconnect ─────────────────────────────────────────────────────────
         const existing = room.seats.find(s => s?.id === myId);
         if (existing) {
           const wasDisconnectedMs = existing.disconnected ? Date.now() - (existing._disconnectedAt||0) : 0;
           if (existing._disconnectTimer) { clearTimeout(existing._disconnectTimer); existing._disconnectTimer = null; }
           const needsHostApproval = existing.autoFold && (existing._missedHands || 0) >= 1;
+
           if (needsHostApproval) {
+            svrLog(`RECONNECT \u2014 ${name} missed ${existing._missedHands} hand(s), queuing for host re-admission`);
+            writeLog(room, `RECONNECT (pending): ${name} returned after missing ${existing._missedHands} hand(s)`);
             if (!room.pendingJoins.find(p => p.id === myId)) {
               room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
             } else {
@@ -321,16 +336,20 @@ wss.on('connection', ws => {
             send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
             send(ws, lobbySnapshot(room));
             if (room.G) send(ws, tableSnapshot(room, myId));
+            writeLog(room, `RECONNECT: ${name} (Seat ${existing.seat+1}) back | Was gone ~${(wasDisconnectedMs/1000).toFixed(1)}s`);
             logEvent(room, `\uD83D\uDD04 ${existing.name} reconnected`);
-            writeLog(room, `RECONNECT: ${name} (Seat ${existing.seat+1}) | Was gone ~${(wasDisconnectedMs/1000).toFixed(1)}s`);
+            svrLog(`RECONNECT OK \u2014 ${name} seat ${existing.seat+1} room ${myRoomId}`);
           }
           return;
         }
 
+        // ── Brand-new player ──────────────────────────────────────────────────
         const hasSeatedPlayers = room.seats.some(s => s !== null);
         if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
           room.seats[0] = mkPlayer(ws, myId, name, 0, room);
           room.hostId = myId;
+          svrLog(`NEW ROOM \u2014 ${name} created room ${myRoomId} as host`);
+          writeLog(room, `HOST JOINED: ${name} created room ${myRoomId} | ${buyInTag(room.seats[0])}`);
           send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
           broadcastAll(room, lobbySnapshot(room));
           return;
@@ -343,6 +362,8 @@ wss.on('connection', ws => {
           return;
         }
 
+        svrLog(`JOIN PENDING \u2014 ${name} (room ${myRoomId})`);
+        writeLog(room, `JOIN REQUEST: ${name} (id: ${myId})`);
         room.pendingJoins.push({ ws, id: myId, name });
         send(ws, { type: 'waiting', id: myId });
         const host = room.seats.find(s => s?.id === room.hostId);
@@ -356,6 +377,7 @@ wss.on('connection', ws => {
         const idx = room.pendingJoins.findIndex(p => p.id === msg.id);
         if (idx === -1) return;
         const p = room.pendingJoins.splice(idx, 1)[0];
+
         if (msg.accept) {
           const existSeat = room.seats.find(s => s?.id === p.id);
           if (existSeat) {
@@ -368,8 +390,8 @@ wss.on('connection', ws => {
             send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
             send(p.ws, lobbySnapshot(room));
             if (room.G) send(p.ws, tableSnapshot(room, p.id));
-            logEvent(room, `\u2705 ${existSeat.name} re-admitted to the table`);
             writeLog(room, `RE-ADMITTED: ${existSeat.name} (Seat ${existSeat.seat+1}) | ${buyInTag(existSeat)}`);
+            logEvent(room, `\u2705 ${existSeat.name} re-admitted to the table`);
           } else {
             const seat = room.seats.findIndex(s => s === null);
             if (seat === -1) {
@@ -398,6 +420,7 @@ wss.on('connection', ws => {
         if (!room || myId !== room.hostId) return;
         const playable = room.seats.filter(s => s && !s.autoFold);
         if (playable.length < 2) { send(ws, { type: 'error', msg: 'Need at least 2 players' }); return; }
+        svrLog(`GAME START \u2014 room ${myRoomId} | ${playable.length} players`);
         room.gameActive = true;
         broadcastAll(room, { type: 'gameStarting' });
         broadcastAll(room, lobbySnapshot(room));
@@ -459,9 +482,9 @@ wss.on('connection', ws => {
         if (!p) return;
         p.voluntaryAutoFold = msg.enabled === true;
         const afStatus = p.voluntaryAutoFold ? 'ENABLED' : 'DISABLED';
-        writeLog(room, `AUTO-FOLD ${afStatus}: ${p.name} | ${buyInTag(p)}`);
+        writeLog(room, `AUTO-FOLD ${afStatus}: ${p.name} (Seat ${p.seat+1}) | ${buyInTag(p)}`);
         logEvent(room, `\uD83D\uDD01 AUTO-FOLD ${afStatus}: ${p.name}`);
-        // If it's currently their turn and they just enabled auto-fold, fold them now
+        svrLog(`AUTO-FOLD ${afStatus} \u2014 ${p.name} room ${myRoomId}`);
         if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
           clearActionTimer(room);
           doFold(room, p.seat, 'auto-fold');
@@ -558,6 +581,7 @@ wss.on('connection', ws => {
     if (pi !== -1) {
       const pj = room.pendingJoins[pi];
       room.pendingJoins.splice(pi, 1);
+      writeLog(room, `PENDING JOIN LEFT: ${pj.name}`);
       broadcastAll(room, lobbySnapshot(room));
       scheduleRoomCleanup(room);
       return;
@@ -570,8 +594,10 @@ wss.on('connection', ws => {
     s.ws = null;
     s._disconnectedAt = Date.now();
     s._missedHands = s._missedHands || 0;
-    logEvent(room, `\u26A0 ${s.name} disconnected \u2014 will be removed after 3 missed hands`);
+    logEvent(room, `\u26A0 ${s.name} disconnected`);
     writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) | Phase: ${room.G?.phase||'idle'}`);
+    svrLog(`DISCONNECT \u2014 ${s.name} seat ${s.seat+1} room ${myRoomId}`);
+
     s.autoFold = true;
     broadcastState(room);
 
@@ -586,6 +612,7 @@ wss.on('connection', ws => {
       broadcastState(room);
       checkRoundEnd(room);
     }
+
     scheduleRoomCleanup(room);
   });
 
@@ -644,8 +671,6 @@ function buildDeck() {
   return shuffle(d);
 }
 
-// activePlaying: seats eligible to be dealt in (excludes VAF — they still get
-// dealt cards and pay blinds, but are folded immediately after the deal)
 function activePlaying(room) {
   return room.seats
     .map((s, i) => {
@@ -671,11 +696,18 @@ function buildActOrder(room, startSeat, active) {
   let startIdx = sorted.indexOf(startSeat);
   if (startIdx === -1) startIdx = 0;
   const ordered = [...sorted.slice(startIdx), ...sorted.slice(0, startIdx)];
-  // Exclude voluntaryAutoFold players — they will be folded after the deal
   return ordered.filter(i => {
     const p = room.seats[i];
     return p && !p.folded && !p.autoFold && !p.voluntaryAutoFold && p.chips > 0;
   });
+}
+
+function canActCount(room) {
+  if (!room.G) return 0;
+  return room.seats.filter(s =>
+    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
+    s.chips > 0
+  ).length;
 }
 
 function checkRoundEnd(room) {
@@ -703,18 +735,23 @@ function startNewHand(room) {
   room.seats.forEach((s, idx) => {
     if (!s) return;
     if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
+
     if (s.disconnected && s.autoFold) {
       s._missedHands = (s._missedHands || 0) + 1;
       writeLog(room, `ABSENT: ${s.name} missed hand ${s._missedHands}/${ABSENT_HAND_LIMIT}`);
       logEvent(room, `\uD83D\uDCA4 ${s.name} absent \u2014 missed ${s._missedHands}/${ABSENT_HAND_LIMIT} hand${s._missedHands>1?'s':''}`);
+
       if (s._missedHands >= ABSENT_HAND_LIMIT) {
+        svrLog(`EVICT \u2014 ${s.name} room ${room.id} seat ${s.seat+1} after ${ABSENT_HAND_LIMIT} missed hands`);
         logEvent(room, `\u274C ${s.name} removed after ${ABSENT_HAND_LIMIT} missed hands`);
         writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) | ${buyInTag(s)}`);
         broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'absent-eviction' });
+
         if (room.hostId === s.id) {
           const newHost = room.seats.find(h => h && h.id !== s.id && h.ws?.readyState === 1);
           if (newHost) {
             room.hostId = newHost.id;
+            writeLog(room, `HOST TRANSFER: ${s.name} evicted \u2192 ${newHost.name} is new host`);
             send(newHost.ws, { type: 'logEvent', text: '\uD83D\uDC51 You are now the host.' });
           } else { room.hostId = null; }
         }
@@ -731,6 +768,7 @@ function startNewHand(room) {
   const active = activePlaying(room);
 
   if (active.length < 2) {
+    writeLog(room, `WAITING: not enough active players | active=${active.length}`);
     broadcastAll(room, { type: 'waitingForPlayers' });
     room.gameActive = false;
     broadcastAll(room, lobbySnapshot(room));
@@ -759,7 +797,7 @@ function startNewHand(room) {
   const dsIdx = active.indexOf(dealStartSeat);
   const dealOrder = dsIdx >= 0 ? [...active.slice(dsIdx), ...active.slice(0, dsIdx)] : active;
 
-  // Write hand header log
+  // Hand header log
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const timeStr = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -814,14 +852,12 @@ function startNewHand(room) {
   });
   writeLog(room, '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518');
 
-  // Build act order first (excludes voluntaryAutoFold players)
   room.G.toAct = buildActOrder(room, preflopStart, active);
 
-  // ── FIX: Explicitly fold voluntaryAutoFold players immediately after deal ──
-  // buildActOrder already excludes them from toAct so they never get prompted,
-  // but without folded=true they remain live in the hand and CAN WIN at showdown.
-  // We fold them here AFTER blinds are posted and cards dealt so blind obligations
-  // are honoured. The fold is broadcast so all clients show them as folded.
+  // ── CRITICAL: Fold voluntaryAutoFold players immediately after deal ──────────
+  // They paid their blinds, they got their cards, but they never look at them.
+  // Setting folded=true here ensures they CANNOT WIN at showdown under any path.
+  // buildActOrder already excludes them from toAct so they are never prompted.
   active.forEach(i => {
     const s = room.seats[i];
     if (s && s.voluntaryAutoFold && !s.folded) {
@@ -830,7 +866,7 @@ function startNewHand(room) {
         type: 'playerAction', seat: i, action: 'fold',
         amount: 0, name: s.name + ' (auto-fold)'
       });
-      writeLog(room, `FOLD   | ${s.name.padEnd(18)} | voluntary auto-fold \u2014 blinds paid, hand folded`);
+      writeLog(room, `FOLD   | ${s.name.padEnd(18)} | voluntary auto-fold \u2014 blinds paid, hand folded immediately`);
     }
   });
 
@@ -843,9 +879,7 @@ function startNewHand(room) {
     if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id));
   });
 
-  writeLog(room, '');
   writeLog(room, '\u250c\u2500 PREFLOP \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
-  writeLog(room, `\u2502  Pot (blinds): \u00a3${((room.G.pot)/100).toFixed(2)}`);
   writeLog(room, `\u2502  Act order: ${room.G.toAct.map(i=>room.seats[i].name).join(' \u2192 ')}`);
   writeLog(room, '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
   promptToAct(room);
@@ -855,7 +889,6 @@ function promptToAct(room) {
   const G = room.G;
   if (!G) return;
 
-  // Clean stale entries from toAct
   while (G.toAct.length) {
     const si = G.toAct[0];
     const p = room.seats[si];
@@ -870,7 +903,6 @@ function promptToAct(room) {
   );
 
   if (activeInHand.length <= 1) {
-    // Fold any stray auto-fold players still marked unfolded
     room.seats.filter(s =>
       s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
       (s.autoFold || s.voluntaryAutoFold)
@@ -1032,6 +1064,7 @@ function advPhase(room) {
       setTimeout(() => advPhase(room), 1200);
       return;
     }
+
     if (canAct.length <= 1) {
       setTimeout(() => { G.phase = 'showdown'; showdown(room); }, 1200);
       return;
@@ -1039,7 +1072,9 @@ function advPhase(room) {
 
     const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
     G.toAct = buildActOrder(room, postStart, active);
+    writeLog(room, `Act order: ${G.toAct.map(i => room.seats[i].name).join(' \u2192 ')}`);
     setTimeout(() => promptToAct(room), 600);
+
   } else {
     G.phase = 'showdown';
     showdown(room);
@@ -1064,11 +1099,10 @@ function endRound(room) {
 function showdown(room) {
   clearActionTimer(room);
 
-  // ── FIX: Exclude autoFold/voluntaryAutoFold from showdown evaluation ──────
-  // These players were folded at hand start. Without this guard they remain
-  // with folded=true BUT older code paths (pre-fix) left them folded=false,
-  // allowing them to win. The double-guard (fold at deal + exclude here)
-  // ensures they can never win the pot regardless of code path taken.
+  // ── CRITICAL: autoFold / voluntaryAutoFold players are NEVER eligible to win ──
+  // They folded at hand start (folded=true set in startNewHand). This double-guard
+  // ensures they cannot win via any code path — checked by both !s.folded AND
+  // !s.autoFold && !s.voluntaryAutoFold.
   const active = room.seats.filter(s =>
     s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
     !s.autoFold && !s.voluntaryAutoFold
@@ -1141,7 +1175,7 @@ function finish(room, winners, label) {
     const cap = contributors[i].totalBet;
     if (cap <= alreadyTaken) continue;
     const levelPot = (cap - alreadyTaken) * (contributors.length - i);
-    // Only unfolded, non-autoFold players are eligible to win
+    // Only unfolded, non-autoFold players are eligible to win their level
     const eligibleIds = new Set(
       allSeats
         .filter(s => !s.folded && !s.autoFold && !s.voluntaryAutoFold && (s.totalBet||0) >= cap)
@@ -1198,7 +1232,6 @@ function finish(room, winners, label) {
     }
   }
 
-  // Broadcast winner messages
   potLevels.forEach((level, li) => {
     if (level.amount <= 0) return;
     const eligibleWinners = winners.filter(w => level.eligibleIds.has(w.id));
@@ -1246,6 +1279,7 @@ function finish(room, winners, label) {
       writeLog(room, `BUST: ${s.name} \u2014 offering buy-back | ${buyInTag(s)}`);
       logEvent(room, `\ud83d\udcb8 ${s.name} is out of chips \u2014 buy-back offer sent`);
       send(s.ws, { type: 'buyBackOffer', chips: room.buyIn });
+
       if (s._buyBackTimer) clearTimeout(s._buyBackTimer);
       s._buyBackTimer = setTimeout(() => {
         if (!s.pendingBuyBack) return;
@@ -1258,6 +1292,7 @@ function finish(room, winners, label) {
         broadcastState(room);
         onBuyBackResolved();
       }, 15000);
+
       s._onBuyBackResolved = onBuyBackResolved;
     });
   }, 4000);
@@ -1336,6 +1371,9 @@ server.listen(PORT, () => {
   const startMsg = `SYFM Poker server started | port=${PORT} | pid=${process.pid} | node=${process.version}`;
   console.log(`\n\u2663 ${startMsg}`);
   svrLog(startMsg);
+  svrLog(`HTTP: http://localhost:${PORT}`);
+  svrLog(`Logs: http://localhost:${PORT}/logs`);
+  svrLog(`FTP:  ${process.env.FTP_HOST || '(not configured)'}`);
 });
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
