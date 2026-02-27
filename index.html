@@ -1,4 +1,4 @@
-<!-- poker.html | Last edited: 2026-02-25 12:38 -->
+<!-- poker.html | Last edited: 2026-02-27 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -58,8 +58,94 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
 .abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
 .abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
-.abtn-allin{background:#8a7a00;border-bottom:3px solid #5a4a00;color:#ffe040}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
+
+/* ── Swipe All-In button ────────────────────────────────────────────────────── */
+.swipe-allin-track{
+  position:relative;
+  width:100%;
+  height:46px;
+  border-radius:8px;
+  background:#1e1400;
+  border:2px solid #7a6a00;
+  border-bottom:3px solid #4a3a00;
+  overflow:hidden;
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+  -webkit-tap-highlight-color:transparent;
+  margin-top:16px;
+}
+.swipe-allin-track:active{cursor:grabbing}
+.swipe-allin-fill{
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:0%;
+  background:linear-gradient(90deg,#5a4a00,#c8a020);
+  border-radius:6px 0 0 6px;
+  pointer-events:none;
+}
+.swipe-allin-thumb{
+  position:absolute;
+  left:4px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:34px;
+  background:linear-gradient(135deg,#c8a020,#8a6a08);
+  border-radius:6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  color:#000;
+  font-weight:bold;
+  box-shadow:0 2px 8px rgba(0,0,0,0.6);
+  transition:left 0.32s cubic-bezier(0.34,1.56,0.64,1);
+  z-index:2;
+  pointer-events:none;
+}
+.swipe-allin-thumb.dragging{
+  transition:none;
+}
+.swipe-allin-label{
+  position:absolute;
+  left:0;right:0;top:0;bottom:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:bold;
+  color:#ffe040;
+  letter-spacing:1.5px;
+  pointer-events:none;
+  z-index:1;
+  text-shadow:0 1px 4px rgba(0,0,0,0.8);
+}
+/* Shake hint animation — triggered on tap with no drag */
+@keyframes allInShake{
+  0%  {transform:translateY(-50%) translateX(0)}
+  15% {transform:translateY(-50%) translateX(9px)}
+  30% {transform:translateY(-50%) translateX(-7px)}
+  45% {transform:translateY(-50%) translateX(7px)}
+  60% {transform:translateY(-50%) translateX(-5px)}
+  75% {transform:translateY(-50%) translateX(4px)}
+  90% {transform:translateY(-50%) translateX(-2px)}
+  100%{transform:translateY(-50%) translateX(0)}
+}
+.swipe-allin-thumb.shake{
+  animation:allInShake 0.52s ease;
+}
+/* Success flash */
+@keyframes allInFlash{
+  0%  {background:linear-gradient(90deg,#5a4a00,#c8a020)}
+  50% {background:linear-gradient(90deg,#c8a020,#ffe040)}
+  100%{background:linear-gradient(90deg,#5a4a00,#c8a020)}
+}
+.swipe-allin-fill.flash{
+  animation:allInFlash 0.18s ease forwards;
+}
+
 #drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
 /* ── Scroll wheel dials ── */
 .dial-row{display:flex;gap:6px;justify-content:center;align-items:center;width:100%;padding:2px 0}
@@ -75,9 +161,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   box-shadow:inset 0 0 18px rgba(0,0,0,0.8),0 0 8px rgba(200,160,32,0.2);
 }
 .dial-wheel:active{cursor:grabbing}
-/* The centre selection bar */
 .dial-wheel::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:32px;background:rgba(200,160,32,0.12);border-top:1px solid rgba(200,160,32,0.5);border-bottom:1px solid rgba(200,160,32,0.5);pointer-events:none;z-index:2}
-/* Fade top & bottom */
 .dial-wheel::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,6,0,0.85) 0%,transparent 35%,transparent 65%,rgba(10,6,0,0.85) 100%);pointer-events:none;z-index:3}
 .dial-inner{position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;align-items:center;will-change:transform}
 .dial-item{height:32px;line-height:32px;text-align:center;font-weight:bold;width:100%;flex-shrink:0}
@@ -260,9 +344,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 @keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .p2d-waiting{color:#888;font-size:9px;font-style:italic}
 
-/* ── Android / narrow screen fixes ───────────────────────────────────────────
-   On narrow phones the left-side action panel can be obscured by the 3D canvas.
-   Move it to the bottom on narrow screens. Also fix panel scaling on small screens. */
 @media screen and (max-width: 480px) {
   .panel{padding:20px 18px;min-width:0;width:94%;}
   .panel h1{font-size:1.6rem;}
@@ -270,8 +351,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   .btn-gold{font-size:1rem;padding:12px;}
 }
 
-/* On mobile: move action panel from left-centre to bottom-left,
-   shrink slightly so it doesn't eat the whole screen */
 @media screen and (max-height: 700px), screen and (max-width: 500px) {
   #actionPanel{
     top:auto !important;
@@ -292,18 +371,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   .dial-item.selected{font-size:18px !important;}
   .dial-item.adj1{font-size:13px !important;}
   .dial-sep{font-size:18px !important;margin-top:14px !important;}
+  /* Shrink swipe button slightly on small screens */
+  .swipe-allin-track{height:38px !important;}
+  .swipe-allin-thumb{width:30px !important;height:28px !important;font-size:11px !important;}
+  .swipe-allin-label{font-size:10px !important;letter-spacing:1px !important;}
 }
 
-/* Ensure toggle view and control bar always visible on Android */
-#toggleViewBtn{
-  /* Force above any canvas overlap */
-  isolation:isolate;
-}
-/* On small screens: move 2D/3D toggle to bottom-left so Safari address bar
-   can't hide it. topBar goes back to top as normal. */
+#toggleViewBtn{isolation:isolate}
 @media screen and (max-width: 500px) {
   #toggleViewBtn{
-    /* Move to bottom-left — always visible, thumb-reachable, avoids Safari chrome */
     top:auto !important;
     bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;
     right:auto !important;
@@ -490,8 +566,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       </div>
     </div>
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET £0.40</button>
- <button class="abtn abtn-allin" id="allInBtn" style="display:none;margin-top:16px">ALL IN</button>
-<button class="abtn abtn-fold" id="foldBtn" style="display:none;margin-top:16px">FOLD</button>
+
+    <!-- Swipe-to-confirm All In — replaces the old tap button -->
+    <div class="swipe-allin-track" id="allInBtn" style="display:none">
+      <div class="swipe-allin-fill" id="allInFill"></div>
+      <div class="swipe-allin-thumb" id="allInThumb">▶▶</div>
+      <span class="swipe-allin-label">SWIPE &mdash; ALL IN</span>
+    </div>
+
+    <button class="abtn abtn-fold" id="foldBtn" style="display:none;margin-top:16px">FOLD</button>
   </div>
   <div id="drumOverlay" style="display:none"></div>
   <div id="bottomBar">
@@ -541,14 +624,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       <div id="activityHeader" onclick="toggleActivityLog()">&#128203; LOG <span id="activityToggle">&#9654; expand</span></div>
       <div id="activityLog"></div>
     </div>
-    <!-- Eliminated players — permanently visible once someone is out -->
     <div id="eliminatedBox" style="background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #6a2010;overflow:hidden;display:none">
       <div id="eliminatedHeader" onclick="toggleEliminated()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#e07050;font-size:11px;font-weight:bold;user-select:none">
         &#128683; <span id="eliminatedHdr">OUT (0)</span> <span id="eliminatedToggle">&#9654; expand</span>
       </div>
       <div id="eliminatedList" style="display:none;padding:4px 8px 6px;border-top:1px solid #4a1a10"></div>
     </div>
-    <!-- Permanent ledger -->
     <div id="ledgerBox" style="background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #1a3a5a;overflow:hidden">
       <div id="ledgerHeader" onclick="toggleLedger()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#60a8c8;font-size:11px;font-weight:bold;user-select:none">
         &#128196; LEDGER <span id="ledgerToggle">&#9654; expand</span>
@@ -1175,11 +1256,9 @@ case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest
 case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);break;
 case 'gameStarting':startKeepAliveTimer();document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
 case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
-  // Always reset raise dials to BB (40p) at start of new hand
   if(window.drumReset) window.drumReset(msg.bb || 40);
   handNumber++;addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,10);},120);setTimeout(()=>{showBet(bbSeat,20);},280);if(lastState)applyState(lastState);});break;}
 case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);
-  // Note starting chips for each seated player (only recorded once per player)
   if(msg.players)msg.players.forEach(p=>{if(p&&p.id&&p.chips>0)noteStartChips(p.id,p.chips);});
   if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='flex';}if(!dealing)applyState(msg);break;
 case 'playerAction':{const pname=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;const logClass=msg.action==='fold'?'log-action':'log-action';addLog('\u27a4 '+pname+': '+ac, logClass);if(msg.amount>0)showBet(msg.seat,msg.amount);hideTurnIndicator();if(lastState)applyState(lastState);break;}
@@ -1189,12 +1268,10 @@ case 'showdown':setPhase('Showdown');hideTurnIndicator();sweepBetsToPot(null);ad
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
 case 'playerLeft':addLog(msg.name+' left the table');addChat('\u2b05 '+msg.name+' left');seatActions[msg.seat]='';
   if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}
-  // Record elimination if player left with 0 chips
   if(msg.chips===0&&msg.id&&msg.name&&_startChips[msg.id]){
     recordElimination(msg.id,msg.name,_startChips[msg.id],0);
     document.getElementById('eliminatedBox').style.display='block';
   } else if(msg.chips!==undefined&&msg.id&&_startChips[msg.id]){
-    // Player cashed out — log their result in ledger
     const net=msg.chips-_startChips[msg.id];
     addLedgerEvent('\uD83D\uDCB0 '+msg.name+' cashed out \u00a3'+(msg.chips/100).toFixed(2)+' (net '+(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2)+')');
   }
@@ -1212,7 +1289,6 @@ case 'spectating':{
   document.getElementById('buyBackOverlay').style.display='none';
   document.getElementById('spectatorBanner').style.display='block';
   addLog('\uD83D\uDC40 You are now spectating \u2014 you will not be dealt cards','log-hand');
-  // Record self as eliminated if chips=0
   if(lastState&&lastState.players&&lastState.players[mySeat]){
     const me=lastState.players[mySeat];
     if(me&&me.chips===0&&_startChips[me.id]){
@@ -1271,9 +1347,6 @@ function addChat(txt){
 }
 let handNumber=0;
 
-// ── Universal keep-alive: ALL clients ping every 4 minutes ───────────────────
-// Keeps Render.com alive and confirms clients are connected, regardless of
-// hand number or whose turn it is. Starts 30s after game begins.
 function sendKeepAlive(){
   if(!myRoomId||!myId)return;
   fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber)
@@ -1288,9 +1361,6 @@ function startKeepAliveTimer(){
 }
 function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
 
-// ── Game Ledger — permanent record that survives the whole session ─────────────
-// Tracks: eliminated players (with net result), host stack adjustments, buy-ins.
-// Shown in a collapsible panel below the activity log.
 const _ledger=[];
 function addLedgerEvent(txt){
   _ledger.push({t:new Date().toLocaleTimeString(),msg:txt});
@@ -1308,10 +1378,9 @@ function refreshLedger(){
   });
 }
 
-// ── Eliminated player registry — never removed, always visible ───────────────
-const _eliminated={}; // id → {name, buyIn, finalChips, netPL}
+const _eliminated={};
 function recordElimination(id,name,startChips,finalChips){
-  if(_eliminated[id])return; // already recorded
+  if(_eliminated[id])return;
   const net=finalChips-startChips;
   const netStr=(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2);
   _eliminated[id]={name,startChips,finalChips,net};
@@ -1335,7 +1404,6 @@ function refreshEliminatedBadge(){
   if(hdr)hdr.textContent='OUT ('+ Object.keys(_eliminated).length+')';
 }
 
-// Track starting chips per player to compute net P&L on elimination
 const _startChips={};
 function noteStartChips(id,chips){if(!_startChips[id])_startChips[id]=chips;}
 
@@ -1378,10 +1446,118 @@ function doCashOut(){if(!confirm('Cash out and leave the table with your remaini
 document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 document.addEventListener('webkitfullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 
+// ── Action button wiring ───────────────────────────────────────────────────────
 document.getElementById('callBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
 document.getElementById('raiseBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
-document.getElementById('allInBtn').onclick=()=>{ensureAudio();const me=lastState&&lastState.players&&lastState.players[mySeat];const allInAmount=me?me.chips:drumGetPence();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:allInAmount});};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
+
+// ── Swipe-to-confirm All In ───────────────────────────────────────────────────
+// The track is the full button area. Drag the gold thumb from left to right.
+// Releasing at ≥88% fires all-in. Releasing early snaps back.
+// Tapping without dragging triggers a shake hint so players know to swipe.
+(function(){
+  const track = document.getElementById('allInBtn');
+  const thumb = document.getElementById('allInThumb');
+  const fill  = document.getElementById('allInFill');
+  if(!track||!thumb||!fill) return;
+
+  const THUMB_W    = 36;   // must match CSS width
+  const CONFIRM_AT = 0.88; // fraction of track that counts as "swiped"
+  const SNAP_MS    = 320;  // snap-back transition duration (matches CSS)
+
+  let active = false, startX = 0, travelX = 0;
+
+  function maxTravel(){ return track.offsetWidth - THUMB_W - 8; }
+
+  // Move thumb and fill without transition (during drag)
+  function setPos(px){
+    const mx = maxTravel();
+    const clamped = Math.max(0, Math.min(px, mx));
+    thumb.style.left = (4 + clamped) + 'px';
+    fill.style.width  = (clamped / mx * 100) + '%';
+  }
+
+  // Snap thumb back to start with springy transition
+  function snapBack(){
+    thumb.classList.remove('dragging');
+    // Let CSS transition handle the spring back
+    thumb.style.left = '4px';
+    fill.style.transition = 'width ' + SNAP_MS + 'ms cubic-bezier(0.34,1.56,0.64,1)';
+    fill.style.width = '0%';
+    setTimeout(() => { fill.style.transition = 'none'; }, SNAP_MS + 50);
+  }
+
+  // Confirm: slam thumb to end, flash, then fire
+  function confirmAllIn(){
+    thumb.classList.remove('dragging');
+    const mx = maxTravel();
+    thumb.style.left = (4 + mx) + 'px';
+    fill.style.width = '100%';
+    fill.classList.add('flash');
+    ensureAudio();
+    snd_win();
+    setTimeout(() => {
+      fill.classList.remove('flash');
+      snapBack();
+      // Fire the all-in action
+      const me = lastState && lastState.players && lastState.players[mySeat];
+      const allInAmount = me ? me.chips : drumGetPence();
+      if(window.drumClearDrag) drumClearDrag();
+      setActions(false);
+      showMsg('');
+      wsSend({ type:'action', action:'raise', amount:allInAmount });
+    }, 220);
+  }
+
+  // Shake hint: called when user taps without meaningfully dragging
+  function shakeHint(){
+    thumb.classList.remove('shake');
+    void thumb.offsetWidth; // force reflow so animation restarts
+    thumb.classList.add('shake');
+    setTimeout(() => thumb.classList.remove('shake'), 560);
+  }
+
+  // ── Pointer events — unified mouse + touch ──────────────────────────────
+  track.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    track.setPointerCapture(e.pointerId);
+    active  = true;
+    startX  = e.clientX;
+    travelX = 0;
+    thumb.classList.add('dragging');
+    fill.style.transition = 'none';
+  }, { passive: false });
+
+  track.addEventListener('pointermove', e => {
+    if(!active) return;
+    e.preventDefault();
+    travelX = Math.max(0, e.clientX - startX);
+    setPos(travelX);
+  }, { passive: false });
+
+  track.addEventListener('pointerup', () => {
+    if(!active) return;
+    active = false;
+    const mx = maxTravel();
+    if(travelX >= mx * CONFIRM_AT){
+      confirmAllIn();
+    } else if(travelX < 6){
+      // Tap with no real drag — show the shake hint
+      snapBack();
+      shakeHint();
+    } else {
+      // Partial drag — just snap back quietly
+      snapBack();
+    }
+  });
+
+  track.addEventListener('pointercancel', () => {
+    if(!active) return;
+    active = false;
+    snapBack();
+  });
+})();
+
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
 document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
@@ -1390,12 +1566,11 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
 
 // ── Scroll wheel dials ─────────────────────────────────────────────────────────
 (function(){
-  const POUNDS = Array.from({length:100},(_,i)=>i);  // 0–99
-  const PENCE  = [0,20,40,60,80];                      // 20p steps
+  const POUNDS = Array.from({length:100},(_,i)=>i);
+  const PENCE  = [0,20,40,60,80];
 
   let poundsIdx = 0, penceIdx = 0, minRaisePence = 40;
 
-  // ── Render a wheel — 3 ghost items above + selected + 3 below ──────────────
   function renderDial(innerId, list, idx){
     const inner = document.getElementById(innerId);
     if(!inner) return;
@@ -1410,8 +1585,6 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
         : '';
       inner.appendChild(div);
     }
-    // Each item 32px; wheel 96px tall; selected item centre at 48px
-    // inner.top = 48 - 3*32 - 16 = -64px
     inner.style.top = '-64px';
   }
 
@@ -1420,10 +1593,7 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     renderDial('dialPenceInner',  PENCE,  penceIdx);
   }
 
-  // ── Display — always show the RAW selected value (no silent clamping) ───────
-  // The button shows exactly what will be sent.
   function updateDisplay(){
-    // Use raw value; if below minimum, show minimum instead so user knows floor
     const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
     const val = Math.max(raw, minRaisePence);
     const btn = document.getElementById('raiseBtn');
@@ -1433,12 +1603,9 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     }
   }
 
-  // ── snapToValue — set both dials to represent a specific pence value ─────────
-  // Finds the closest valid PENCE step for the pence component.
   function snapToValue(totalPence){
     const p = Math.max(0, totalPence);
     poundsIdx = Math.min(Math.floor(p / 100), POUNDS.length - 1);
-    // Find the nearest PENCE entry for the sub-pound remainder
     const rem = p % 100;
     let best = 0;
     for(let i = 0; i < PENCE.length; i++){
@@ -1448,13 +1615,8 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     renderAll();
   }
 
-  // Tracks whether the user has dragged the wheels since the last yourTurn.
-  // If they haven't, drumSetMin always snaps to the new minimum (handles
-  // new betting rounds where minRaise drops back to BB after a flop/turn/river).
-  // If they have dragged, we respect their choice unless it's below the minimum.
   let _userDraggedSinceLastMin = false;
 
-  // ── drumReset — called at NEW HAND start. Always resets dials to the minimum.
   window.drumReset = function(minPence){
     minRaisePence = Math.max(minPence || 40, 20);
     _userDraggedSinceLastMin = false;
@@ -1462,33 +1624,25 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     updateDisplay();
   };
 
-  // ── drumSetMin — called each yourTurn during a hand.
-  // If the user hasn't touched the dials yet this turn, snap to new minimum.
-  // This correctly resets to BB at the start of each new betting round (flop etc).
-  // If the user already dragged, only bump up if they went below the minimum.
   window.drumSetMin = function(minPence){
     minRaisePence = Math.max(minPence || 40, 20);
     const currentVal = POUNDS[poundsIdx] * 100 + PENCE[penceIdx];
     if(!_userDraggedSinceLastMin || currentVal < minRaisePence){
       snapToValue(minRaisePence);
     }
-    _userDraggedSinceLastMin = false; // reset — next drag will re-enable preservation
+    _userDraggedSinceLastMin = false;
     updateDisplay();
   };
 
-  // ── drumGetPence — return exactly what's selected (clamped to min floor) ────
   window.drumGetPence = function(){
     const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
     return Math.max(raw, minRaisePence);
   };
 
-  // ── drumClearDrag — call when any action is sent.
-  // Ensures the NEXT drumSetMin (new betting round) always resets to new minimum.
   window.drumClearDrag = function(){
     _userDraggedSinceLastMin = false;
   };
 
-  // ── drumStep — step one tick (used sparingly) ───────────────────────────────
   window.drumStep = function(drum, dir){
     ensureAudio(); snd_chip();
     if(drum==='pounds'){
@@ -1501,57 +1655,28 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     updateDisplay();
   };
 
-  // ── attachWheel — drag UP = increase, drag DOWN = decrease ──────────────────
-  // startIdx is captured once per drag so the whole gesture is calculated
-  // from that anchor — no cumulative drift, no direction reversal.
-  // Momentum flick removed: on mobile it was misfiring and reverting values.
   function attachWheel(wheelId, drum){
     const el = document.getElementById(wheelId);
     if(!el) return;
-
-    const PX_PER_STEP = 26; // px of drag per one value tick
+    const PX_PER_STEP = 26;
     let active = false, startY = 0, startIdx = 0;
-
     function getIdx(){ return drum==='pounds' ? poundsIdx : penceIdx; }
     function getList(){ return drum==='pounds' ? POUNDS : PENCE; }
     function setIdx(i){ if(drum==='pounds') poundsIdx=i; else penceIdx=i; }
-
-    function onStart(y){
-      active = true;
-      startY = y;
-      startIdx = getIdx();
-      _userDraggedSinceLastMin = true; // user is actively choosing — preserve their value
-    }
-
+    function onStart(y){ active=true; startY=y; startIdx=getIdx(); _userDraggedSinceLastMin=true; }
     function onMove(y){
       if(!active) return;
-      // Drag UP (y decreasing from startY) → increase value
-      const dy = startY - y;
-      const steps = Math.round(dy / PX_PER_STEP);
-      const list = getList();
-      const ni = Math.max(0, Math.min(list.length-1, startIdx + steps));
-      if(ni !== getIdx()){
-        snd_chip();
-        setIdx(ni);
-        if(drum==='pounds') renderDial('dialPoundsInner', POUNDS, poundsIdx);
-        else                 renderDial('dialPenceInner',  PENCE,  penceIdx);
-        updateDisplay();
-      }
+      const dy=startY-y;
+      const steps=Math.round(dy/PX_PER_STEP);
+      const list=getList();
+      const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));
+      if(ni!==getIdx()){ snd_chip(); setIdx(ni); if(drum==='pounds')renderDial('dialPoundsInner',POUNDS,poundsIdx); else renderDial('dialPenceInner',PENCE,penceIdx); updateDisplay(); }
     }
-
-    function onEnd(){ active = false; }
-
-    // Unified pointer events — no synthetic mouse events on mobile
-    el.addEventListener('pointerdown', e=>{
-      e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      onStart(e.clientY);
-    }, {passive:false});
-    el.addEventListener('pointermove', e=>{
-      if(active){ e.preventDefault(); onMove(e.clientY); }
-    }, {passive:false});
-    el.addEventListener('pointerup',     ()=>{ onEnd(); });
-    el.addEventListener('pointercancel', ()=>{ onEnd(); });
+    function onEnd(){ active=false; }
+    el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);onStart(e.clientY);},{passive:false});
+    el.addEventListener('pointermove',e=>{if(active){e.preventDefault();onMove(e.clientY);}},{passive:false});
+    el.addEventListener('pointerup',()=>{onEnd();});
+    el.addEventListener('pointercancel',()=>{onEnd();});
   }
 
   window.addEventListener('load',()=>{
@@ -1561,8 +1686,6 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
     attachWheel('dialPence',  'pence');
   });
 })();
-
-
 
 // ── Cookie notice gate ─────────────────────────────────────────────────────────
 function cookieAccept(){document.getElementById('cookieOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';}
