@@ -1,4 +1,4 @@
-// server.js — SYFM Poker | Last edited: 2026-02-25 12:37
+// server.js — SYFM Poker | Last edited: 2026-02-27
 'use strict';
 const http   = require('http');
 const { WebSocketServer } = require('ws');
@@ -169,7 +169,8 @@ function getOrCreateRoom(roomId) {
       paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT,
       actionTimerStarted: 0,
       buyIn: START_CHIPS,
-      _emptyTimer: null
+      _emptyTimer: null,
+      gameHistory: []   // cumulative record of every player ever seated
     });
   }
   const room = rooms.get(roomId);
@@ -466,6 +467,7 @@ wss.on('connection', ws => {
           p.pendingBuyBack = false;
           p.sittingOut = true;
           p.spectator = true;
+          recordPlayerExit(room, p, 'bust');   // declined buy-back, 0 chips
           writeLog(room, `SPECTATOR: ${p.name} declined buy-back`);
           logEvent(room, `\ud83d\udc40 ${p.name} declined buy-back \u2014 now spectating`);
           send(p.ws, { type: 'spectating' });
@@ -625,6 +627,7 @@ wss.on('connection', ws => {
 function executeCashOut(room, s) {
   const chips = s.chips;
   const seatIdx = s.seat;
+  recordPlayerExit(room, s, 'cashout');   // record before seat is nulled
   svrLog(`CASH OUT \u2014 ${s.name} room ${room.id} \u00a3${(chips/100).toFixed(2)}`);
   if (room.G) writeLog(room, `CASH OUT: ${s.name} leaves with \u00a3${(chips/100).toFixed(2)} | ${buyInTag(s)}`);
   logEvent(room, `\uD83D\uDCB0 ${s.name} cashed out with \u00a3${(chips/100).toFixed(2)}`);
@@ -654,6 +657,108 @@ function mkPlayer(ws, id, name, seat, room) {
 
 function buyInTag(s) {
   return `[Buy-ins: ${s.buyInCount} | Total in: \u00a3${(s.buyInTotal/100).toFixed(2)}]`;
+}
+
+// ─── Game history helpers ──────────────────────────────────────────────────────
+
+// Register or refresh a seated player in the room's permanent game history.
+// Called once per player at the start of every hand to keep buyInTotal current.
+function ensurePlayerHistory(room, s) {
+  if (!room.gameHistory) room.gameHistory = [];
+  const existing = room.gameHistory.find(h => h.id === s.id);
+  if (!existing) {
+    room.gameHistory.push({
+      id: s.id, name: s.name,
+      buyInTotal: s.buyInTotal || room.buyIn,
+      chips: s.chips, status: 'active',
+    });
+  } else {
+    existing.name       = s.name;
+    existing.buyInTotal = s.buyInTotal || existing.buyInTotal;
+    if (existing.status !== 'cashout' && existing.status !== 'evicted') {
+      existing.status = 'active';
+    }
+  }
+}
+
+// Record a player's final state when they exit (cashout / eviction / bust).
+function recordPlayerExit(room, s, status) {
+  if (!room.gameHistory) room.gameHistory = [];
+  const idx = room.gameHistory.findIndex(h => h.id === s.id);
+  const record = {
+    id: s.id, name: s.name,
+    buyInTotal: s.buyInTotal || room.buyIn,
+    chips: s.chips, status,
+  };
+  if (idx >= 0) { room.gameHistory[idx] = record; }
+  else          { room.gameHistory.push(record);   }
+}
+
+// Write a full cumulative game summary to the current hand's log file.
+// Uses fs.appendFileSync directly (no timestamp prefix) so box-drawing stays clean.
+function writeGameSummary(room) {
+  if (!room.G || !room.G.logPath) return;
+
+  // Start with exited players from history, then overlay live seat data
+  const registry = new Map();
+  (room.gameHistory || []).forEach(h => registry.set(h.id, { ...h }));
+  room.seats.forEach(s => {
+    if (!s) return;
+    const prev = registry.get(s.id) || {};
+    registry.set(s.id, {
+      id: s.id, name: s.name,
+      buyInTotal: s.buyInTotal || prev.buyInTotal || room.buyIn,
+      chips: s.chips,
+      status: s.spectator      ? 'spectating' :
+              s.pendingBuyBack ? 'bust'        : 'active',
+    });
+  });
+
+  if (registry.size === 0) return;
+
+  // Sort: active first, then by net P&L descending
+  const ORD = { active: 0, spectating: 1, cashout: 2, bust: 3, evicted: 4 };
+  const players = [...registry.values()].sort((a, b) => {
+    const od = (ORD[a.status] ?? 5) - (ORD[b.status] ?? 5);
+    if (od) return od;
+    return ((b.chips ?? 0) - (b.buyInTotal || 0)) -
+           ((a.chips ?? 0) - (a.buyInTotal || 0));
+  });
+
+  let totalIn = 0, totalOut = 0;
+  players.forEach(p => { totalIn += p.buyInTotal || 0; totalOut += p.chips ?? 0; });
+
+  // Column widths: name=18, buyIn=10, chips=10, net=10, status=10  (+ borders = 62 interior)
+  const W   = 62;
+  const pad = (s, n) => { s = String(s); return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length); };
+  const fmt = n => '\u00a3' + (n / 100).toFixed(2);
+  const net = n => (n >= 0 ? '+' : '-') + '\u00a3' + (Math.abs(n) / 100).toFixed(2);
+  const SEP = '\u2560' + '\u2550'.repeat(W) + '\u2563\n';
+
+  const dataRow = (name, bi, chips, n, status) =>
+    '\u2551  ' + pad(name, 18) + ' ' + pad(fmt(bi), 10) + ' ' +
+    pad(fmt(chips), 10) + ' ' + pad(net(n), 10) + ' ' + pad(status, 8) + '\u2551\n';
+
+  const titleStr = '  GAME SUMMARY \u2014 After Hand #' + String(room.handNum).padStart(4, '0');
+  const titleRow = '\u2551' + titleStr + ' '.repeat(W - titleStr.length) + '\u2551\n';
+  const hdrStr   = '  ' + pad('Player', 18) + ' ' + pad('Bought In', 10) + ' ' +
+                   pad('Has / Out', 10) + ' ' + pad('Net P&L', 10) + ' ' + pad('Status', 8);
+  const hdrRow   = '\u2551' + hdrStr + '\u2551\n';
+
+  let out = '\n\u2554' + '\u2550'.repeat(W) + '\u2557\n';
+  out += titleRow + SEP + hdrRow + SEP;
+
+  players.forEach(p => {
+    const c = p.chips ?? 0;
+    out += dataRow(p.name, p.buyInTotal || 0, c, c - (p.buyInTotal || 0), p.status || 'active');
+  });
+
+  const totalNet = totalOut - totalIn;
+  const balTag   = Math.abs(totalNet) <= 1 ? 'BALANCED' : 'ERR ' + net(totalNet);
+  out += SEP + dataRow('TOTALS', totalIn, totalOut, totalNet, balTag);
+  out += '\u255a' + '\u2550'.repeat(W) + '\u255d\n';
+
+  try { fs.appendFileSync(room.G.logPath, out); } catch {}
 }
 
 // ─── Game helpers ─────────────────────────────────────────────────────────────
@@ -745,6 +850,7 @@ function startNewHand(room) {
         svrLog(`EVICT \u2014 ${s.name} room ${room.id} seat ${s.seat+1} after ${ABSENT_HAND_LIMIT} missed hands`);
         logEvent(room, `\u274C ${s.name} removed after ${ABSENT_HAND_LIMIT} missed hands`);
         writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) | ${buyInTag(s)}`);
+        recordPlayerExit(room, s, 'evicted');   // record before seat is nulled
         broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'absent-eviction' });
 
         if (room.hostId === s.id) {
@@ -764,6 +870,9 @@ function startNewHand(room) {
       s.sittingOut = false;
     }
   });
+
+  // Snapshot all currently seated players into game history
+  room.seats.forEach(s => { if (s) ensurePlayerHistory(room, s); });
 
   const active = activePlaying(room);
 
@@ -1263,6 +1372,9 @@ function finish(room, winners, label) {
     writeLog(room, `  Seat ${s.seat+1} ${s.name.padEnd(18)} \u00a3${(s.chips/100).toFixed(2)} | ${buyInTag(s)}`);
   });
 
+  // Write cumulative game summary to this hand's log
+  writeGameSummary(room);
+
   const logPath = room.G.logPath;
   if (logPath) setTimeout(() => ftpUpload(logPath), 500);
 
@@ -1286,6 +1398,7 @@ function finish(room, winners, label) {
         s.pendingBuyBack = false;
         s.sittingOut = true;
         s.spectator = true;
+        recordPlayerExit(room, s, 'bust');   // timed out on buy-back, 0 chips
         writeLog(room, `SPECTATOR (timeout): ${s.name} did not respond`);
         logEvent(room, `\ud83d\udc40 ${s.name} timed out on buy-back \u2014 now spectating`);
         send(s.ws, { type: 'spectating' });
