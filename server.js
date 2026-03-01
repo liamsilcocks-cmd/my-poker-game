@@ -505,6 +505,32 @@ wss.on('connection', ws => {
         break;
       }
 
+       case 'exitGame': {
+        const room = rooms.get(myRoomId);
+        if (!room) return;
+        const s = room.seats.find(s => s?.id === myId);
+        if (!s) return;
+        if (s._buyBackTimer) { clearTimeout(s._buyBackTimer); s._buyBackTimer = null; }
+        const resolve = s._onBuyBackResolved;
+        s._onBuyBackResolved = null;
+        s.pendingBuyBack = false;
+        recordPlayerExit(room, s, 'bust');
+        svrLog(`EXIT GAME — ${s.name} room ${room.id}`);
+        writeLog(room, `EXIT: ${s.name} chose to exit after busting | ${buyInTag(s)}`);
+        logEvent(room, `🚪 ${s.name} has left the game`);
+        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, chips: 0, reason: 'exit' });
+        room.seats[s.seat] = null;
+        if (room.hostId === s.id) {
+          const newHost = room.seats.find(Boolean);
+          if (newHost) { room.hostId = newHost.id; send(newHost.ws, { type: 'logEvent', text: '👑 You are now the host.' }); }
+        }
+        broadcastAll(room, lobbySnapshot(room));
+        broadcastState(room);
+        scheduleRoomCleanup(room);
+        if (resolve) resolve();
+        break;
+      }
+   
       case 'cashOut': {
         const room = rooms.get(myRoomId);
         if (!room) return;
@@ -1502,3 +1528,4 @@ function gracefulShutdown(signal) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+
