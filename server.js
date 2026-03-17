@@ -971,6 +971,10 @@ function startNewHand(room) {
   room.G.pot = SB + BB;
   room._chipsInPlayAtHandStart = room.seats.filter(Boolean).reduce((sum, s) => sum + s.chips, 0) + room.G.pot;
 
+  writeLog(room, `BLINDS | ${room.seats[sbSeat].name.padEnd(18)} posts SB £${(SB/100).toFixed(2)} | Stack: £${(room.seats[sbSeat].chips/100).toFixed(2)}`);
+  writeLog(room, `BLINDS | ${room.seats[bbSeat].name.padEnd(18)} posts BB £${(BB/100).toFixed(2)} | Stack: £${(room.seats[bbSeat].chips/100).toFixed(2)}`);
+  writeLog(room, `BLINDS | Pot after blinds: £${(room.G.pot/100).toFixed(2)} | Total chips in play: £${(room._chipsInPlayAtHandStart/100).toFixed(2)}`);
+
   // Deal cards to all active players (including voluntaryAutoFold — they pay blinds too)
   for (let rd = 0; rd < 2; rd++)
     for (const si of dealOrder)
@@ -1119,6 +1123,13 @@ function handleAction(room, seat, action, amount) {
   if (!p || !G) return;
   const stackBefore = p.chips;
 
+  function chipCheck(label) {
+    const total = room.seats.filter(Boolean).reduce((s, p) => s + p.chips, 0) + G.pot;
+    const expected = room._chipsInPlayAtHandStart || 0;
+    const diff = total - expected;
+    writeLog(room, `       | Chip check [${label}]: stacks+pot=\u00a3${(total/100).toFixed(2)} expected=\u00a3${(expected/100).toFixed(2)}${diff!==0?' \u26a0 DIFF='+(diff>0?'+':'')+(diff/100).toFixed(2):'  \u2713'}`);
+  }
+
   if (action === 'fold') {
     doFold(room, seat, null);
 
@@ -1127,7 +1138,8 @@ function handleAction(room, seat, action, amount) {
     p.chips -= ca; p.bet += ca; p.totalBet = (p.totalBet||0) + ca; G.pot += ca;
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    writeLog(room, `${act.toUpperCase().padEnd(6)} | ${p.name.padEnd(18)} | \u00a3${(stackBefore/100).toFixed(2)} \u2192 \u00a3${(p.chips/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    writeLog(room, `${act.toUpperCase().padEnd(6)} | ${p.name.padEnd(18)} | \u00a3${(stackBefore/100).toFixed(2)} \u2192 \u00a3${(p.chips/100).toFixed(2)} | Called: \u00a3${(ca/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    chipCheck(act);
     broadcastState(room);
     G.toAct.shift();
     setTimeout(() => promptToAct(room), 200);
@@ -1145,7 +1157,8 @@ function handleAction(room, seat, action, amount) {
     if (G.currentBet > prevCurrentBet) G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
 
     broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
-    writeLog(room, `RAISE  | ${p.name.padEnd(18)} | \u00a3${(stackBefore/100).toFixed(2)} \u2192 \u00a3${(p.chips/100).toFixed(2)} | Raised: \u00a3${(raiseFromStack/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    writeLog(room, `RAISE  | ${p.name.padEnd(18)} | \u00a3${(stackBefore/100).toFixed(2)} \u2192 \u00a3${(p.chips/100).toFixed(2)} | callAmt: \u00a3${(callAmount/100).toFixed(2)} | raised: \u00a3${(raiseFromStack/100).toFixed(2)} | playerBet: \u00a3${(p.bet/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    chipCheck('raise');
     broadcastState(room);
 
     const active = activePlaying(room).sort((a, b) => a - b);
@@ -1184,6 +1197,8 @@ function advPhase(room) {
     for (let i = 0; i < count; i++) { const c = G.deck.shift(); G.community.push(c); newCards.push(c); }
 
     writeLog(room, `PHASE: ${prevPhase.toUpperCase()} \u2192 ${G.phase.toUpperCase()} | Cards: ${newCards.map(c=>c.r+c.s).join(' ')} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    const stackSummary = room.seats.filter(Boolean).map(s => `${s.name}=\u00a3${(s.chips/100).toFixed(2)}`).join(' | ');
+    writeLog(room, `       | Stacks: ${stackSummary}`);
     broadcastAll(room, { type: 'communityDealt', phase: G.phase, cards: G.community, newCards });
     broadcastState(room);
 
@@ -1305,6 +1320,16 @@ function finish(room, winners, label) {
     .filter(s => (s.totalBet||0) > 0)
     .sort((a, b) => (a.totalBet||0) - (b.totalBet||0));
 
+  // Log total bets per player for reconciliation
+  writeLog(room, '\u250c\u2500 POT BREAKDOWN \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
+  writeLog(room, `\u2502 Total pot: \u00a3${(totalPot/100).toFixed(2)}`);
+  allSeats.forEach(s => {
+    const status = s.folded ? 'folded' : 'active';
+    writeLog(room, `\u2502 ${s.name.padEnd(18)} totalBet=\u00a3${((s.totalBet||0)/100).toFixed(2)} stack=\u00a3${(s.chips/100).toFixed(2)} [${status}]`);
+  });
+  const betSum = allSeats.reduce((sum, s) => sum + (s.totalBet||0), 0);
+  writeLog(room, `\u2502 Sum of all totalBets: \u00a3${(betSum/100).toFixed(2)} ${betSum!==totalPot?'\u26a0 MISMATCH with pot! diff=\u00a3'+((betSum-totalPot)/100).toFixed(2):'\u2713 matches pot'}`);
+
   const potLevels = [];
   let alreadyTaken = 0;
 
@@ -1312,20 +1337,23 @@ function finish(room, winners, label) {
     const cap = contributors[i].totalBet;
     if (cap <= alreadyTaken) continue;
     const levelPot = (cap - alreadyTaken) * (contributors.length - i);
-    // Only unfolded, non-autoFold players are eligible to win their level
     const eligibleIds = new Set(
       allSeats
         .filter(s => !s.folded && !s.autoFold && !s.voluntaryAutoFold && (s.totalBet||0) >= cap)
         .map(s => s.id)
     );
+    const potLabel = potLevels.length === 0 ? 'main' : `side${potLevels.length}`;
+    writeLog(room, `\u2502 ${potLabel} pot: cap=\u00a3${(cap/100).toFixed(2)} x${contributors.length-i} players = \u00a3${(levelPot/100).toFixed(2)} | eligible: ${allSeats.filter(s=>eligibleIds.has(s.id)).map(s=>s.name).join(', ')}`);
     potLevels.push({ amount: levelPot, eligibleIds, cap });
     alreadyTaken = cap;
   }
 
   const levelTotal = potLevels.reduce((sum, l) => sum + l.amount, 0);
   if (levelTotal !== totalPot && potLevels.length > 0) {
+    writeLog(room, `\u2502 \u26a0 Level total \u00a3${(levelTotal/100).toFixed(2)} != pot \u00a3${(totalPot/100).toFixed(2)} | adjusting last level by \u00a3${((totalPot-levelTotal)/100).toFixed(2)}`);
     potLevels[potLevels.length - 1].amount += (totalPot - levelTotal);
   }
+  writeLog(room, '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
 
   let totalAwarded = 0;
   const awardLog = [];
