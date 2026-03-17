@@ -344,7 +344,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 @keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .p2d-waiting{color:#888;font-size:9px;font-style:italic}
 
-@media screen and (max-width: 480px) {
+#loginBuyInInput::-webkit-inner-spin-button,#loginBuyInInput::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
   .panel{padding:20px 18px;min-width:0;width:94%;}
   .panel h1{font-size:1.6rem;}
   .panel input[type=text],.panel input[type=number]{font-size:1rem;padding:10px 12px;}
@@ -507,7 +508,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <p>Enter your name and a room number to play</p>
     <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
     <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
-    <input type="number" id="buyInInput" placeholder="Buy-in amount (£)" min="1" step="1" value="10">
+    <input type="text" id="loginBuyInInput" value="Stake £10" autocomplete="off">
     <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
     <p id="loginErr" style="color:#e05050;margin-top:10px;font-size:.9rem"></p>
   </div>
@@ -1550,8 +1551,8 @@ document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClea
 
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim(),buyIn=parseFloat(document.getElementById('buyInInput').value)||10;if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}if(buyIn<=0){document.getElementById('loginErr').textContent='Please enter a valid buy-in amount.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=Math.round(buyIn*100);localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
-['nameInput','roomInput','buyInInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
+document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim(),buyIn=parseFloat(document.getElementById('loginBuyInInput').value.replace(/[^0-9.]/g,''))||10;if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}if(buyIn<=0){document.getElementById('loginErr').textContent='Please enter a valid buy-in amount.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=Math.round(buyIn*100);localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
+['nameInput','roomInput','loginBuyInInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
 document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
 // ── Scroll wheel dials ─────────────────────────────────────────────────────────
