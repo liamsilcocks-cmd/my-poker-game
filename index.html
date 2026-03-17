@@ -517,9 +517,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 <div id="buyBackOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h2>💸 Out of Chips!</h2>
-    <p id="buyBackMsg">You've run out of chips. Buy back in for <strong>£10.00</strong>?</p>
+    <p id="buyBackMsg">You've run out of chips. Buy back in?</p>
+    <input type="text" id="buyBackStakeInput" value="Stake £10" autocomplete="off" style="margin-bottom:4px">
     <p style="color:#e09020;font-size:22px;font-weight:bold;margin:4px 0">⏱ <span id="buyBackTimer">15</span>s</p>
-    <button class="btn-gold" onclick="respondBuyBack(true)">✅ BUY BACK IN — £10.00</button>
+    <button class="btn-gold" onclick="respondBuyBack(true)">✅ BUY BACK IN</button>
     <button class="btn-gold" style="background:linear-gradient(135deg,#6a1a1a,#3a0a0a);margin-top:8px" onclick="respondBuyBack(false)">👀 Watch as Spectator</button>
     <button class="btn-gold" style="background:linear-gradient(135deg,#2a2a2a,#111);margin-top:8px;color:#aaa" onclick="exitGame()">🚪 Exit Game</button>
   </div>
@@ -534,7 +535,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 </div>
 <div id="lobbyOverlay" class="overlay" style="display:none">
   <div class="panel">
-    <h2>&#127920; Room <span id="lobbyRoomId"></span></h2>
+    <h2>🍆 Room <span id="lobbyRoomId"></span></h2>
     <div id="playerList"></div>
     <div id="pendingSection" style="display:none">
       <h3>&#9203; Requesting to join:</h3>
@@ -1254,7 +1255,7 @@ case 'waiting':document.getElementById('loginOverlay').style.display='none';docu
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
 case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}if(isHost&&msg.buyIn){const bi=document.getElementById('buyInInput');if(bi&&document.activeElement!==bi)bi.value=(msg.buyIn/100).toFixed(2);}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
-case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
+case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6\ud83d\udca6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
 case 'gameStarting':startKeepAliveTimer();document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
 case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
   if(window.drumReset) window.drumReset(msg.bb || 40);
@@ -1304,7 +1305,7 @@ function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getEleme
 function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
 function updateLedgerStacks(){if(!lastState||!lastState.players)return;const seated=lastState.players.filter(Boolean);if(!seated.length)return;let txt='📊 After hand #'+handNumber+': '+seated.map(p=>p.name+' \u00a3'+(p.chips/100).toFixed(2)).join(' | ');addLedgerEvent(txt);}
 function exitGame(){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}document.getElementById('buyBackOverlay').style.display='none';_intentionalClose=true;wsSend({type:'exitGame'});}
-function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}wsSend({type:'buyBack',accept});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
+function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}const stakeInput=document.getElementById('buyBackStakeInput');const buyIn=accept?Math.round((parseFloat((stakeInput?stakeInput.value:'').replace(/[^0-9.]/g,''))||10)*100):null;wsSend({type:'buyBack',accept,buyIn});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
 let pendingInGame={};
 function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
 function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(\''+p.id+'\',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(\''+p.id+'\',false)">Reject</button></span>';list.appendChild(row);}}
