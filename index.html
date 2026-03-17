@@ -507,6 +507,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <p>Enter your name and a room number to play</p>
     <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
     <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
+    <input type="number" id="buyInInput" placeholder="Buy-in amount (£)" min="1" step="1" value="10">
     <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
     <p id="loginErr" style="color:#e05050;margin-top:10px;font-size:.9rem"></p>
   </div>
@@ -649,7 +650,7 @@ function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,
 function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([delay,freq])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq*0.8,t+delay);o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);g.gain.setValueAtTime(0,t+delay);g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+delay);o.stop(t+delay+0.3);});}
 const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
-let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
+let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,myBuyIn=1000,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
 let occupiedSeats=[];
 let is2D=false;
 function updateOccupiedSeats(seats){
@@ -1191,7 +1192,7 @@ function connectWS(name,roomId,playerId){
     _serverShutdown=false;
     const rb=document.getElementById('reconnectBanner');
     if(rb)rb.style.display='none';
-    ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId}));
+    ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId,buyIn:myBuyIn}));
   };
   ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};
   ws.onclose=()=>{
@@ -1549,8 +1550,8 @@ document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClea
 
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
-['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
+document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim(),buyIn=parseFloat(document.getElementById('buyInInput').value)||10;if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}if(buyIn<=0){document.getElementById('loginErr').textContent='Please enter a valid buy-in amount.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=Math.round(buyIn*100);localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
+['nameInput','roomInput','buyInInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
 document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
 // ── Scroll wheel dials ─────────────────────────────────────────────────────────
