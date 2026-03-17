@@ -455,15 +455,16 @@ wss.on('connection', ws => {
         const resolve = p._onBuyBackResolved;
         p._onBuyBackResolved = null;
         if (msg.accept) {
-          p.chips = room.buyIn;
+          const buyInChips = (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : room.buyIn;
+          p.chips = buyInChips;
           p.pendingBuyBack = false;
           p.spectator = false;
           p.buyInCount = (p.buyInCount || 1) + 1;
-          p.buyInTotal = (p.buyInTotal || room.buyIn) + room.buyIn;
+          p.buyInTotal = (p.buyInTotal || room.buyIn) + buyInChips;
           p.sittingOut = true;
           writeLog(room, `BUY-BACK: ${p.name} bought back in \u2014 joining next hand | ${buyInTag(p)}`);
-          logEvent(room, `\u2705 ${p.name} bought back in for \u00a3${(room.buyIn/100).toFixed(2)}`);
-          send(p.ws, { type: 'buyBackAccepted', chips: room.buyIn });
+          logEvent(room, `\u2705 ${p.name} bought back in for \u00a3${(buyInChips/100).toFixed(2)}`);
+          send(p.ws, { type: 'buyBackAccepted', chips: buyInChips });
         } else {
           p.pendingBuyBack = false;
           p.sittingOut = true;
