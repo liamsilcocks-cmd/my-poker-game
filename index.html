@@ -925,12 +925,13 @@ trm.emissiveColor=new BABYLON.Color3(0.12,0.08,0.01);
 trim.material=trm;
 const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
 felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.28;
-const feltTex=new BABYLON.DynamicTexture('feltTex',{width:1024,height:512},scene,true);feltTex.hasAlpha=false;const ftc=feltTex.getContext();ftc.fillStyle='#040f05';ftc.fillRect(0,0,1024,512);ftc.fillStyle='rgba(255,200,0,0.35)';ftc.font='bold 200px Arial Black';ftc.textAlign='center';ftc.textBaseline='middle';ftc.fillText('SYFM',512,256);feltTex.update();
+const feltTex=new BABYLON.DynamicTexture('feltTex',{width:1024,height:512},scene,false);const ftc=feltTex.getContext();ftc.fillStyle='#040f05';ftc.fillRect(0,0,1024,512);ftc.fillStyle='rgba(255,200,0,0.30)';ftc.font='bold 200px Arial Black';ftc.textAlign='center';ftc.textBaseline='middle';ftc.fillText('SYFM',512,256);feltTex.update();
 const ftm=new BABYLON.PBRMaterial('ftm',scene);
-ftm.albedoTexture=feltTex;
+ftm.albedoColor=new BABYLON.Color3(0.02,0.16,0.07);
 ftm.roughness=0.96;ftm.metallic=0;
 ftm.sheen.isEnabled=true;ftm.sheen.intensity=0.38;ftm.sheen.color=new BABYLON.Color3(0.08,0.28,0.12);
-ftm.emissiveTexture=feltTex;ftm.emissiveColor=new BABYLON.Color3(0.08,0.06,0.0);
+const syEmTex=new BABYLON.DynamicTexture('syEmTex',{width:1024,height:512},scene,false);syEmTex.hasAlpha=true;const sec=syEmTex.getContext();sec.clearRect(0,0,1024,512);sec.fillStyle='rgba(255,200,0,0.28)';sec.font='bold 200px Arial Black';sec.textAlign='center';sec.textBaseline='middle';sec.fillText('SYFM',512,256);syEmTex.update();
+ftm.emissiveTexture=syEmTex;ftm.emissiveColor=new BABYLON.Color3(1,1,1);
 felt.material=ftm;felt.receiveShadows=true;
 const inlay=BABYLON.MeshBuilder.CreateTorus('inlay',{diameter:9.8,thickness:0.04,tessellation:T,radialSegments:6},scene);
 inlay.scaling.x=TRX/(9.8/2)*0.86;inlay.scaling.z=TRZ/(9.8/2)*0.86;inlay.position.y=0.32;
@@ -938,7 +939,7 @@ const ilm=new BABYLON.StandardMaterial('ilm',scene);
 ilm.diffuseColor=new BABYLON.Color3(0.08,0.32,0.14);
 ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
 inlay.material=ilm;
-bc.fillStyle='rgba(255,215,0,0.18)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM',512,256);buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();
+buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();
 return scene;}
 let seatActions={};
 
