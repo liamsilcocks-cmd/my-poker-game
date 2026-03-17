@@ -347,7 +347,8 @@ wss.on('connection', ws => {
         // ── Brand-new player ──────────────────────────────────────────────────
         const hasSeatedPlayers = room.seats.some(s => s !== null);
         if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
-          room.seats[0] = mkPlayer(ws, myId, name, 0, room);
+          const hostBuyIn = (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : START_CHIPS;
+          room.seats[0] = mkPlayer(ws, myId, name, 0, room, hostBuyIn);
           room.hostId = myId;
           svrLog(`NEW ROOM \u2014 ${name} created room ${myRoomId} as host`);
           writeLog(room, `HOST JOINED: ${name} created room ${myRoomId} | ${buyInTag(room.seats[0])}`);
@@ -365,7 +366,7 @@ wss.on('connection', ws => {
 
         svrLog(`JOIN PENDING \u2014 ${name} (room ${myRoomId})`);
         writeLog(room, `JOIN REQUEST: ${name} (id: ${myId})`);
-        room.pendingJoins.push({ ws, id: myId, name });
+        room.pendingJoins.push({ ws, id: myId, name, buyIn: (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : null });
         send(ws, { type: 'waiting', id: myId });
         const host = room.seats.find(s => s?.id === room.hostId);
         if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name });
@@ -400,7 +401,7 @@ wss.on('connection', ws => {
               broadcastAll(room, lobbySnapshot(room));
               return;
             }
-            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat, room);
+            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat, room, p.buyIn || null);
             send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
             writeLog(room, `SEATED: ${p.name} assigned Seat ${seat+1} | ${buyInTag(room.seats[seat])}`);
             if (room.gameActive) {
@@ -671,8 +672,8 @@ function executeCashOut(room, s) {
   scheduleRoomCleanup(room);
 }
 
-function mkPlayer(ws, id, name, seat, room) {
-  const startChips = room ? room.buyIn : START_CHIPS;
+function mkPlayer(ws, id, name, seat, room, chips) {
+  const startChips = chips != null ? chips : (room ? room.buyIn : START_CHIPS);
   return {
     ws, id, name, chips: startChips, seat, cards: [], bet: 0,
     folded: false, disconnected: false, autoFold: false,
@@ -1528,4 +1529,3 @@ function gracefulShutdown(signal) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
-
