@@ -1,1560 +1,1692 @@
-// server.js — SYFM Poker | Last edited: 2026-02-27
+<!-- poker.html | Last edited: 2026-02-27 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SYFM Poker">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SYFM Poker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:'Segoe UI',Arial,sans-serif}
+#gameUI{--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px)}
+#c{width:100%;height:100%;display:block;touch-action:none}
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,5,2,0.88);z-index:200}
+.panel{background:linear-gradient(160deg,#1c0e06 0%,#2a1408 100%);border:2px solid #c8a020;border-radius:16px;padding:36px 44px;min-width:340px;max-width:480px;width:90%;text-align:center;box-shadow:0 0 60px rgba(200,160,32,0.20)}
+.panel h1{color:#ffd700;font-size:2.2rem;margin-bottom:8px;letter-spacing:2px}
+.panel h2{color:#ffd700;font-size:1.5rem;margin-bottom:18px}
+.panel h3{color:#c8a020;font-size:1rem;margin:14px 0 8px}
+.panel p{color:#c8a060;margin-bottom:14px;line-height:1.5}
+.panel input[type=text],.panel input[type=number]{width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;background:#0d0704;border:1px solid #6a5010;color:#ffd700;font-size:1.1rem;outline:none;text-align:center}
+.panel input:focus{border-color:#c8a020}
+.btn-gold{width:100%;padding:14px;margin-top:14px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:1.1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
+.btn-gold:hover{opacity:.85}
+.btn-gold:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:8px 18px;border-radius:6px;border:none;font-size:.9rem;font-weight:bold;cursor:pointer;color:#fff;margin:4px}
+.btn-approve{background:#1a6a1a}
+.btn-reject{background:#6a1a1a}
+.player-row{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);border-radius:8px;padding:10px 14px;margin:6px 0;color:#e0c060;font-size:.95rem}
+.player-row .chips{color:#ffd700;font-weight:bold}
+.host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
+.pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.1);border-radius:8px;padding:8px 12px;margin:4px 0;color:#e0c060}
+/* ── Cookie / UAT notice overlay ── */
+#cookieOverlay{z-index:500}
+#cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px;overflow-y:auto;max-height:92vh}
+#cookieOverlay h2{text-align:center;margin-bottom:4px;font-size:1.35rem}
+.cookie-subtitle{color:#e09020;font-size:.82rem;letter-spacing:1px;text-transform:uppercase;text-align:center;margin-bottom:18px;display:block}
+.cookie-table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:.85rem}
+.cookie-table th{background:rgba(200,160,32,0.18);color:#ffd700;padding:7px 10px;text-align:left;border:1px solid #4a3a10;font-size:.8rem;letter-spacing:.5px}
+.cookie-table td{padding:7px 10px;border:1px solid #3a2a08;color:#d0b860;vertical-align:top;line-height:1.45}
+.cookie-table tr:nth-child(even) td{background:rgba(255,255,255,0.03)}
+.cookie-table td:first-child{color:#ffd700;font-weight:bold;white-space:nowrap;width:36%}
+.cookie-uat{margin-top:16px;padding:10px 14px;background:rgba(180,40,40,0.18);border:1px solid #8a2020;border-radius:8px;color:#e08080;font-size:.85rem;line-height:1.5;text-align:center}
+.cookie-uat strong{color:#ff9090}
+.cookie-btns{display:flex;gap:10px;margin-top:20px}
+.cookie-btns .btn-gold{flex:1;margin-top:0;font-size:1rem;padding:12px}
+.btn-deny{flex:1;padding:12px;border-radius:8px;border:1px solid #6a2020;background:linear-gradient(135deg,#4a1a1a,#2a0a0a);color:#c06060;font-size:1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
+.btn-deny:hover{opacity:.8}
+#gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
+#gameUI > *{pointer-events:auto}
+#topBar{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px}
+#phase{font-size:14px;font-weight:bold;white-space:nowrap}
+#pot{font-size:17px;font-weight:bold;white-space:nowrap}
+#roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
+#actionPanel{position:fixed;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px;background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
+.abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
+.abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
+.abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
+.abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
+
+/* ── Swipe All-In button ────────────────────────────────────────────────────── */
+.swipe-allin-track{
+  position:relative;
+  width:100%;
+  height:46px;
+  border-radius:8px;
+  background:#1e1400;
+  border:2px solid #7a6a00;
+  border-bottom:3px solid #4a3a00;
+  overflow:hidden;
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+  -webkit-tap-highlight-color:transparent;
+  margin-top:16px;
+}
+.swipe-allin-track:active{cursor:grabbing}
+.swipe-allin-fill{
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:0%;
+  background:linear-gradient(90deg,#5a4a00,#c8a020);
+  border-radius:6px 0 0 6px;
+  pointer-events:none;
+}
+.swipe-allin-thumb{
+  position:absolute;
+  left:4px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:34px;
+  background:linear-gradient(135deg,#c8a020,#8a6a08);
+  border-radius:6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  color:#000;
+  font-weight:bold;
+  box-shadow:0 2px 8px rgba(0,0,0,0.6);
+  transition:left 0.32s cubic-bezier(0.34,1.56,0.64,1);
+  z-index:2;
+  pointer-events:none;
+}
+.swipe-allin-thumb.dragging{
+  transition:none;
+}
+.swipe-allin-label{
+  position:absolute;
+  left:0;right:0;top:0;bottom:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:bold;
+  color:#ffe040;
+  letter-spacing:1.5px;
+  pointer-events:none;
+  z-index:1;
+  text-shadow:0 1px 4px rgba(0,0,0,0.8);
+}
+/* Shake hint animation — triggered on tap with no drag */
+@keyframes allInShake{
+  0%  {transform:translateY(-50%) translateX(0)}
+  15% {transform:translateY(-50%) translateX(9px)}
+  30% {transform:translateY(-50%) translateX(-7px)}
+  45% {transform:translateY(-50%) translateX(7px)}
+  60% {transform:translateY(-50%) translateX(-5px)}
+  75% {transform:translateY(-50%) translateX(4px)}
+  90% {transform:translateY(-50%) translateX(-2px)}
+  100%{transform:translateY(-50%) translateX(0)}
+}
+.swipe-allin-thumb.shake{
+  animation:allInShake 0.52s ease;
+}
+/* Success flash */
+@keyframes allInFlash{
+  0%  {background:linear-gradient(90deg,#5a4a00,#c8a020)}
+  50% {background:linear-gradient(90deg,#c8a020,#ffe040)}
+  100%{background:linear-gradient(90deg,#5a4a00,#c8a020)}
+}
+.swipe-allin-fill.flash{
+  animation:allInFlash 0.18s ease forwards;
+}
+
+#drumWidget{width:100%;display:none;flex-direction:column;gap:3px;align-items:center}
+/* ── Scroll wheel dials ── */
+.dial-row{display:flex;gap:6px;justify-content:center;align-items:center;width:100%;padding:2px 0}
+.dial-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1}
+.dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
+.dial-wheel{
+  width:72px;height:96px;
+  overflow:hidden;position:relative;
+  border-radius:10px;
+  background:linear-gradient(180deg,#0a0600 0%,#1a1000 30%,#1a1000 70%,#0a0600 100%);
+  border:2px solid #c8a020;
+  cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;
+  box-shadow:inset 0 0 18px rgba(0,0,0,0.8),0 0 8px rgba(200,160,32,0.2);
+}
+.dial-wheel:active{cursor:grabbing}
+.dial-wheel::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:32px;background:rgba(200,160,32,0.12);border-top:1px solid rgba(200,160,32,0.5);border-bottom:1px solid rgba(200,160,32,0.5);pointer-events:none;z-index:2}
+.dial-wheel::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,6,0,0.85) 0%,transparent 35%,transparent 65%,rgba(10,6,0,0.85) 100%);pointer-events:none;z-index:3}
+.dial-inner{position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;align-items:center;will-change:transform}
+.dial-item{height:32px;line-height:32px;text-align:center;font-weight:bold;width:100%;flex-shrink:0}
+.dial-item.selected{font-size:22px;color:#ffd700}
+.dial-item.adj1{font-size:16px;color:rgba(200,160,32,0.55)}
+.dial-item.adj2{font-size:13px;color:rgba(200,160,32,0.25)}
+.dial-sep{font-size:22px;font-weight:bold;color:#c8a060;line-height:1;align-self:center;margin-top:18px}
+#tableSlider{position:absolute;right:calc(8px + env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:110;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,0,0,0.6);border-radius:20px;padding:10px 7px;border:1px solid rgba(200,160,32,0.35)}
+#tableSlider label{font-size:11px;color:#c8a060}
+#tablePan{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:36px;height:130px;cursor:pointer;accent-color:#c8a020}
+#tablePan::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
+#tablePan::-moz-range-thumb{width:32px;height:32px;border-radius:50%;background:#c8a020;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.6);cursor:pointer}
+#bottomBar{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:215px;transform:none;background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
+#myInfo{font-size:14px;font-weight:bold;color:#ffd700;line-height:1.5;letter-spacing:0.5px}
+#controlBar{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:1000}
+.cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;line-height:1;cursor:pointer;color:#fff;background:#1a4a7a}
+.cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
+.cbtn-cashout{padding:9px 11px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
+.cbtn-cashout.pending{background:#6a1a00;border-color:#ff6040;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.65}}
+.cbtn-autofold{padding:9px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#3a1a5a;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.cbtn-autofold.active{background:#8a10cc;box-shadow:0 0 10px rgba(180,60,255,0.7)}
+#stackEditor{position:absolute;bottom:calc(50px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.93);border:1px solid #c8a020;border-radius:10px;padding:10px 12px;z-index:115;display:none;min-width:210px;max-height:60vh;overflow-y:auto}
+#stackEditor h4{color:#ffd700;font-size:12px;margin:0 0 8px 0;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #4a3a10;padding-bottom:5px}
+.se-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.se-name{flex:1;color:#e0d0a0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.se-input{width:68px;background:#1a1000;border:1px solid #6a5010;border-radius:5px;color:#ffd700;font-size:13px;font-weight:bold;padding:4px 6px;text-align:right}
+.se-input:focus{outline:none;border-color:#c8a020}
+.se-btn{padding:4px 8px;border-radius:5px;border:none;background:#4a6a00;color:#fff;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.se-btn:active{background:#6a9a00}
+.cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent;display:block}
+@supports (-webkit-touch-callout:none) and (not (display:-webkit-box)){
+  .cbtn-fs{display:none!important}
+}
+#msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
+#sideBoxes{position:fixed;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
+#chatBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #3a2a10;overflow:hidden}
+#chatBox.flash #chatHeader{animation:chatFlash 0.6s ease 3}
+@keyframes chatFlash{0%{background:transparent}50%{background:rgba(200,160,32,0.35)}100%{background:transparent}}
+#chatHeader{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#c8a060;font-size:11px;font-weight:bold;user-select:none}
+#chatHeader span{color:#a09060;font-size:10px}
+#chatInner{padding:0 8px 8px;border-top:1px solid #3a2a10;display:none}
+#chatLog{height:90px;overflow-y:auto;font-size:11px;color:#c8c8a0;margin-bottom:5px;display:flex;flex-direction:column;gap:2px}
+#chatInput{width:100%;padding:5px 8px;border-radius:4px;border:1px solid #4a3a15;background:rgba(0,0,0,0.7);color:#ffd700;font-size:11px}
+#activityBox{background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #2a3a1a;overflow:hidden}
+#activityHeader{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#60c840;font-size:11px;font-weight:bold;user-select:none}
+#activityHeader span{color:#a0d070;font-size:10px}
+#activityLog{height:160px;overflow-y:auto;font-size:10px;color:#b0d890;padding:4px 8px 6px;display:none;flex-direction:column;gap:2px;border-top:1px solid #1a2a10}
+#activityLog .log-hand{color:#ffd700;font-weight:bold;margin-top:3px}
+#activityLog .log-action{color:#90c870}
+#activityLog .log-win{color:#40e870;font-weight:bold}
+#activityLog .log-community{color:#a0b8ff}
+#activityLog .log-fold{color:#e07050}
+#activityLog .log-system{color:#c8a060;font-style:italic}
+#waitingMsg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:20px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none}
+#joinRequestNotif{position:absolute;top:58px;right:240px;background:rgba(10,40,10,0.95);padding:12px 14px;border-radius:10px;color:#e0e0e0;font-size:13px;display:none;border:1px solid #20a040;min-width:200px;z-index:10}
+#joinRequestNotif h4{color:#40e060;margin-bottom:6px;font-size:14px}
+#joinReqList{display:flex;flex-direction:column;gap:5px}
+.jr-row{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.07);padding:5px 8px;border-radius:6px}
+.jr-name{color:#ffd700;font-weight:bold;font-size:12px}
+.jr-btns{display:flex;gap:4px}
+.jr-admit{background:#1a6a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
+.jr-reject{background:#6a1a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
+#turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
+#spectatorBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:16px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none;z-index:50}
+#pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
+#toggleViewBtn{
+  position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:9999;
+  height:44px;padding:0 14px;border-radius:22px;
+  border:2px solid #c8a020;
+  background:rgba(10,5,2,0.94);
+  color:#ffd700;font-size:13px;font-weight:bold;letter-spacing:1px;
+  cursor:pointer;display:none;
+  box-shadow:0 0 0 3px rgba(200,160,32,0.25),0 4px 18px rgba(0,0,0,0.7);
+  -webkit-tap-highlight-color:transparent;
+  transition:background 0.2s,box-shadow 0.2s;
+  display:none;align-items:center;gap:7px;white-space:nowrap;
+}
+#toggleViewBtn:active{background:rgba(200,160,32,0.3);box-shadow:0 0 0 5px rgba(200,160,32,0.4)}
+#toggleViewBtn.mode2d{background:rgba(200,160,32,0.18);border-color:#ffd700;box-shadow:0 0 0 3px rgba(200,160,32,0.5),0 4px 18px rgba(0,0,0,0.7)}
+#view2d{
+  display:none;position:fixed;inset:0;
+  background:#1a0d05;overflow:hidden;
+  z-index:90;
+}
+#table2d{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:min(92vw,560px);height:min(58vw,360px);
+  background:radial-gradient(ellipse at center,#0d3a18 0%,#072010 60%,#041408 100%);
+  border-radius:50%;
+  border:4px solid #1a5a28;
+  box-shadow:0 0 0 6px #0a2a10,0 0 60px rgba(0,0,0,0.8),inset 0 0 40px rgba(0,0,0,0.5);
+}
+#table2dInner{position:relative;width:100%;height:100%;}
+#table2dCenter{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-52%);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  pointer-events:none;
+}
+#pot2d{text-align:center;}
+#pot2d .pot-label{color:#c8a060;font-size:9px;letter-spacing:2px;text-transform:uppercase}
+#pot2d .pot-val{color:#ffd700;font-size:17px;font-weight:bold;text-shadow:0 0 10px rgba(200,160,32,0.7)}
+#community2d{display:flex;gap:4px;overflow:visible;}
+.c2d-card{
+  position:relative;
+  width:72px;height:102px;border-radius:7px;
+  background:#fff;border:1px solid #ccc;
+  box-shadow:0 2px 10px rgba(0,0,0,0.5);
+  flex-shrink:0;
+}
+.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
+.c2d-card.red{color:#cc2020;}
+.c2d-card.black{color:#111;}
+.p2d-seat{
+  position:absolute;transform:translate(-50%,-50%);
+  display:flex;flex-direction:row;align-items:center;gap:8px;
+  pointer-events:none;
+}
+.p2d-info{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:74px;order:2;}
+.p2d-name{
+  font-size:10px;font-weight:bold;color:#e0d0a0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:74px;
+  background:rgba(0,0,0,0.78);border-radius:4px;padding:2px 5px;
+}
+.p2d-name.me{color:#ffd700;background:rgba(200,160,32,0.22)}
+.p2d-name.folded{color:#555;text-decoration:line-through}
+.p2d-stack{font-size:9px;color:#80cfff;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
+.p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px;}
+.p2d-cards{display:flex;gap:4px;order:1;}
+.p2d-card{
+  position:relative;
+  width:70px;height:99px;border-radius:7px;
+  background:#fff;border:1px solid #aaa;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  flex-shrink:0;
+}
+.p2d-seat.me .p2d-card{width:90px;height:126px;border-radius:9px;box-shadow:0 3px 14px rgba(0,0,0,0.6);}
+.p2d-card.back,.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa;}
+.p2d-card.red,.c2d-card.red{color:#cc2020;}
+.p2d-card.black,.c2d-card.black{color:#111;}
+.p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5;}
+.p2dc-tl{position:absolute;top:3px;left:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;}
+.p2dc-br{position:absolute;bottom:3px;right:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;transform:rotate(180deg);}
+.c2d-card .p2dc-tl,.c2d-card .p2dc-br{font-size:13px;}
+.p2d-seat.me .p2d-card .p2dc-tl,.p2d-seat.me .p2d-card .p2dc-br{font-size:14px;}
+.p2dc-center{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  display:flex;align-items:center;gap:3px;
+  font-weight:bold;line-height:1;white-space:nowrap;
+}
+.p2dc-center .p2dc-rank{font-size:28px;font-weight:900;}
+.p2dc-center .p2dc-suit{font-size:28px;}
+.c2d-card .p2dc-center .p2dc-rank{font-size:36px;}
+.c2d-card .p2dc-center .p2dc-suit{font-size:36px;}
+.p2d-seat.me .p2d-card .p2dc-center .p2dc-rank{font-size:36px;}
+.p2d-seat.me .p2d-card .p2dc-center .p2dc-suit{font-size:36px;}
+#stackInfo2d{
+  position:fixed;
+  bottom:calc(56px + env(safe-area-inset-bottom,0px));
+  right:calc(10px + env(safe-area-inset-right,0px));
+  background:rgba(0,0,0,0.88);
+  border:1px solid #6a5010;border-radius:8px;
+  padding:5px 12px;color:#ffd700;
+  font-size:13px;font-weight:bold;
+  text-align:right;white-space:nowrap;
+  display:none;z-index:112;pointer-events:none;
+  box-shadow:0 2px 10px rgba(0,0,0,0.6);
+}
+.p2d-token{
+  display:inline-block;font-size:8px;font-weight:bold;
+  border-radius:3px;padding:1px 3px;margin-right:2px;
+}
+.p2d-token.dealer{background:#c8a020;color:#000}
+.p2d-token.sb{background:#1a6a1a;color:#fff}
+.p2d-token.bb{background:#1a1a8a;color:#fff}
+.p2d-token.toact{background:#cc2020;color:#fff;animation:p2dPulse 0.8s ease-in-out infinite}
+@keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.p2d-waiting{color:#888;font-size:9px;font-style:italic}
+
+#loginBuyInInput::-webkit-inner-spin-button,#loginBuyInInput::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+  .panel{padding:20px 18px;min-width:0;width:94%;}
+  .panel h1{font-size:1.6rem;}
+  .panel input[type=text],.panel input[type=number]{font-size:1rem;padding:10px 12px;}
+  .btn-gold{font-size:1rem;padding:12px;}
+}
+
+@media screen and (max-height: 700px), screen and (max-width: 500px) {
+  #actionPanel{
+    top:auto !important;
+    bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;
+    transform:none !important;
+    left:0 !important;
+    right:auto !important;
+    width:160px !important;
+    padding:6px 8px !important;
+    gap:5px !important;
+    max-height:calc(100vh - 120px);
+    overflow-y:auto;
+    border-radius:0 12px 12px 0 !important;
+  }
+  .abtn{padding:9px 6px !important;font-size:13px !important;}
+  #drumWidget{gap:2px !important;}
+  .dial-wheel{width:60px !important;height:80px !important;}
+  .dial-item.selected{font-size:18px !important;}
+  .dial-item.adj1{font-size:13px !important;}
+  .dial-sep{font-size:18px !important;margin-top:14px !important;}
+  /* Shrink swipe button slightly on small screens */
+  .swipe-allin-track{height:38px !important;}
+  .swipe-allin-thumb{width:30px !important;height:28px !important;font-size:11px !important;}
+  .swipe-allin-label{font-size:10px !important;letter-spacing:1px !important;}
+}
+
+#toggleViewBtn{isolation:isolate}
+@media screen and (max-width: 500px) {
+  #toggleViewBtn{
+    top:auto !important;
+    bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;
+    right:auto !important;
+    left:calc(4px + env(safe-area-inset-left,0px)) !important;
+    font-size:11px !important;
+    padding:0 10px !important;
+    height:36px !important;
+    border-radius:18px !important;
+    z-index:1001 !important;
+  }
+  #topBar{
+    top:calc(8px + env(safe-area-inset-top,0px)) !important;
+    font-size:11px;
+  }
+  #phase{font-size:11px !important;}
+  #pot{font-size:13px !important;}
+  #controlBar{
+    bottom:calc(4px + env(safe-area-inset-bottom,0px)) !important;
+    right:calc(4px + env(safe-area-inset-right,0px)) !important;
+    gap:3px !important;
+  }
+  .cbtn-pause,.cbtn-cashout,.cbtn-autofold,.cbtn-fs{
+    padding:7px 8px !important;
+    font-size:11px !important;
+  }
+  #sideBoxes{
+    width:160px !important;
+    top:104px !important;
+    right:4px !important;
+  }
+  #tableSlider{display:none !important;}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="toggleViewBtn" onclick="toggle2D()" title="Switch to 2D view">
+  <svg width="18" height="18" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+    <circle cx="18" cy="18" r="16" fill="#2a1a00" stroke="#c8a020" stroke-width="3"/>
+    <circle cx="18" cy="18" r="10" fill="none" stroke="#c8a020" stroke-width="2"/>
+    <line x1="18" y1="2" x2="18" y2="8" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="18" y1="28" x2="18" y2="34" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="2" y1="18" x2="8" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="28" y1="18" x2="34" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>
+  <span id="toggleViewLabel">→2D</span>
+</button>
+
+<div id="view2d">
+  <div id="table2d">
+    <div id="table2dInner">
+     <div id="pot2d" style="position:absolute;top:14%;left:50%;transform:translateX(-50%);text-align:center;z-index:4;pointer-events:none;background:rgba(0,0,0,0.55);border-radius:8px;padding:3px 14px 4px;border:1px solid rgba(200,160,32,0.30);white-space:nowrap;">
+        <div class="pot-label">POT</div>
+        <div class="pot-val" id="pot2dVal">£0.00</div>
+      </div>
+    <div id="table2dCenter">
+        <div id="msg2d" style="display:none;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:8px 18px;color:#fff;font-size:15px;font-weight:bold;text-align:center;white-space:pre-line;max-width:260px;pointer-events:none;"></div>
+        <div id="community2d"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="cookieOverlay" class="overlay">
+  <div class="panel">
+    <h2>🍪 Cookie Notice</h2>
+    <span class="cookie-subtitle">Please read before continuing</span>
+    <p style="color:#c8a060;font-size:.9rem;line-height:1.6;margin-bottom:4px">
+      Whilst no cookies are deliberately created to track you or your behaviour, the following data is stored locally and on our server for the purposes of playing this game online:
+    </p>
+    <table class="cookie-table">
+      <thead>
+        <tr><th>Feature</th><th>How it's handled</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>User Identity</td>
+          <td>Generated as a random string and saved in Local Storage.</td>
+        </tr>
+        <tr>
+          <td>Session Tracking</td>
+          <td>Handled by a persistent WebSocket connection (ws).</td>
+        </tr>
+        <tr>
+          <td>Game History</td>
+          <td>Written to text files on the server disk and uploaded via FTP. This is used during development for debug purposes.</td>
+        </tr>
+        <tr>
+          <td>Reconnection</td>
+          <td>The client reads the ID from Local Storage and sends it to the server to &ldquo;resume&rdquo; their seat.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="cookie-uat">
+      ⚠️ <strong>Development &amp; UAT Notice</strong><br>
+      This game is in development and UAT.<br>
+      You should <strong>never</strong> bet any real money using this game.
+    </div>
+    <div class="cookie-btns">
+      <button class="btn-gold" onclick="cookieAccept()">✅ Yes, I love dick &amp; Continue</button>
+      <button class="btn-deny" onclick="cookieDeny()">✖ I love scranning pussy &amp; Deny</button>
+    </div>
+  </div>
+</div>
+
+<div id="loginOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px">
+      <circle cx="36" cy="36" r="34" fill="#1a1a1a" stroke="#c8a020" stroke-width="4"/>
+      <g opacity="0.9">
+        <path d="M36 2 A34 34 0 0 1 62.4 19" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M62.4 19 A34 34 0 0 1 68.8 47" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M68.8 47 A34 34 0 0 1 50 66.5" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M50 66.5 A34 34 0 0 1 22 66.5" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M22 66.5 A34 34 0 0 1 3.2 47" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M3.2 47 A34 34 0 0 1 9.6 19" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
+        <path d="M9.6 19 A34 34 0 0 1 36 2" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
+      </g>
+      <circle cx="36" cy="36" r="24" fill="#1c0e06" stroke="#c8a020" stroke-width="2.5"/>
+      <circle cx="36" cy="36" r="20" fill="none" stroke="rgba(200,160,32,0.3)" stroke-width="1"/>
+      <text x="36" y="40" font-family="Arial" font-weight="bold" font-size="9" fill="#ffd700" text-anchor="middle">SYFM</text>
+    </svg>
+    <h1 style="font-size:2.4rem;letter-spacing:4px;margin-bottom:4px">SYFM</h1>
+    <div style="color:#c8a060;font-size:0.95rem;letter-spacing:6px;margin-bottom:18px;text-transform:uppercase">Poker</div>
+    <p>Enter your name and a room number to play</p>
+    <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
+    <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
+    <input type="text" id="loginBuyInInput" value="Stake £10" autocomplete="off">
+    <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
+    <p id="loginErr" style="color:#e05050;margin-top:10px;font-size:.9rem"></p>
+  </div>
+</div>
+
+<div id="buyBackOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <h2>💸 Out of Chips!</h2>
+    <p id="buyBackMsg">You've run out of chips. Buy back in?</p>
+    <input type="text" id="buyBackStakeInput" value="Stake £10" autocomplete="off" style="margin-bottom:4px">
+    <p style="color:#e09020;font-size:22px;font-weight:bold;margin:4px 0">⏱ <span id="buyBackTimer">15</span>s</p>
+    <button class="btn-gold" onclick="respondBuyBack(true)">✅ BUY BACK IN</button>
+    <button class="btn-gold" style="background:linear-gradient(135deg,#6a1a1a,#3a0a0a);margin-top:8px" onclick="respondBuyBack(false)">👀 Watch as Spectator</button>
+    <button class="btn-gold" style="background:linear-gradient(135deg,#2a2a2a,#111);margin-top:8px;color:#aaa" onclick="exitGame()">🚪 Exit Game</button>
+  </div>
+</div>
+
+<div id="waitingOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <h2>&#9203; Waiting for host&hellip;</h2>
+    <p id="waitingTxt">The host will approve your entry shortly.</p>
+    <button class="btn-gold" onclick="location.reload()" style="margin-top:10px">Cancel</button>
+  </div>
+</div>
+<div id="lobbyOverlay" class="overlay" style="display:none">
+  <div class="panel">
+    <h2>🍆 Room <span id="lobbyRoomId"></span></h2>
+    <div id="playerList"></div>
+    <div id="pendingSection" style="display:none">
+      <h3>&#9203; Requesting to join:</h3>
+      <div id="pendingItems"></div>
+    </div>
+    <p id="lobbyStatus" style="color:#c8a060;margin-top:14px;font-size:.9rem"></p>
+    <button class="btn-gold" id="startBtn" style="display:none;margin-top:18px">&#9654; START GAME</button>
+  </div>
+</div>
+<div id="gameUI">
+  <div id="topBar">
+    <div id="phase">PRE-FLOP</div>
+    <div id="pot">POT: &pound;0.00</div>
+    <div id="myNameBadge" style="font-size:12px;color:#80cfff;padding:3px 8px;background:rgba(0,80,160,0.25);border-radius:6px;white-space:nowrap"></div>
+    <div id="roomBadge">ROOM &mdash;</div>
+  </div>
+  <div id="actionPanel">
+    <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
+    <div id="drumWidget">
+      <div class="dial-row">
+        <div class="dial-wrap">
+          <div class="dial-label">pounds £</div>
+          <div class="dial-wheel" id="dialPounds"><div class="dial-inner" id="dialPoundsInner"></div></div>
+        </div>
+        <div class="dial-sep">.</div>
+        <div class="dial-wrap">
+          <div class="dial-label">pence</div>
+          <div class="dial-wheel" id="dialPence"><div class="dial-inner" id="dialPenceInner"></div></div>
+        </div>
+      </div>
+    </div>
+    <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET £0.40</button>
+
+    <!-- Swipe-to-confirm All In — replaces the old tap button -->
+    <div class="swipe-allin-track" id="allInBtn" style="display:none">
+      <div class="swipe-allin-fill" id="allInFill"></div>
+      <div class="swipe-allin-thumb" id="allInThumb">▶▶</div>
+      <span class="swipe-allin-label">SWIPE &mdash; ALL IN</span>
+    </div>
+
+    <button class="abtn abtn-fold" id="foldBtn" style="display:none;margin-top:16px">FOLD</button>
+  </div>
+  <div id="drumOverlay" style="display:none"></div>
+  <div id="bottomBar">
+    <div id="myInfo">Stack £10.00</div>
+  </div>
+  <div id="tableSlider">
+    <label>▲</label>
+    <input type="range" id="tablePan" min="-3" max="3" step="0.1" value="0.5">
+    <label>▼</label>
+  </div>
+  <div id="stackEditor">
+    <h4>🔧 Host Controls</h4>
+    <div class="se-row" style="margin-bottom:10px;border-bottom:1px solid #4a3a10;padding-bottom:10px">
+      <span class="se-name" style="color:#ffd700">Buy-in £</span>
+      <input class="se-input" id="buyInInput" type="number" min="1" step="1" value="10.00" style="width:72px">
+      <button class="se-btn" id="buyInBtn" onclick="applyBuyIn()" style="background:#1a3a6a">SET</button>
+    </div>
+    <div style="color:#888;font-size:10px;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Player stacks</div>
+    <div id="stackEditorRows"></div>
+  </div>
+  <div id="stackInfo2d"></div>
+  <div id="controlBar">
+    <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">⏸</button>
+    <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
+    <button class="cbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
+    <button class="cbtn-autofold" id="stackEditorBtn" onclick="toggleStackEditor()" style="display:none;background:#2a4a1a">🔧</button>
+    <button class="cbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+  </div>
+  <div id="pauseBanner"></div>
+  <div id="spectatorBanner">👀 You are spectating — no cards will be dealt to you</div>
+  <div id="msg"></div>
+  <div id="waitingMsg"></div>
+  <div id="joinRequestNotif">
+    <h4>&#9203; Players want to join</h4>
+    <div id="joinReqList"></div>
+  </div>
+  <div id="turnIndicator"></div>
+  <div id="sideBoxes">
+    <div id="chatBox">
+      <div id="chatHeader" onclick="toggleChat()">&#128172; CHAT <span id="chatToggle">&#9654; expand</span></div>
+      <div id="chatInner">
+        <div id="chatLog"></div>
+        <input type="text" id="chatInput" placeholder="Type and press Enter&hellip;" maxlength="100">
+      </div>
+    </div>
+    <div id="activityBox">
+      <div id="activityHeader" onclick="toggleActivityLog()">&#128203; LOG <span id="activityToggle">&#9654; expand</span></div>
+      <div id="activityLog"></div>
+    </div>
+    <div id="eliminatedBox" style="background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #6a2010;overflow:hidden;display:none">
+      <div id="eliminatedHeader" onclick="toggleEliminated()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#e07050;font-size:11px;font-weight:bold;user-select:none">
+        &#128683; <span id="eliminatedHdr">OUT (0)</span> <span id="eliminatedToggle">&#9654; expand</span>
+      </div>
+      <div id="eliminatedList" style="display:none;padding:4px 8px 6px;border-top:1px solid #4a1a10"></div>
+    </div>
+    <div id="ledgerBox" style="background:rgba(0,0,0,0.82);border-radius:8px;border:1px solid #1a3a5a;overflow:hidden">
+      <div id="ledgerHeader" onclick="toggleLedger()" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;cursor:pointer;color:#60a8c8;font-size:11px;font-weight:bold;user-select:none">
+        &#128196; LEDGER <span id="ledgerToggle">&#9654; expand</span>
+      </div>
+      <div id="ledgerLog" style="display:none;max-height:140px;overflow-y:auto;padding:4px 8px 6px;border-top:1px solid #1a3a5a"></div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
 'use strict';
-const http   = require('http');
-const { WebSocketServer } = require('ws');
-const fs     = require('fs');
-const path   = require('path');
-const ftp    = require('basic-ftp');
-const crypto = require('crypto');
-
-const PORT  = process.env.PORT || 10000;
-const SUITS = ['\u2660','\u2665','\u2666','\u2663'];
-const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-const RVAL  = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
-const NP    = 9;
-const SB    = 10, BB = 20;
-const START_CHIPS = 1000;
-const ACTION_TIMEOUT = 15000;
-
-// A room with no connected players is destroyed after this much idle time.
-const ROOM_EMPTY_TTL_MS = 60_000; // 1 minute
-
-// ─── Logging ──────────────────────────────────────────────────────────────────
-const LOGS_DIR = path.join(__dirname, 'logs');
-if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
-
-const SERVER_LOG = path.join(LOGS_DIR, `server_${new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)}.txt`);
-function svrLog(line) {
-  const ts = new Date().toISOString().slice(11,23);
-  const entry = `[${ts}] ${line}\n`;
-  try { fs.appendFileSync(SERVER_LOG, entry); } catch {}
-  console.log(`[SVR] ${line}`);
+let audioCtx;
+function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
+function snd_deal(){ensureAudio();const t=audioCtx.currentTime,len=Math.floor(audioCtx.sampleRate*0.12),buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/len),0.6);const src=audioCtx.createBufferSource(),bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.Q.value=0.6;bp.frequency.setValueAtTime(4200,t);bp.frequency.exponentialRampToValueAtTime(1600,t+0.12);const g=audioCtx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.28,t+0.015);g.gain.exponentialRampToValueAtTime(0.001,t+0.12);src.buffer=buf;src.connect(bp);bp.connect(g);g.connect(audioCtx.destination);src.start(t);}
+function snd_flip(){ensureAudio();const t=audioCtx.currentTime,b=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.055),audioCtx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2200;g.gain.setValueAtTime(0.32,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.055);src.buffer=b;src.connect(hp);hp.connect(g);g.connect(audioCtx.destination);src.start(t);}
+function snd_chip(){ensureAudio();const t=audioCtx.currentTime,base=1600+Math.random()*500;[[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{const osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.type='sine';osc.frequency.value=base*r*(0.97+Math.random()*0.06);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);osc.connect(g);g.connect(audioCtx.destination);osc.start(t);osc.stop(t+0.14);});}
+function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,1319].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*0.10);g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);o.connect(g);g.connect(audioCtx.destination);o.start(t+i*0.10);o.stop(t+i*0.10+0.6);});}
+function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([delay,freq])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq*0.8,t+delay);o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);g.gain.setValueAtTime(0,t+delay);g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+delay);o.stop(t+delay+0.3);});}
+const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
+let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,myBuyIn=1000,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
+let occupiedSeats=[];
+let is2D=false;
+function updateOccupiedSeats(seats){
+  occupiedSeats=seats.map((s,i)=>s?i:null).filter(i=>i!==null);
 }
-
-function handLogPath(roomId, handNum) {
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return path.join(LOGS_DIR, `room${roomId}_hand${String(handNum).padStart(4,'0')}_${ts}.txt`);
+function vs(serverSeat){
+  if(occupiedSeats.length===0)return(serverSeat-mySeat+NP)%NP;
+  const myIdx=occupiedSeats.indexOf(mySeat);
+  const seatIdx=occupiedSeats.indexOf(serverSeat);
+  if(seatIdx===-1)return 0;
+  const n=occupiedSeats.length;
+  return(seatIdx-myIdx+n)%n;
 }
-
-function writeLog(room, line) {
-  if (!room.G || !room.G.logPath) return;
-  const ts = new Date().toTimeString().slice(0, 8);
-  try { fs.appendFileSync(room.G.logPath, `[${ts}] ${line}\n`); } catch {}
+function numVisualSeats(){return Math.max(occupiedSeats.length,2);}
+const canvas=document.getElementById('c');
+const engine=new BABYLON.Engine(canvas,true);
+window.addEventListener('resize',()=>engine.resize());
+canvas.addEventListener('click',()=>ensureAudio(),{once:true});
+let scene,cam,spotLight,shadowGen,cardBackMat,cardFrontMats={},cardPool=[],cardIdx=0,chipPool=[],potChips=[],seatBetChips=Array.from({length:NP},()=>[]),playerLabels=[],seatCardMeshes=Array.from({length:NP},()=>[null,null]),communityCardMeshes=[],dealerToken=null,sbToken=null,bbToken=null;
+const POT_BASE=new BABYLON.Vector3(0.2,0.32,-1.90);
+function betPos(vSeat){const n=numVisualSeats();const a=-Math.PI/2-(vSeat/n)*Math.PI*2,rx=TRX*0.46,rz=TRZ*0.46;return new BABYLON.Vector3(Math.cos(a)*rx,0.32,Math.sin(a)*rz);}
+function seatPos(i){const n=numVisualSeats();const a=-Math.PI/2-(i/n)*Math.PI*2;return new BABYLON.Vector3(Math.cos(a)*SRX,0.26,Math.sin(a)*SRZ);}
+function cardPos(si,cn){
+  const n=numVisualSeats();
+  const a=-Math.PI/2-(si/n)*Math.PI*2;
+  const rx=TRX*0.70,rz=TRZ*0.70;
+  const pa=a+Math.PI/2;
+  const off=(cn===0?-0.72:0.72);
+  return new BABYLON.Vector3(
+    Math.cos(a)*rx+Math.cos(pa)*off,
+    0.40+cn*0.018,
+    Math.sin(a)*rz+Math.sin(pa)*off
+  );
 }
-
-function logEvent(room, text) {
-  broadcastAll(room, { type: 'logEvent', text });
+function cardPosOther(si,cn){
+  const n=numVisualSeats();
+  const a=-Math.PI/2-(si/n)*Math.PI*2;
+  const rx=SRX*0.78,rz=SRZ*0.78;
+  const pa=a+Math.PI/2;
+  const off=(cn===0?-0.42:0.42);
+  return new BABYLON.Vector3(
+    Math.cos(a)*rx+Math.cos(pa)*off,
+    1.72,
+    Math.sin(a)*rz+Math.sin(pa)*off
+  );
 }
-
-function logBoth(room, text) {
-  writeLog(room, text);
-  logEvent(room, text);
-}
-
-// FTP upload after hand finishes
-async function ftpUpload(localPath) {
-  const host = process.env.FTP_HOST;
-  const user = process.env.FTP_USER;
-  const pass = process.env.FTP_PASS;
-  const dir  = process.env.FTP_DIR || '/poker-logs';
-  if (!host || !user || !pass) { svrLog('FTP: env vars not set \u2014 upload skipped'); return; }
-  const client = new ftp.Client();
-  client.ftp.verbose = false;
-  const fname = path.basename(localPath);
-  try {
-    await client.access({ host, user, password: pass, secure: false });
-    try { await client.ensureDir(dir); } catch {}
-    await client.uploadFrom(localPath, `${dir}/${fname}`);
-    svrLog(`FTP: \u2705 uploaded ${fname} \u2192 ${host}${dir}/${fname}`);
-  } catch (err) {
-    svrLog(`FTP: \u274C upload FAILED for ${fname} \u2014 ${err.message}`);
-  } finally {
-    client.close();
+const DECK_POS=()=>new BABYLON.Vector3(-TRX*0.76,0.42,0);
+const COM_POS=[new BABYLON.Vector3(-2.84,0.55,0.55),new BABYLON.Vector3(-1.42,0.55,0.55),new BABYLON.Vector3(0.00,0.55,0.55),new BABYLON.Vector3(1.42,0.55,0.55),new BABYLON.Vector3(2.84,0.55,0.55)];
+function mkBackTex(){
+  const W=512,H=768;
+  const tex=new BABYLON.DynamicTexture('bt',{width:W,height:H},scene,true);
+  const c=tex.getContext();
+  const g=c.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#0b1850');g.addColorStop(1,'#060c2a');
+  c.fillStyle=g;c.fillRect(0,0,W,H);
+  c.strokeStyle='#c8a020';c.lineWidth=14;c.strokeRect(7,7,W-14,H-14);
+  c.strokeStyle='rgba(200,160,32,0.55)';c.lineWidth=3;c.strokeRect(24,24,W-48,H-48);
+  c.strokeStyle='rgba(200,160,32,0.10)';c.lineWidth=1;
+  for(let x=-H;x<W+H;x+=20){
+    c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();
+    c.beginPath();c.moveTo(x+H,0);c.lineTo(x,H);c.stroke();
   }
+  c.fillStyle='rgba(200,160,32,0.82)';
+  c.font='bold 118px Arial';
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillText('SYFM',W/2,H/2);
+  c.font='bold 36px Arial';
+  c.fillStyle='rgba(200,160,32,0.55)';
+  c.textAlign='left';c.textBaseline='top';
+  c.fillText('SYFM',34,34);
+  c.save();c.translate(W,H);c.rotate(Math.PI);
+  c.textAlign='left';c.textBaseline='top';
+  c.fillText('SYFM',34,34);
+  c.restore();
+  tex.update();return tex;
 }
+function mkFrontTex(suit,rank){
+  const W=512,H=768;
+  const tex=new BABYLON.DynamicTexture('ft'+rank+suit,{width:W,height:H},scene,true);
+  const c=tex.getContext();
+  const isRed=suit==='\u2665'||suit==='\u2666';
+  const col=isRed?'#cc0000':'#111111';
+  const suitNames={'\u2660':'SPADES','\u2665':'HEARTS','\u2666':'DIAMONDS','\u2663':'CLUBS'};
+  const suitName=suitNames[suit]||'';
+  c.fillStyle='#fafafa';c.fillRect(0,0,W,H);
+  c.strokeStyle='rgba(80,80,80,0.18)';c.lineWidth=3;c.strokeRect(2,2,W-4,H-4);
+  const BX=30,BY=30,BW=W-60,BH=H-60;
+  const rnkSz=rank==='10'?88:100;
+  const cPipSz=64;
+  const cx=16,cy=14;
+  c.fillStyle=col;
+  c.textAlign='left';c.textBaseline='top';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,cx,cy);
+  c.font=cPipSz+'px Arial';c.fillText(suit,cx+2,cy+rnkSz+2);
+  c.textAlign='right';c.textBaseline='top';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-cx,cy);
+  c.font=cPipSz+'px Arial';c.fillText(suit,W-cx-2,cy+rnkSz+2);
+  c.save();c.translate(W,H);c.rotate(Math.PI);
+  c.textAlign='left';c.textBaseline='top';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,cx,cy);
+  c.font=cPipSz+'px Arial';c.fillText(suit,cx+2,cy+rnkSz+2);
+  c.textAlign='right';
+  c.font='bold '+rnkSz+'px Arial';c.fillText(rank,W-cx,cy);
+  c.font=cPipSz+'px Arial';c.fillText(suit,W-cx-2,cy+rnkSz+2);
+  c.restore();
+  c.fillStyle=col;
+  c.font='bold 30px Arial';c.textAlign='center';c.textBaseline='top';
+  c.fillText(suitName,W/2,BY+8);
+  const pipTop=BY+52;
+  const pipBot=H-BY-52;
+  const pipH=pipBot-pipTop;
+  const pipLeft=BX+32;
+  const pipRight=W-BX-32;
+  const pipW=pipRight-pipLeft;
+  const L={
+    '2': [[0.5,0.12,false],[0.5,0.88,true]],
+    '3': [[0.5,0.12,false],[0.5,0.5,false],[0.5,0.88,true]],
+    '4': [[0.2,0.12,false],[0.8,0.12,false],[0.2,0.88,true],[0.8,0.88,true]],
+    '5': [[0.2,0.12,false],[0.8,0.12,false],[0.5,0.5,false],[0.2,0.88,true],[0.8,0.88,true]],
+    '6': [[0.2,0.12,false],[0.8,0.12,false],[0.2,0.5,false],[0.8,0.5,true],[0.2,0.88,true],[0.8,0.88,true]],
+    '7': [[0.2,0.12,false],[0.8,0.12,false],[0.5,0.31,false],[0.2,0.5,false],[0.8,0.5,true],[0.2,0.88,true],[0.8,0.88,true]],
+    '8': [[0.2,0.10,false],[0.8,0.10,false],[0.5,0.30,false],[0.2,0.50,false],[0.8,0.50,true],[0.5,0.68,true],[0.2,0.88,true],[0.8,0.88,true]],
+    '9': [[0.2,0.10,false],[0.8,0.10,false],[0.2,0.34,false],[0.8,0.34,false],[0.5,0.50,false],[0.2,0.66,true],[0.8,0.66,true],[0.2,0.90,true],[0.8,0.90,true]],
+    '10':[[0.2,0.10,false],[0.8,0.10,false],[0.5,0.26,false],[0.2,0.40,false],[0.8,0.40,false],[0.2,0.60,true],[0.8,0.60,true],[0.5,0.74,true],[0.2,0.90,true],[0.8,0.90,true]]
+  };
+  c.fillStyle=col;
+  c.textAlign='center';c.textBaseline='middle';
+  const centreY=H*0.54;
+  const cSz=rank==='10'?160:190;
+  c.font='bold '+cSz+'px Arial';
+  const rankW=c.measureText(rank).width;
+  const gap=14;
+  c.font=cSz+'px Arial';
+  const suitW=c.measureText(suit).width;
+  const totalW=rankW+gap+suitW;
+  const startX=(W-totalW)/2;
+  c.font='bold '+cSz+'px Arial';
+  c.textAlign='left';c.textBaseline='middle';
+  c.fillText(rank, startX, centreY);
+  c.font=cSz+'px Arial';
+  c.fillText(suit, startX+rankW+gap, centreY);
+  tex.update();return tex;
+}
+let cardFoldedMat=null;
+function buildCardMats(){cardBackMat=new BABYLON.StandardMaterial('back',scene);cardBackMat.diffuseTexture=mkBackTex();cardBackMat.specularColor=new BABYLON.Color3(0.1,0.1,0.1);cardBackMat.specularPower=30;cardBackMat.backFaceCulling=false;
+  cardFoldedMat=new BABYLON.StandardMaterial('folded',scene);
+  const fTex=new BABYLON.DynamicTexture('foldedTex',{width:64,height:64},scene,false);
+  const fc=fTex.getContext();fc.fillStyle='#555';fc.fillRect(0,0,64,64);fTex.update();
+  cardFoldedMat.diffuseTexture=fTex;cardFoldedMat.diffuseColor=new BABYLON.Color3(0.45,0.45,0.45);
+  cardFoldedMat.specularColor=new BABYLON.Color3(0,0,0);cardFoldedMat.alpha=0.55;cardFoldedMat.backFaceCulling=false;
+  for(const s of SUITS)for(const r of RANKS){const k=r+s,m=new BABYLON.StandardMaterial('f'+k,scene);m.diffuseTexture=mkFrontTex(s,r);m.specularColor=new BABYLON.Color3(0.08,0.08,0.08);m.specularPower=20;m.backFaceCulling=false;cardFrontMats[k]=m;}}
+function buildCardPool(){for(let i=0;i<80;i++){const m=BABYLON.MeshBuilder.CreatePlane('card'+i,{width:1.28,height:1.80},scene);m.rotation.x=Math.PI/2;m.position=DECK_POS();m.material=cardBackMat;m.isVisible=false;m.renderingGroupId=1;shadowGen.addShadowCaster(m);cardPool.push(m);}}
+function nextCardMesh(){const m=cardPool[cardIdx%cardPool.length];cardIdx=(cardIdx+1)%cardPool.length;m.position=DECK_POS().clone();m.position.y+=0.40;m.rotation=new BABYLON.Vector3(Math.PI/2,0,0);m.billboardMode=BABYLON.Mesh.BILLBOARDMODE_NONE;m.scaling=new BABYLON.Vector3(1,1,1);m.material=cardBackMat;m.isVisible=true;return m;}
+const CHIP_DENOM=[{val:500,col:[0.52,0.06,0.62]},{val:100,col:[0.14,0.20,0.88]},{val:25,col:[0.10,0.60,0.16]},{val:5,col:[0.85,0.10,0.10]},{val:1,col:[0.90,0.88,0.86]}];
+function buildChipPool(){for(const d of CHIP_DENOM){for(let i=0;i<60;i++){const chip=BABYLON.MeshBuilder.CreateCylinder('chip_'+d.val+'_'+i,{height:0.072,diameter:0.34,tessellation:32},scene),m=new BABYLON.StandardMaterial('cmat_'+d.val+'_'+i,scene);m.diffuseColor=new BABYLON.Color3(...d.col);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(...d.col.map(v=>v*0.22));chip.material=m;chip.isVisible=false;chip.renderingGroupId=1;chip._dval=d.val;chipPool.push(chip);}}}
+function acquireChip(forVal){const d=CHIP_DENOM.find(d=>d.val<=forVal)||CHIP_DENOM[CHIP_DENOM.length-1];const ch=chipPool.find(c=>!c.isVisible&&c._dval===d.val)||chipPool.find(c=>!c.isVisible)||null;if(ch)ch.isVisible=true;return ch;}
+function freeChip(c){if(c){c.isVisible=false;c.position=new BABYLON.Vector3(0,-5,0);}}
+function freeAllChips(){[...potChips].forEach(freeChip);potChips=[];seatBetChips.forEach(arr=>{arr.forEach(freeChip);});seatBetChips=Array.from({length:NP},()=>[]);}
+function buildChipStack(amount){const chips=[];let rem=amount;for(const d of CHIP_DENOM){if(rem<=0||chips.length>=12)break;const n=Math.min(Math.floor(rem/d.val),5);for(let i=0;i<n&&chips.length<12;i++){const ch=acquireChip(d.val);if(ch){chips.push(ch);rem-=d.val;}}}return chips;}
+function animChipArc(chips,srcPos,dstBase,staggerMs,baseY,cb){
+  if(!chips.length){if(cb)setTimeout(cb,50);return;}
+  let done=0;
+  chips.forEach((chip,i)=>{
+    chip.position=new BABYLON.Vector3(srcPos.x,srcPos.y+0.45+i*0.07,srcPos.z);
+    const tgt=new BABYLON.Vector3(dstBase.x+(Math.random()-0.5)*0.20,baseY+i*0.060,dstBase.z+(Math.random()-0.5)*0.20);
+    const mid=new BABYLON.Vector3((chip.position.x+tgt.x)*0.5,chip.position.y+2.0,(chip.position.z+tgt.z)*0.5);
+    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:chip.position.clone()},{frame:10,value:mid},{frame:22,value:tgt}],'out');
+    chip.animations=[a];
+    setTimeout(()=>{scene.beginAnimation(chip,0,22,false,1.4,()=>{snd_chip();done++;if(done===chips.length&&cb)cb();});},i*staggerMs);
+  });}
+function sweepBetsToPot(cb){
+  if(is2D){if(cb)setTimeout(cb,60);return;}
+  const all=[];seatBetChips.forEach(arr=>all.push(...arr));
+  seatBetChips=Array.from({length:NP},()=>[]);
+  if(!all.length){if(cb)setTimeout(cb,60);return;}
+  const baseY=0.32+potChips.length*0.055;
+  let done=0;
+  all.forEach((chip,i)=>{
+    const tgt=new BABYLON.Vector3(POT_BASE.x+(Math.random()-0.5)*0.38,baseY+i*0.055,POT_BASE.z+(Math.random()-0.5)*0.28);
+    const mid=new BABYLON.Vector3((chip.position.x+tgt.x)*0.5,chip.position.y+1.5,(chip.position.z+tgt.z)*0.5);
+    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:chip.position.clone()},{frame:8,value:mid},{frame:18,value:tgt}],'out');
+    chip.animations=[a];
+    setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.6,()=>{snd_chip();potChips.push(chip);done++;if(done===all.length&&cb)cb();});},i*28);});}
+function chipsFlyToWinner(winSeat,cb){
+  if(is2D){if(cb)cb();return;}
+  const wp=seatPos(vs(winSeat));wp.y+=0.8;
+  const all=[...potChips];seatBetChips.forEach(arr=>all.push(...arr));
+  potChips=[];seatBetChips=Array.from({length:NP},()=>[]);
+  if(!all.length){if(cb)cb();return;}
+  let done=0;
+  all.forEach((chip,i)=>{
+    const start=chip.position.clone(),mid=new BABYLON.Vector3((start.x+wp.x)*0.5,start.y+2.4,(start.z+wp.z)*0.5);
+    const a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:8,value:mid},{frame:18,value:wp}],'in');
+    chip.animations=[a];
+    setTimeout(()=>{scene.beginAnimation(chip,0,18,false,1.5,()=>{snd_chip();freeChip(chip);done++;if(done===all.length&&cb)cb();});},i*18);});}
+function buildTokens(){function makeToken(name,r,g,b,label){const tok=BABYLON.MeshBuilder.CreateCylinder(name,{height:0.12,diameter:0.48,tessellation:32},scene),m=new BABYLON.StandardMaterial(name+'m',scene);m.diffuseColor=new BABYLON.Color3(r,g,b);m.specularColor=new BABYLON.Color3(1,1,1);m.specularPower=300;m.emissiveColor=new BABYLON.Color3(r*0.3,g*0.3,b*0.3);tok.material=m;tok.isVisible=false;tok.renderingGroupId=1;const discTex=new BABYLON.DynamicTexture(name+'dt',{width:128,height:128},scene,false),dc=discTex.getContext();dc.fillStyle='rgb('+Math.round(r*255)+','+Math.round(g*255)+','+Math.round(b*255)+')';dc.beginPath();dc.arc(64,64,62,0,Math.PI*2);dc.fill();dc.strokeStyle='rgba(0,0,0,0.5)';dc.lineWidth=3;dc.stroke();dc.fillStyle=(r+g+b>1.5)?'#000':'#fff';dc.font='bold 42px Arial';dc.textAlign='center';dc.textBaseline='middle';dc.fillText(label,64,64);discTex.update();const disc=BABYLON.MeshBuilder.CreateDisc(name+'d',{radius:0.24,tessellation:32},scene),dm=new BABYLON.StandardMaterial(name+'dm',scene);dm.diffuseTexture=discTex;dm.emissiveColor=new BABYLON.Color3(1,1,1);dm.disableLighting=true;dm.backFaceCulling=false;disc.material=dm;disc.rotation.x=-Math.PI/2;disc.position.y=0.07;disc.parent=tok;disc.renderingGroupId=2;return tok;}dealerToken=makeToken('dealer',0.95,0.95,0.95,'D');sbToken=makeToken('sb',0.15,0.40,0.90,'SB');bbToken=makeToken('bb',0.90,0.80,0.10,'BB');}
+function positionTokens(dSeat,sbSeat,bbSeat){
+  const RX=TRX*0.50,RZ=TRZ*0.50;
+  const _n=numVisualSeats();
+  function seatA(seat){return -Math.PI/2-(seat/_n)*Math.PI*2;}
+  function place(tok,seat,angOffset){const a=seatA(seat)+angOffset;tok.position=new BABYLON.Vector3(Math.cos(a)*RX,0.38,Math.sin(a)*RZ);tok.isVisible=true;}
+  if(dSeat===sbSeat){place(dealerToken,dSeat,0.18);place(sbToken,sbSeat,-0.18);}
+  else{place(dealerToken,dSeat,0);place(sbToken,sbSeat,0.06);}
+  place(bbToken,bbSeat,0.06);}
+const LW=320,LH=128;
+function buildPlayerLabels(){for(let i=0;i<NP;i++){const tex=new BABYLON.DynamicTexture('plbtex'+i,{width:LW,height:LH},scene,false);tex.hasAlpha=true;const mat=new BABYLON.StandardMaterial('plbm'+i,scene);mat.diffuseTexture=tex;mat.hasAlpha=true;mat.emissiveColor=new BABYLON.Color3(1,1,1);mat.disableLighting=true;mat.backFaceCulling=false;const plane=BABYLON.MeshBuilder.CreatePlane('plbp'+i,{width:2.2,height:0.88},scene);plane.material=mat;const sp=seatPos(i);plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);plane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;plane.isVisible=false;plane.renderingGroupId=2;playerLabels.push({plane,tex});}}
+function updateLabel(seat,name,chips,bet,action,isMe,isDead,isAutoFold,isSpectator,isPendingBuyBack){const vSeat=vs(seat),lb=playerLabels[vSeat];if(!lb)return;const sp=seatPos(vSeat);lb.plane.position=new BABYLON.Vector3(sp.x*0.78,0.98,sp.z*0.78);const ctx=lb.tex.getContext();ctx.clearRect(0,0,LW,LH);if(!name){lb.plane.isVisible=false;lb.tex.update();return;}
+  const bgCol=isAutoFold?'rgba(60,10,80,0.92)':isDead?'rgba(80,20,20,0.82)':isMe?'rgba(10,60,10,0.88)':'rgba(10,10,50,0.82)';
+  ctx.fillStyle=bgCol;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.fill();
+  const borderCol=isAutoFold?'#aa40ff':isMe?'#20c040':isDead?'#802020':'#c8a020';
+  ctx.strokeStyle=borderCol;ctx.lineWidth=3;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(2,2,LW-4,LH-4,10);else ctx.rect(2,2,LW-4,LH-4);ctx.stroke();
+  ctx.fillStyle='#ffffff';ctx.font='bold 24px Arial';ctx.textAlign='center';ctx.textBaseline='top';
+  const dispName=(name.length>14?name.slice(0,13)+'\u2026':name).toUpperCase();
+  ctx.fillText(dispName,LW/2,6);
+  ctx.fillStyle='#ffd700';ctx.font='bold 18px Arial';
+  ctx.fillText('Stack \u00a3'+(chips/100).toFixed(2),LW/2,34);
+  if(bet>0){ctx.fillStyle='#80cfff';ctx.font='15px Arial';ctx.fillText('Bet \u00a3'+(bet/100).toFixed(2),LW/2,58);}
+  if(isPendingBuyBack){ctx.fillStyle='#ffaa20';ctx.font='bold 15px Arial';ctx.fillText('\uD83D\uDCB8 BUY-BACK?',LW/2,bet>0?82:58);}
+  else if(isSpectator){ctx.fillStyle='#8899aa';ctx.font='bold 15px Arial';ctx.fillText('\uD83D\uDC40 SPECTATOR',LW/2,bet>0?82:58);}
+  else if(isAutoFold){ctx.fillStyle='#cc44ff';ctx.font='bold 16px Arial';ctx.fillText('\u23f8 AUTO-FOLD ON',LW/2,bet>0?82:58);}
+  else if(action){const ac=action.toUpperCase(),acCol=ac.startsWith('FOLD')?'#c04040':ac.startsWith('RAISE')||ac.startsWith('BET')?'#e09020':'#20c040';ctx.fillStyle=acCol;ctx.font='bold 16px Arial';ctx.fillText(ac,LW/2,bet>0?82:58);}
+  lb.tex.update();lb.plane.isVisible=true;
+}
+function mkAnim(prop,type,keys,ease){const a=new BABYLON.Animation('a_'+prop,prop,60,type,BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);a.setKeys(keys);const ef=ease==='in'?new BABYLON.QuadraticEase():new BABYLON.CubicEase();ef.setEasingMode(ease==='in'?BABYLON.EasingFunction.EASINGMODE_EASEIN:BABYLON.EasingFunction.EASINGMODE_EASEOUT);a.setEasingFunction(ef);return a;}
+function animDeal(mesh,target,cb){const start=mesh.position.clone(),mid=new BABYLON.Vector3((start.x+target.x)*.5,start.y+2.8,(start.z+target.z)*.5),a=mkAnim('position',BABYLON.Animation.ANIMATIONTYPE_VECTOR3,[{frame:0,value:start},{frame:10,value:mid},{frame:24,value:target}],'out');scene.stopAnimation(mesh);mesh.animations=[a];scene.beginAnimation(mesh,0,24,false,1.5,cb||null);}
+function animFlipUp(mesh,frontMat,cb){const a1=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:1},{frame:9,value:0}],'in');scene.stopAnimation(mesh);mesh.animations=[a1];scene.beginAnimation(mesh,0,9,false,1,()=>{mesh.material=frontMat;const a2=mkAnim('scaling.x',BABYLON.Animation.ANIMATIONTYPE_FLOAT,[{frame:0,value:0},{frame:9,value:1}],'out');scene.stopAnimation(mesh);mesh.animations=[a2];scene.beginAnimation(mesh,0,9,false,1,cb||null);});}
+function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(0.04,0.04,0.04,1);
+cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,Math.PI/3.6,17,new BABYLON.Vector3(0,0.5,0),scene);
+cam.lowerAlphaLimit=-Math.PI/2-0.52;
+cam.upperAlphaLimit=-Math.PI/2+0.52;
+cam.lowerBetaLimit=0.55;
+cam.upperBetaLimit=1.18;
+cam.lowerRadiusLimit=5;
+cam.upperRadiusLimit=22;
+cam.wheelPrecision=28;
+cam.pinchPrecision=180;
+cam.panningSensibility=0;
+cam.attachControl(canvas,true);
+const h=new BABYLON.HemisphericLight('h',new BABYLON.Vector3(0,1,0),scene);
+h.intensity=0.12;h.diffuse=new BABYLON.Color3(0.7,0.62,0.45);h.groundColor=new BABYLON.Color3(0.04,0.03,0.02);
+spotLight=new BABYLON.SpotLight('sp',new BABYLON.Vector3(0,12,0),new BABYLON.Vector3(0,-1,0),Math.PI/2.2,1.8,scene);
+spotLight.intensity=2.2;spotLight.diffuse=new BABYLON.Color3(1.0,0.92,0.72);
+const fillLight=new BABYLON.PointLight('fill',new BABYLON.Vector3(-4,7,4),scene);
+fillLight.intensity=0.5;fillLight.diffuse=new BABYLON.Color3(0.8,0.75,0.55);
+shadowGen=new BABYLON.ShadowGenerator(2048,spotLight);shadowGen.useBlurExponentialShadowMap=true;shadowGen.blurKernel=16;
+const f=BABYLON.MeshBuilder.CreateGround('floor',{width:44,height:44},scene);
+f.position.y=-0.22;f.receiveShadows=true;
+const fm=new BABYLON.StandardMaterial('fm',scene);
+fm.diffuseColor=new BABYLON.Color3(0.06,0.04,0.02);
+fm.specularColor=new BABYLON.Color3(0.25,0.15,0.06);fm.specularPower=120;f.material=fm;
+const T=96;
+const base=BABYLON.MeshBuilder.CreateCylinder('base',{height:0.52,diameter:12,tessellation:T},scene);
+base.scaling.x=TRX/6;base.scaling.z=TRZ/6;base.position.y=-0.01;
+const bm=new BABYLON.PBRMaterial('bm',scene);
+bm.albedoColor=new BABYLON.Color3(0.12,0.06,0.02);
+bm.roughness=0.28;bm.metallic=0;
+base.material=bm;
+const rail=BABYLON.MeshBuilder.CreateTorus('rail',{diameter:11.4,thickness:0.52,tessellation:T,radialSegments:24},scene);
+rail.scaling.x=TRX/(11.4/2)*0.97;rail.scaling.z=TRZ/(11.4/2)*0.97;rail.position.y=0.22;
+const rm=new BABYLON.PBRMaterial('rm',scene);
+rm.albedoColor=new BABYLON.Color3(0.16,0.04,0.02);
+rm.roughness=0.82;rm.metallic=0;
+rail.material=rm;
+const trim=BABYLON.MeshBuilder.CreateTorus('trim',{diameter:10.9,thickness:0.08,tessellation:T,radialSegments:8},scene);
+trim.scaling.x=TRX/(10.9/2)*0.93;trim.scaling.z=TRZ/(10.9/2)*0.93;trim.position.y=0.30;
+const trm=new BABYLON.StandardMaterial('trm',scene);
+trm.diffuseColor=new BABYLON.Color3(0.72,0.52,0.08);
+trm.specularColor=new BABYLON.Color3(1,0.9,0.4);trm.specularPower=400;
+trm.emissiveColor=new BABYLON.Color3(0.12,0.08,0.01);
+trim.material=trm;
+const felt=BABYLON.MeshBuilder.CreateCylinder('felt',{height:0.07,diameter:10.8,tessellation:T},scene);
+felt.scaling.x=TRX/(10.8/2)*0.90;felt.scaling.z=TRZ/(10.8/2)*0.90;felt.position.y=0.28;
+const feltTex=new BABYLON.DynamicTexture('feltTex',{width:1024,height:512},scene,true);feltTex.hasAlpha=false;const ftc=feltTex.getContext();ftc.fillStyle='#040f05';ftc.fillRect(0,0,1024,512);ftc.fillStyle='rgba(255,200,0,0.35)';ftc.font='bold 200px Arial Black';ftc.textAlign='center';ftc.textBaseline='middle';ftc.fillText('SYFM',512,256);feltTex.update();
+const ftm=new BABYLON.PBRMaterial('ftm',scene);
+ftm.albedoTexture=feltTex;
+ftm.roughness=0.96;ftm.metallic=0;
+ftm.sheen.isEnabled=true;ftm.sheen.intensity=0.38;ftm.sheen.color=new BABYLON.Color3(0.08,0.28,0.12);
+ftm.emissiveTexture=feltTex;ftm.emissiveColor=new BABYLON.Color3(0.08,0.06,0.0);
+felt.material=ftm;felt.receiveShadows=true;
+const inlay=BABYLON.MeshBuilder.CreateTorus('inlay',{diameter:9.8,thickness:0.04,tessellation:T,radialSegments:6},scene);
+inlay.scaling.x=TRX/(9.8/2)*0.86;inlay.scaling.z=TRZ/(9.8/2)*0.86;inlay.position.y=0.32;
+const ilm=new BABYLON.StandardMaterial('ilm',scene);
+ilm.diffuseColor=new BABYLON.Color3(0.08,0.32,0.14);
+ilm.emissiveColor=new BABYLON.Color3(0.01,0.04,0.02);
+inlay.material=ilm;
+bc.fillStyle='rgba(255,215,0,0.18)';bc.font='bold 170px Arial';bc.textAlign='center';bc.textBaseline='middle';bc.fillText('SYFM',512,256);buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens();
+return scene;}
+let seatActions={};
 
-// ─── HTTP server ──────────────────────────────────────────────────────────────
-const server = http.createServer((req, res) => {
-  if (req.url === '/' || req.url === '/index.html') {
-    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      if (err) { res.writeHead(500); res.end('Error loading game'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(data);
-    });
-    return;
+function applyState(st){
+  if(!st)return;
+  lastState=st;
+  if(st.players)updateOccupiedSeats(st.players);
+  for(let i=0;i<NP;i++){
+    const p=st.players[i];
+    if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false,p.spectator||false,p.pendingBuyBack||false);
+    else updateLabel(i,null,0,0,'',false,false,false,false,false);
   }
-  if (req.url === '/logs') {
-    let files = [];
-    try { files = fs.readdirSync(LOGS_DIR).filter(f => f.endsWith('.txt')).sort().reverse(); } catch {}
-    const links = files.map(f => `<li><a href="/logs/download/${encodeURIComponent(f)}">${f}</a></li>`).join('');
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(`<!DOCTYPE html><html><head><title>Logs</title>
-      <style>body{font-family:monospace;background:#111;color:#aef;padding:20px}a{color:#ffd700}li{margin:4px 0}</style></head>
-      <body><h2>SYFM Poker - Hand Logs (${files.length} files)</h2><ul>${links}</ul>
-      <p><a href="/">Back to game</a></p></body></html>`);
-    return;
-  }
-  const dl = req.url.match(/^\/logs\/download\/(.+)$/);
-  if (dl) {
-    const name = decodeURIComponent(dl[1]).replace(/[/\\]/g, '');
-    const fp = path.join(LOGS_DIR, name);
-    if (!fp.startsWith(LOGS_DIR) || !name.endsWith('.txt')) { res.writeHead(403); res.end(); return; }
-    fs.readFile(fp, (err, data) => {
-      if (err) { res.writeHead(404); res.end('Not found'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Disposition': `attachment; filename="${name}"` });
-      res.end(data);
-    });
-    return;
-  }
-  if (req.url && req.url.startsWith('/keepalive')) {
-    const params = new URL(req.url, 'http://x').searchParams;
-    const room = params.get('room') || '?';
-    const hand = params.get('hand') || '?';
-    const ts = new Date().toISOString();
-    svrLog(`KEEPALIVE | Room: ${room} | Hand: ${hand}`);
-    const r = rooms.get(room);
-    if (r && r.G) writeLog(r, `KEEPALIVE: client ping at hand #${hand} | rooms: ${rooms.size} | ws: ${wss.clients.size}`);
-    res.writeHead(200, {'Content-Type':'text/plain','Access-Control-Allow-Origin':'*'});
-    res.end('alive:'+ts);
-    return;
-  }
-  res.writeHead(404); res.end('Not found');
-});
-
-// ─── WebSocket ────────────────────────────────────────────────────────────────
-const wss = new WebSocketServer({ server });
-const rooms = new Map();
-
-// ── Room lifecycle ────────────────────────────────────────────────────────────
-function destroyRoom(room) {
-  svrLog(`ROOM ${room.id} DESTROY`);
-  clearActionTimer(room);
-  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
-  room.seats.forEach(s => {
-    if (s) {
-      if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
-      if (s._buyBackTimer)    { clearTimeout(s._buyBackTimer);    s._buyBackTimer    = null; }
-      try { if (s.ws?.readyState === 1) s.ws.close(); } catch {}
+  const comm=st.community||[];
+  for(let ci=0;ci<5;ci++){
+    const mesh=communityCardMeshes[ci];
+    if(ci<comm.length){
+      if(!mesh||!mesh.isVisible){
+        const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();
+        m.material=cardBackMat;m.isVisible=true;
+        animDeal(m,target,()=>{
+          snd_deal();
+          const cd=comm[ci];
+          if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
+        });
+      }
+    }else{
+      if(mesh)mesh.isVisible=false;
     }
-  });
-  room.pendingJoins.forEach(p => { try { if (p.ws?.readyState === 1) p.ws.close(); } catch {} });
-  rooms.delete(room.id);
-}
-
-function scheduleRoomCleanup(room) {
-  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
-  const hasConnected = room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
-    || room.pendingJoins.some(p => p.ws?.readyState === 1);
-  if (!hasConnected) {
-    svrLog(`ROOM ${room.id} EMPTY \u2014 scheduling cleanup in ${ROOM_EMPTY_TTL_MS/1000}s`);
-    room._emptyTimer = setTimeout(() => {
-      const stillEmpty = !room.seats.some(s => s && !s.disconnected && s.ws?.readyState === 1)
-        && !room.pendingJoins.some(p => p.ws?.readyState === 1);
-      if (stillEmpty) {
-        svrLog(`ROOM ${room.id} CLEANUP \u2014 TTL expired, destroying`);
-        destroyRoom(room);
+  }
+  for(let i=0;i<NP;i++){
+    const p=st.players[i],meshes=seatCardMeshes[i];
+    if(!p||!p.cards||p.cards.length===0){
+      for(const m of meshes){if(m)m.isVisible=false;}
+      seatCardMeshes[i]=[null,null];
+      continue;
+    }
+    p.cards.forEach((cd,cn)=>{
+      const m=meshes[cn];
+      if(!m||!m.isVisible)return;
+      if(p.folded){
+        if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;
+        return;
+      }
+      if(cd&&cd!=='back'){
+        const fmat=cardFrontMats[cd.r+cd.s];
+        if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());
       } else {
-        svrLog(`ROOM ${room.id} CLEANUP \u2014 cancelled, player reconnected`);
+        if(m.material!==cardBackMat)m.material=cardBackMat;
       }
-    }, ROOM_EMPTY_TTL_MS);
-  }
-}
-
-function getOrCreateRoom(roomId) {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, {
-      id: roomId, seats: Array(NP).fill(null), hostId: null,
-      gameActive: false, pendingJoins: [], G: null, dealerSeat: -1,
-      actionTimer: null, handNum: 0,
-      paused: false, actionTimerSeat: -1, actionTimerRemaining: ACTION_TIMEOUT,
-      actionTimerStarted: 0,
-      buyIn: START_CHIPS,
-      _emptyTimer: null,
-      gameHistory: []   // cumulative record of every player ever seated
     });
   }
-  const room = rooms.get(roomId);
-  if (room._emptyTimer) { clearTimeout(room._emptyTimer); room._emptyTimer = null; }
-  return room;
+  const p0=st.players[mySeat];
+  if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
+  document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);
+  document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');
+  if(is2D) render2D(st);
 }
 
-function send(ws, msg) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
-}
-
-function broadcastAll(room, msg) {
-  const str = JSON.stringify(msg);
-  room.seats.forEach(s => { if (s?.ws?.readyState === 1) s.ws.send(str); });
-}
-
-function lobbySnapshot(room) {
-  return {
-    type: 'lobby', roomId: room.id, hostId: room.hostId, gameActive: room.gameActive,
-    buyIn: room.buyIn,
-    seats: room.seats.map(s => s ? { id: s.id, name: s.name, chips: s.chips, seat: s.seat } : null),
-    pending: room.pendingJoins.map(p => ({ id: p.id, name: p.name }))
-  };
-}
-
-function tableSnapshot(room, forId) {
-  const G = room.G;
-  if (!G) return {
-    type: 'state', phase: 'idle',
-    players: room.seats.map(s => {
-      if (!s) return null;
-      return { seat: s.seat, name: s.name, chips: s.chips, bet: 0,
-               folded: false, disconnected: s.disconnected || false,
-               pendingCashOut: s.pendingCashOut || false,
-               voluntaryAutoFold: s.voluntaryAutoFold || false,
-               spectator: s.spectator || false,
-               pendingBuyBack: s.pendingBuyBack || false,
-               cards: [], active: !s.sittingOut };
-    })
-  };
-  return {
-    type: 'state', phase: G.phase, pot: G.pot, currentBet: G.currentBet,
-    community: G.community, dealerSeat: room.dealerSeat,
-    sbSeat: G.sbSeat, bbSeat: G.bbSeat, toActSeat: G.toAct[0] ?? null,
-    players: room.seats.map(s => {
-      if (!s) return null;
-      const isOwner = s.id === forId;
-      const atShowdown = G.phase === 'showdown' && !s.folded;
-      const showCards = isOwner || atShowdown;
-      return {
-        seat: s.seat, name: s.name, chips: s.chips, bet: s.bet,
-        folded: s.folded, disconnected: s.disconnected || false,
-        pendingCashOut: s.pendingCashOut || false,
-        voluntaryAutoFold: s.voluntaryAutoFold || false,
-        spectator: s.spectator || false,
-        pendingBuyBack: s.pendingBuyBack || false,
-        cards: showCards ? s.cards : s.cards.map(() => 'back'),
-        active: !s.sittingOut
-      };
-    })
-  };
-}
-
-function startActionTimer(room, seat, remainingMs) {
-  clearActionTimer(room);
-  if (room.paused) {
-    room.actionTimerSeat = seat;
-    room.actionTimerRemaining = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
-    return;
-  }
-  const duration = remainingMs != null ? remainingMs : ACTION_TIMEOUT;
-  room.actionTimerSeat = seat;
-  room.actionTimerRemaining = duration;
-  room.actionTimerStarted = Date.now();
-  writeLog(room, `ACTION TIMER: started \u2014 seat ${seat+1} (${room.seats[seat]?.name}) has ${(duration/1000).toFixed(1)}s`);
-  room.actionTimer = setTimeout(() => {
-    const p = room.seats[seat];
-    if (!p || p.folded || !room.G || room.G.toAct[0] !== seat) return;
-    writeLog(room, `ACTION TIMER: EXPIRED \u2014 seat ${seat+1} (${p.name}) auto-folding`);
-    doFold(room, seat, 'timeout');
-  }, duration);
-}
-
-function clearActionTimer(room) {
-  if (room.actionTimer) { clearTimeout(room.actionTimer); room.actionTimer = null; }
-  if (room.actionTimerStarted) {
-    const elapsed = Date.now() - room.actionTimerStarted;
-    room.actionTimerRemaining = Math.max(2000, (room.actionTimerRemaining || ACTION_TIMEOUT) - elapsed);
-    room.actionTimerStarted = 0;
+function toggle2D(){
+  is2D=!is2D;
+  const btn=document.getElementById('toggleViewBtn');
+  const label=document.getElementById('toggleViewLabel');
+  const canvas=document.getElementById('c');
+  const view2d=document.getElementById('view2d');
+  const slider=document.getElementById('tableSlider');
+  const bottomBar=document.getElementById('bottomBar');
+  const stackInfo2d=document.getElementById('stackInfo2d');
+  if(is2D){
+    canvas.style.display='none';
+    view2d.style.display='block';
+    if(slider)slider.style.display='none';
+    if(bottomBar)bottomBar.style.display='none';
+    if(stackInfo2d)stackInfo2d.style.display='block';
+    if(label)label.textContent='→3D';
+    btn.classList.add('mode2d');
+    btn.title='Switch to 3D view';
+    if(lastState)render2D(lastState);
+  } else {
+    canvas.style.display='block';
+    view2d.style.display='none';
+    if(slider)slider.style.display='';
+    if(bottomBar)bottomBar.style.display='';
+    if(stackInfo2d)stackInfo2d.style.display='none';
+    if(label)label.textContent='→2D';
+    btn.classList.remove('mode2d');
+    btn.title='Switch to 2D view';
+    if(lastState)applyState(lastState);
   }
 }
 
-// ─── Pause / Resume ───────────────────────────────────────────────────────────
-function pauseGame(room, byName) {
-  if (room.paused) return;
-  room.paused = true;
-  room._pausedAt = Date.now();
-  clearActionTimer(room);
-  broadcastAll(room, { type: 'gamePaused', byName });
-  writeLog(room, `GAME PAUSED by ${byName}`);
-  svrLog(`ROOM ${room.id} PAUSED by ${byName}`);
+function build2DCard(rank,suit,folded){
+  const el=document.createElement('div');
+  el.className='p2d-card';
+  if(folded){el.classList.add('folded');return el;}
+  if(!rank||rank==='back'){el.classList.add('back');return el;}
+  const isRed=(suit==='\u2665'||suit==='\u2666');
+  el.classList.add(isRed?'red':'black');
+  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
+  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
+  el.appendChild(tl);el.appendChild(br);
+  const ctr=document.createElement('div');ctr.className='p2dc-center';
+  const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;
+  const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;
+  ctr.appendChild(rSpan);ctr.appendChild(sSpan);
+  el.appendChild(ctr);
+  return el;
+}
+function build2DCommCard(rank,suit){
+  const el=document.createElement('div');
+  el.className='c2d-card';
+  if(!rank||rank==='back'){el.classList.add('back');return el;}
+  const isRed=(suit==='\u2665'||suit==='\u2666');
+  el.classList.add(isRed?'red':'black');
+  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
+  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
+  el.appendChild(tl);el.appendChild(br);
+  const ctr=document.createElement('div');ctr.className='p2dc-center';
+  const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;
+  const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;
+  ctr.appendChild(rSpan);ctr.appendChild(sSpan);
+  el.appendChild(ctr);
+  return el;
 }
 
-function resumeGame(room, byName) {
-  if (!room.paused) return;
-  const pausedForMs = room._pausedAt ? Date.now() - room._pausedAt : 0;
-  room.paused = false;
-  room._pausedAt = null;
-  broadcastAll(room, { type: 'gameResumed', byName });
-  writeLog(room, `GAME RESUMED by ${byName} | Was paused for ${(pausedForMs/1000).toFixed(1)}s`);
-  svrLog(`ROOM ${room.id} RESUMED by ${byName}`);
-  if (room.G && room.actionTimerSeat >= 0 && room.G.toAct[0] === room.actionTimerSeat) {
-    startActionTimer(room, room.actionTimerSeat, room.actionTimerRemaining || ACTION_TIMEOUT);
+function render2D(st){
+  if(!st||!st.players)return;
+  const inner=document.getElementById('table2dInner');
+  inner.querySelectorAll('.p2d-seat').forEach(el=>el.remove());
+  document.getElementById('pot2dVal').textContent='\u00a3'+((st.pot||0)/100).toFixed(2);
+  const p0=st.players[mySeat];
+  const si2d=document.getElementById('stackInfo2d');
+  if(si2d&&p0){
+    si2d.innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff;font-size:11px">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
   }
+  const comm=st.community||[];
+  const commEl=document.getElementById('community2d');
+  commEl.innerHTML='';
+  for(let i=0;i<5;i++){
+    if(i<comm.length&&comm[i]&&comm[i]!=='back'){
+      commEl.appendChild(build2DCommCard(comm[i].r,comm[i].s));
+    }else if(i<comm.length){
+      commEl.appendChild(build2DCommCard('back',null));
+    }else{
+      const ph=document.createElement('div');ph.className='c2d-card';ph.style.visibility='hidden';commEl.appendChild(ph);
+    }
+  }
+  const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);
+  const n=seated.length||2;
+  const rx=44,ry=38;
+  seated.forEach((srvSeat)=>{
+    const p=st.players[srvSeat];
+    if(!p)return;
+    const vSeat=vs(srvSeat);
+    const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;
+    const px=50+rx*Math.cos(angle);
+    const py=50-ry*Math.sin(angle);
+    const isMe=(srvSeat===mySeat);
+    const isToAct=(st.toActSeat===srvSeat);
+    const isDealer=(st.dealerSeat===srvSeat);
+    const isSB=(st.sbSeat===srvSeat);
+    const isBB=(st.bbSeat===srvSeat);
+    const div=document.createElement('div');
+    div.className='p2d-seat'+(isMe?' me':'');
+    div.style.left=px+'%';div.style.top=py+'%';
+    if(p.cards&&p.cards.length){
+      const cardsDiv=document.createElement('div');
+      cardsDiv.className='p2d-cards';
+      p.cards.forEach(cd=>{
+        const rank=cd&&cd!=='back'?cd.r:null;
+        const suit=cd&&cd!=='back'?cd.s:null;
+        cardsDiv.appendChild(build2DCard(rank,suit,p.folded));
+      });
+      div.appendChild(cardsDiv);
+    }
+    const info=document.createElement('div');
+    info.className='p2d-info';
+    const nameDiv=document.createElement('div');
+    nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');
+    nameDiv.textContent=p.name;
+    info.appendChild(nameDiv);
+    const tokens=document.createElement('div');
+    if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}
+    if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}
+    if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}
+    if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}
+    if(tokens.children.length)info.appendChild(tokens);
+    if(!isMe){
+      const stackDiv=document.createElement('div');
+      stackDiv.className='p2d-stack';
+      stackDiv.textContent='\u00a3'+(p.chips/100).toFixed(2);
+      info.appendChild(stackDiv);
+    }
+    if(p.bet>0){
+      const betDiv=document.createElement('div');
+      betDiv.className='p2d-bet';
+      betDiv.textContent='bet \u00a3'+(p.bet/100).toFixed(2);
+      info.appendChild(betDiv);
+    }
+    div.appendChild(info);
+    inner.appendChild(div);
+  });
 }
 
-// ─── Connections ──────────────────────────────────────────────────────────────
-wss.on('connection', ws => {
-  let myId = null, myRoomId = null;
-  const connectedAt = Date.now();
-  const remoteIp = ws._socket?.remoteAddress || 'unknown';
-  svrLog(`WS OPEN \u2014 ${remoteIp} (total: ${wss.clients.size})`);
+function getOrCreateCommunityMesh(idx){
+  if(communityCardMeshes[idx]&&communityCardMeshes[idx].isVisible!==undefined)return communityCardMeshes[idx];
+  const m=nextCardMesh();
+  communityCardMeshes[idx]=m;
+  return m;
+}
 
-  ws.on('message', raw => {
-    let msg;
-    try { msg = JSON.parse(raw); } catch { return; }
-
-    switch (msg.type) {
-
-      case 'join': {
-        const rawRoom = String(msg.room || '1').replace(/\D/g, '') || '1';
-        myRoomId = rawRoom.slice(0, 6);
-        myId = msg.id || ('p_' + Math.random().toString(36).slice(2, 8));
-        const name = (msg.name || 'Player').slice(0, 18).trim() || 'Player';
-        const room = getOrCreateRoom(myRoomId);
-        svrLog(`JOIN \u2014 room ${myRoomId} | id=${myId} | name="${name}"`);
-
-        // ── Reconnect ─────────────────────────────────────────────────────────
-        const existing = room.seats.find(s => s?.id === myId);
-        if (existing) {
-          const wasDisconnectedMs = existing.disconnected ? Date.now() - (existing._disconnectedAt||0) : 0;
-          if (existing._disconnectTimer) { clearTimeout(existing._disconnectTimer); existing._disconnectTimer = null; }
-          const needsHostApproval = existing.autoFold && (existing._missedHands || 0) >= 1;
-
-          if (needsHostApproval) {
-            svrLog(`RECONNECT \u2014 ${name} missed ${existing._missedHands} hand(s), queuing for host re-admission`);
-            writeLog(room, `RECONNECT (pending): ${name} returned after missing ${existing._missedHands} hand(s)`);
-            if (!room.pendingJoins.find(p => p.id === myId)) {
-              room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
-            } else {
-              const pj = room.pendingJoins.find(p => p.id === myId);
-              if (pj) pj.ws = ws;
-            }
-            send(ws, { type: 'waiting', id: myId, reason: `You missed ${existing._missedHands} hand(s). Waiting for host to re-admit you.` });
-            const host = room.seats.find(s => s?.id === room.hostId);
-            if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
-            broadcastAll(room, lobbySnapshot(room));
-          } else {
-            existing.ws = ws;
-            existing.disconnected = false;
-            existing.autoFold = false;
-            existing._disconnectedAt = null;
-            existing._missedHands = 0;
-            send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
-            send(ws, lobbySnapshot(room));
-            if (room.G) send(ws, tableSnapshot(room, myId));
-            writeLog(room, `RECONNECT: ${name} (Seat ${existing.seat+1}) back | Was gone ~${(wasDisconnectedMs/1000).toFixed(1)}s`);
-            logEvent(room, `\uD83D\uDD04 ${existing.name} reconnected`);
-            svrLog(`RECONNECT OK \u2014 ${name} seat ${existing.seat+1} room ${myRoomId}`);
-          }
-          return;
-        }
-
-        // ── Brand-new player ──────────────────────────────────────────────────
-        const hasSeatedPlayers = room.seats.some(s => s !== null);
-        if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
-          const hostBuyIn = (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : START_CHIPS;
-          room.seats[0] = mkPlayer(ws, myId, name, 0, room, hostBuyIn);
-          room.hostId = myId;
-          svrLog(`NEW ROOM \u2014 ${name} created room ${myRoomId} as host`);
-          writeLog(room, `HOST JOINED: ${name} created room ${myRoomId} | ${buyInTag(room.seats[0])}`);
-          send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
-          broadcastAll(room, lobbySnapshot(room));
-          return;
-        }
-
-        if (room.pendingJoins.find(p => p.id === myId)) {
-          const pj = room.pendingJoins.find(p => p.id === myId);
-          pj.ws = ws;
-          send(ws, { type: 'waiting', id: myId });
-          return;
-        }
-
-        svrLog(`JOIN PENDING \u2014 ${name} (room ${myRoomId})`);
-        writeLog(room, `JOIN REQUEST: ${name} (id: ${myId})`);
-        room.pendingJoins.push({ ws, id: myId, name, buyIn: (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : null });
-        send(ws, { type: 'waiting', id: myId });
-        const host = room.seats.find(s => s?.id === room.hostId);
-        if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name });
-        break;
+function startDealAnimation(activeSeats,afterDone){
+  if(is2D){dealing=false;if(afterDone)afterDone();return;}
+  dealing=true;
+  for(let i=0;i<NP;i++){const meshes=seatCardMeshes[i]||[];for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];}
+  for(const m of communityCardMeshes){if(m)m.isVisible=false;}
+  communityCardMeshes=[];freeAllChips();
+  const seq=[];
+  for(let rd=0;rd<2;rd++)for(const si of activeSeats)seq.push(si);
+  const dealt={};for(const si of activeSeats)dealt[si]=0;
+  let idx=0;
+  function next(){
+    if(idx>=seq.length){dealing=false;if(afterDone)afterDone();return;}
+    const si=seq[idx++],cn=dealt[si]||0;dealt[si]=cn+1;
+    if(!activeSeats.includes(si)){next();return;}
+    const isMe=(si===mySeat);
+    const target=isMe ? cardPos(vs(si),cn) : cardPosOther(vs(si),cn);
+    const m=nextCardMesh();
+    if(!isMe){m.rotation=new BABYLON.Vector3(0,0,0);m.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;}
+    seatCardMeshes[si][cn]=m;
+    animDeal(m,target,()=>{
+      snd_deal();
+      if(lastState&&lastState.players[si]){
+        const cd=lastState.players[si].cards[cn];
+        if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());
       }
+      setTimeout(next,80);
+    });
+  }
+  next();
+}
 
-      case 'approve': {
-        const room = rooms.get(myRoomId);
-        if (!room || myId !== room.hostId) return;
-        const idx = room.pendingJoins.findIndex(p => p.id === msg.id);
-        if (idx === -1) return;
-        const p = room.pendingJoins.splice(idx, 1)[0];
+let _reconnectTimer=null, _reconnectAttempts=0, _intentionalClose=false;
+let _serverShutdown=false;
+const MAX_RECONNECT_ATTEMPTS=12;
+const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,10000,10000,10000,10000,10000];
+const SHUTDOWN_FIRST_DELAY=12000;
 
-        if (msg.accept) {
-          const existSeat = room.seats.find(s => s?.id === p.id);
-          if (existSeat) {
-            if (existSeat._disconnectTimer) { clearTimeout(existSeat._disconnectTimer); existSeat._disconnectTimer = null; }
-            existSeat.ws = p.ws;
-            existSeat.disconnected = false;
-            existSeat.autoFold = false;
-            existSeat._missedHands = 0;
-            existSeat._disconnectedAt = null;
-            send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
-            send(p.ws, lobbySnapshot(room));
-            if (room.G) send(p.ws, tableSnapshot(room, p.id));
-            writeLog(room, `RE-ADMITTED: ${existSeat.name} (Seat ${existSeat.seat+1}) | ${buyInTag(existSeat)}`);
-            logEvent(room, `\u2705 ${existSeat.name} re-admitted to the table`);
-          } else {
-            const seat = room.seats.findIndex(s => s === null);
-            if (seat === -1) {
-              send(p.ws, { type: 'rejected', reason: 'Table is full' });
-              broadcastAll(room, lobbySnapshot(room));
-              return;
-            }
-            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat, room, p.buyIn || null);
-            send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
-            writeLog(room, `SEATED: ${p.name} assigned Seat ${seat+1} | ${buyInTag(room.seats[seat])}`);
-            if (room.gameActive) {
-              room.seats[seat].sittingOut = true;
-              send(p.ws, { type: 'sittingOut', reason: 'Hand in progress - you will join next hand.' });
-              send(p.ws, tableSnapshot(room, p.id));
-            }
-          }
-        } else {
-          send(p.ws, { type: 'rejected', reason: 'Host declined your request' });
-        }
-        broadcastAll(room, lobbySnapshot(room));
-        break;
-      }
-
-      case 'startGame': {
-        const room = rooms.get(myRoomId);
-        if (!room || myId !== room.hostId) return;
-        const playable = room.seats.filter(s => s && !s.autoFold);
-        if (playable.length < 2) { send(ws, { type: 'error', msg: 'Need at least 2 players' }); return; }
-        svrLog(`GAME START \u2014 room ${myRoomId} | ${playable.length} players`);
-        room.gameActive = true;
-        broadcastAll(room, { type: 'gameStarting' });
-        broadcastAll(room, lobbySnapshot(room));
-        startNewHand(room);
-        break;
-      }
-
-      case 'pause': {
-        const room = rooms.get(myRoomId);
-        if (!room || !room.gameActive) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (p) pauseGame(room, p.name);
-        break;
-      }
-
-      case 'resume': {
-        const room = rooms.get(myRoomId);
-        if (!room || !room.gameActive) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (p) resumeGame(room, p.name);
-        break;
-      }
-
-      case 'buyBack': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (!p || !p.pendingBuyBack) return;
-        if (p._buyBackTimer) { clearTimeout(p._buyBackTimer); p._buyBackTimer = null; }
-        const resolve = p._onBuyBackResolved;
-        p._onBuyBackResolved = null;
-        if (msg.accept) {
-          const buyInChips = (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : room.buyIn;
-          p.chips = buyInChips;
-          p.pendingBuyBack = false;
-          p.spectator = false;
-          p.buyInCount = (p.buyInCount || 1) + 1;
-          p.buyInTotal = (p.buyInTotal || room.buyIn) + buyInChips;
-          p.sittingOut = true;
-          writeLog(room, `BUY-BACK: ${p.name} bought back in \u2014 joining next hand | ${buyInTag(p)}`);
-          logEvent(room, `\u2705 ${p.name} bought back in for \u00a3${(buyInChips/100).toFixed(2)}`);
-          send(p.ws, { type: 'buyBackAccepted', chips: buyInChips });
-        } else {
-          p.pendingBuyBack = false;
-          p.sittingOut = true;
-          p.spectator = true;
-          recordPlayerExit(room, p, 'bust');   // declined buy-back, 0 chips
-          writeLog(room, `SPECTATOR: ${p.name} declined buy-back`);
-          logEvent(room, `\ud83d\udc40 ${p.name} declined buy-back \u2014 now spectating`);
-          send(p.ws, { type: 'spectating' });
-        }
-        broadcastState(room);
-        if (resolve) resolve();
-        break;
-      }
-
-      case 'voluntaryAutoFold': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const p = room.seats.find(s => s?.id === myId);
-        if (!p) return;
-        p.voluntaryAutoFold = msg.enabled === true;
-        const afStatus = p.voluntaryAutoFold ? 'ENABLED' : 'DISABLED';
-        writeLog(room, `AUTO-FOLD ${afStatus}: ${p.name} (Seat ${p.seat+1}) | ${buyInTag(p)}`);
-        logEvent(room, `\uD83D\uDD01 AUTO-FOLD ${afStatus}: ${p.name}`);
-        svrLog(`AUTO-FOLD ${afStatus} \u2014 ${p.name} room ${myRoomId}`);
-        if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
-          clearActionTimer(room);
-          doFold(room, p.seat, 'auto-fold');
-        }
-        send(ws, { type: 'voluntaryAutoFoldAck', enabled: p.voluntaryAutoFold });
-        break;
-      }
-
-      case 'action': {
-        const room = rooms.get(myRoomId);
-        if (!room?.G || !room.gameActive) return;
-        const actSeat = room.seats.findIndex(s => s?.id === myId);
-        if (actSeat === -1 || room.G.toAct[0] !== actSeat) return;
-        clearActionTimer(room);
-        handleAction(room, actSeat, msg.action, msg.amount);
-        break;
-      }
-
-       case 'exitGame': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const s = room.seats.find(s => s?.id === myId);
-        if (!s) return;
-        if (s._buyBackTimer) { clearTimeout(s._buyBackTimer); s._buyBackTimer = null; }
-        const resolve = s._onBuyBackResolved;
-        s._onBuyBackResolved = null;
-        s.pendingBuyBack = false;
-        recordPlayerExit(room, s, 'bust');
-        svrLog(`EXIT GAME — ${s.name} room ${room.id}`);
-        writeLog(room, `EXIT: ${s.name} chose to exit after busting | ${buyInTag(s)}`);
-        logEvent(room, `🚪 ${s.name} has left the game`);
-        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, chips: 0, reason: 'exit' });
-        room.seats[s.seat] = null;
-        if (room.hostId === s.id) {
-          const newHost = room.seats.find(Boolean);
-          if (newHost) { room.hostId = newHost.id; send(newHost.ws, { type: 'logEvent', text: '👑 You are now the host.' }); }
-        }
-        broadcastAll(room, lobbySnapshot(room));
-        broadcastState(room);
-        scheduleRoomCleanup(room);
-        if (resolve) resolve();
-        break;
-      }
-   
-      case 'cashOut': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const s = room.seats.find(s => s?.id === myId);
-        if (!s) return;
-        const inActiveHand = room.G && !s.folded && !s.sittingOut &&
-          room.G.phase !== 'idle' && s.cards && s.cards.length > 0;
-        if (inActiveHand) {
-          s.pendingCashOut = true;
-          send(ws, { type: 'cashOutPending' });
-          logEvent(room, `\uD83D\uDCB0 ${s.name} will cash out after this hand`);
-          writeLog(room, `CASH OUT PENDING: ${s.name} | Phase: ${room.G.phase}`);
-          if (room.G.toAct[0] === s.seat) {
-            clearActionTimer(room);
-            doFold(room, s.seat, 'cash out');
-          } else if (!s.folded) {
-            s.folded = true;
-            const idx = room.G.toAct.indexOf(s.seat);
-            if (idx !== -1) room.G.toAct.splice(idx, 1);
-            broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (cashing out)' });
-            broadcastState(room);
-            checkRoundEnd(room);
-          }
-          broadcastState(room);
-        } else {
-          executeCashOut(room, s);
-        }
-        break;
-      }
-
-      case 'chat': {
-        const room = rooms.get(myRoomId);
-        if (!room) return;
-        const s = room.seats.find(s => s?.id === myId);
-        if (!s) return;
-        writeLog(room, `CHAT: ${s.name}: ${(msg.text||'').slice(0,120)}`);
-        broadcastAll(room, { type: 'chat', name: s.name, text: (msg.text || '').slice(0, 120) });
-        break;
-      }
-
-      case 'setBuyIn': {
-        const room = rooms.get(myRoomId);
-        if (!room || room.hostId !== myId) return;
-        const newBuyIn = Math.max(20, Math.round(Number(msg.buyIn)));
-        room.buyIn = newBuyIn;
-        writeLog(room, `BUY-IN CHANGED: \u00a3${(newBuyIn/100).toFixed(2)}`);
-        logEvent(room, `\uD83D\uDCB0 Buy-in set to \u00a3${(newBuyIn/100).toFixed(2)} by host`);
-        broadcastAll(room, lobbySnapshot(room));
-        break;
-      }
-
-      case 'setStack': {
-        const room = rooms.get(myRoomId);
-        if (!room || room.hostId !== myId) return;
-        const target = room.seats.find(s => s?.id === msg.playerId);
-        if (!target) return;
-        const newChips = Math.max(0, Math.round(Number(msg.chips)));
-        const oldChips = target.chips;
-        target.chips = newChips;
-        writeLog(room, `STACK OVERRIDE: ${target.name} \u00a3${(oldChips/100).toFixed(2)} \u2192 \u00a3${(newChips/100).toFixed(2)}`);
-        logEvent(room, `\uD83D\uDD27 ${target.name}'s stack set to \u00a3${(newChips/100).toFixed(2)} by host`);
-        broadcastState(room);
-        broadcastAll(room, lobbySnapshot(room));
-        break;
-      }
+function connectWS(name,roomId,playerId){
+  _intentionalClose=false;
+  if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  ws=new WebSocket(proto+'//'+location.host);
+  ws.onopen=()=>{
+    _reconnectAttempts=0;
+    _serverShutdown=false;
+    const rb=document.getElementById('reconnectBanner');
+    if(rb)rb.style.display='none';
+    ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId,buyIn:myBuyIn}));
+  };
+  ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};
+  ws.onclose=()=>{
+    if(_intentionalClose)return;
+    if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){showRestartPrompt();return;}
+    const baseDelay=_serverShutdown&&_reconnectAttempts===0?SHUTDOWN_FIRST_DELAY:RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];
+    _reconnectAttempts++;
+    showReconnectBanner(_reconnectAttempts,baseDelay);
+    _reconnectTimer=setTimeout(()=>{if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);},baseDelay);
+  };
+  ws.onerror=()=>{
+    if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){
+      document.getElementById('loginErr').textContent='Could not connect to server.';
+      document.getElementById('loginOverlay').style.display='flex';
+      document.getElementById('waitingOverlay').style.display='none';
+      document.getElementById('lobbyOverlay').style.display='none';
     }
-  });
+  };
+}
 
-  ws.on('close', () => {
-    svrLog(`WS CLOSE \u2014 id=${myId||'(pre-join)'} room=${myRoomId||'none'}`);
-    if (!myId || !myRoomId) return;
-    const room = rooms.get(myRoomId);
-    if (!room) return;
+function showReconnectBanner(attempt,delayMs){
+  let rb=document.getElementById('reconnectBanner');
+  if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';document.body.appendChild(rb);}
+  rb.style.display='block';
+  const secs=Math.round(delayMs/1000);
+  const shutMsg=_serverShutdown?'\nServer restarting — please wait…':'';
+  rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+secs+'s'+shutMsg;
+  if(rb._countdown)clearInterval(rb._countdown);
+  let remaining=secs;
+  rb._countdown=setInterval(()=>{remaining--;if(remaining<=0){clearInterval(rb._countdown);rb._countdown=null;return;}const sm=_serverShutdown?'\nServer restarting — please wait…':'';rb.textContent='⚠ Reconnecting… ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+remaining+'s'+sm;},1000);
+}
 
-    const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
-    if (pi !== -1) {
-      const pj = room.pendingJoins[pi];
-      room.pendingJoins.splice(pi, 1);
-      writeLog(room, `PENDING JOIN LEFT: ${pj.name}`);
-      broadcastAll(room, lobbySnapshot(room));
-      scheduleRoomCleanup(room);
-      return;
+function showRestartPrompt(){
+  let rb=document.getElementById('reconnectBanner');
+  if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';document.body.appendChild(rb);}
+  rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.96);border:2px solid #c84040;border-radius:14px;padding:24px 32px;color:#ff9090;font-size:15px;font-weight:bold;text-align:center;z-index:999;min-width:280px';
+  rb.innerHTML='⚠ Lost connection to server.<br><br><span style="color:#c8a060;font-weight:normal;font-size:13px">The server may have restarted.<br>Your seat will be held if you reconnect.</span><br><br><button onclick="location.reload()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:14px;font-weight:bold;cursor:pointer">🔄 Reload &amp; Reconnect</button>';
+}
+
+function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
+
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&myName&&myRoomId&&myId){
+    if(!ws||ws.readyState===WebSocket.CLOSED||ws.readyState===WebSocket.CLOSING){
+      if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}
+      _reconnectAttempts=0;
+      showReconnectBanner(1,0);
+      connectWS(myName,myRoomId,myId);
     }
-
-    const s = room.seats.find(s => s?.id === myId);
-    if (!s || s.ws !== ws) return;
-
-    s.disconnected = true;
-    s.ws = null;
-    s._disconnectedAt = Date.now();
-    s._missedHands = s._missedHands || 0;
-    logEvent(room, `\u26A0 ${s.name} disconnected`);
-    writeLog(room, `DISCONNECT: ${s.name} (Seat ${s.seat+1}) | Phase: ${room.G?.phase||'idle'}`);
-    svrLog(`DISCONNECT \u2014 ${s.name} seat ${s.seat+1} room ${myRoomId}`);
-
-    s.autoFold = true;
-    broadcastState(room);
-
-    if (room.G && room.G.toAct[0] === s.seat) {
-      clearActionTimer(room);
-      doFold(room, s.seat, 'disconnected');
-    } else if (room.G && !s.folded) {
-      s.folded = true;
-      const idx = room.G.toAct.indexOf(s.seat);
-      if (idx !== -1) room.G.toAct.splice(idx, 1);
-      broadcastAll(room, { type: 'playerAction', seat: s.seat, action: 'fold', amount: 0, name: s.name + ' (disconnected)' });
-      broadcastState(room);
-      checkRoundEnd(room);
-    }
-
-    scheduleRoomCleanup(room);
-  });
-
-  ws.on('error', err => {
-    svrLog(`WS ERROR \u2014 id=${myId||'(pre-join)'}: ${err.message}`);
-  });
+  }
 });
 
-// ─── Execute cash-out ─────────────────────────────────────────────────────────
-function executeCashOut(room, s) {
-  const chips = s.chips;
-  const seatIdx = s.seat;
-  recordPlayerExit(room, s, 'cashout');   // record before seat is nulled
-  svrLog(`CASH OUT \u2014 ${s.name} room ${room.id} \u00a3${(chips/100).toFixed(2)}`);
-  if (room.G) writeLog(room, `CASH OUT: ${s.name} leaves with \u00a3${(chips/100).toFixed(2)} | ${buyInTag(s)}`);
-  logEvent(room, `\uD83D\uDCB0 ${s.name} cashed out with \u00a3${(chips/100).toFixed(2)}`);
-  broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: seatIdx, chips: s.chips, reason: 'cashout' });
-  room.seats[seatIdx] = null;
-  if (room.hostId === s.id) {
-    const newHost = room.seats.find(Boolean);
-    if (newHost) {
-      room.hostId = newHost.id;
-      send(newHost.ws, { type: 'logEvent', text: '\uD83D\uDC51 You are now the host.' });
+function handleServerMsg(msg){switch(msg.type){
+case 'serverShutdown':{_serverShutdown=true;showReconnectBanner(0,SHUTDOWN_FIRST_DELAY);addLog('⚠ Server restarting — will reconnect automatically…','log-fold');break;}
+case 'logEvent':{addLog(msg.text,'log-system');break;}
+case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';break;
+case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
+case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
+case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}if(isHost&&msg.buyIn){const bi=document.getElementById('buyInInput');if(bi&&document.activeElement!==bi)bi.value=(msg.buyIn/100).toFixed(2);}break;
+case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
+case 'winner':snd_win();hideTurnIndicator();addLog('\ud83c\udfc6\ud83d\udca6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\ud83c\udfc6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
+case 'gameStarting':startKeepAliveTimer();document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
+case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';
+  if(window.drumReset) window.drumReset(msg.bb || 40);
+  handNumber++;addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+' \u2501\u2501','log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,10);},120);setTimeout(()=>{showBet(bbSeat,20);},280);if(lastState)applyState(lastState);});break;}
+case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);
+  if(msg.players)msg.players.forEach(p=>{if(p&&p.id&&p.chips>0)noteStartChips(p.id,p.chips);});
+  if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='flex';}if(!dealing)applyState(msg);break;
+case 'playerAction':{const pname=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL \u00a3'+((msg.amount||0)/100).toFixed(2):'RAISE \u00a3'+((msg.amount||0)/100).toFixed(2);if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;const logClass=msg.action==='fold'?'log-action':'log-action';addLog('\u27a4 '+pname+': '+ac, logClass);if(msg.amount>0)showBet(msg.seat,msg.amount);hideTurnIndicator();if(lastState)applyState(lastState);break;}
+case 'yourTurn':{const ca=msg.callAmt||0;if(msg.seat===mySeat){const callLabel=ca>0?'CALL \u00a3'+(ca/100).toFixed(2):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2b50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
+case 'communityDealt':addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');sweepBetsToPot(()=>{if(lastState)applyState(lastState);});break;
+case 'showdown':setPhase('Showdown');hideTurnIndicator();sweepBetsToPot(null);addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\ud83c\udccf Showdown!',2000);break;
+case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
+case 'playerLeft':addLog(msg.name+' left the table');addChat('\u2b05 '+msg.name+' left');seatActions[msg.seat]='';
+  if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}
+  if(msg.chips===0&&msg.id&&msg.name&&_startChips[msg.id]){
+    recordElimination(msg.id,msg.name,_startChips[msg.id],0);
+    document.getElementById('eliminatedBox').style.display='block';
+  } else if(msg.chips!==undefined&&msg.id&&_startChips[msg.id]){
+    const net=msg.chips-_startChips[msg.id];
+    addLedgerEvent('\uD83D\uDCB0 '+msg.name+' cashed out \u00a3'+(msg.chips/100).toFixed(2)+' (net '+(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2)+')');
+  }
+  if(msg.id===myId){_intentionalClose=true;setTimeout(()=>location.reload(),600);return;}
+  if(lastState)applyState(lastState);
+  break;
+case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
+case 'gamePaused':handlePaused(true,msg.byName);break;
+case 'gameResumed':handlePaused(false,msg.byName);break;
+case 'cashOutPending':{const btn=document.getElementById('cashOutBtn');btn.classList.add('pending');btn.textContent='CASH OUT \u23f3';addLog('\u{1F4B0} CASH OUT: '+(myName||'You')+' will cash out after this hand','log-win');showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);break;}
+case 'voluntaryAutoFoldAck':addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));break;
+case 'buyBackOffer':{document.getElementById('buyBackOverlay').style.display='flex';addLog('\uD83D\uDCB8 You are out of chips! Choose to buy back in or spectate.','log-hand');let _bbSecs=15;const _bbEl=document.getElementById('buyBackTimer');_bbEl.textContent=_bbSecs;if(window._buyBackInterval)clearInterval(window._buyBackInterval);window._buyBackInterval=setInterval(()=>{_bbSecs--;_bbEl.textContent=_bbSecs;if(_bbSecs<=0){clearInterval(window._buyBackInterval);window._buyBackInterval=null;respondBuyBack(false);}},1000);break;}
+case 'buyBackAccepted':{document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='none';showMsg('\u2705 Bought back in!\nYou\u2019ll be dealt in from the next hand.',4500);addLog('\u2705 BUY-BACK: You have bought back in for \u00a310.00 \u2014 joining next hand','log-win');document.getElementById('spectatorBanner').textContent='\u23f3 Bought back in \u2014 you\u2019ll be dealt from the next hand';document.getElementById('spectatorBanner').style.display='block';break;}
+case 'spectating':{
+  document.getElementById('buyBackOverlay').style.display='none';
+  document.getElementById('spectatorBanner').style.display='block';
+  addLog('\uD83D\uDC40 You are now spectating \u2014 you will not be dealt cards','log-hand');
+  if(lastState&&lastState.players&&lastState.players[mySeat]){
+    const me=lastState.players[mySeat];
+    if(me&&me.chips===0&&_startChips[me.id]){
+      recordElimination(me.id,me.name,_startChips[me.id],0);
+      document.getElementById('eliminatedBox').style.display='block';
     }
   }
-  broadcastAll(room, lobbySnapshot(room));
-  broadcastState(room);
-  scheduleRoomCleanup(room);
-}
+  break;}
+case 'chat':addChat(msg.name+': '+msg.text);break;
+case 'error':addChat('\u26a0 '+msg.msg);break;}}
+function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(\''+p.id+'\',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(\''+p.id+'\',false)">\u2717 Reject</button></span>';pi.appendChild(row);}}else{ps.style.display='none';}const statusEl=document.getElementById('lobbyStatus');if(isHost)statusEl.textContent=seated.length<2?'Waiting for more players to join\u2026':'Ready to start!';else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
+function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
+function updateLedgerStacks(){if(!lastState||!lastState.players)return;const seated=lastState.players.filter(Boolean);if(!seated.length)return;let txt='📊 After hand #'+handNumber+': '+seated.map(p=>p.name+' \u00a3'+(p.chips/100).toFixed(2)).join(' | ');addLedgerEvent(txt);}
+function exitGame(){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}document.getElementById('buyBackOverlay').style.display='none';_intentionalClose=true;wsSend({type:'exitGame'});}
+function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}const stakeInput=document.getElementById('buyBackStakeInput');const buyIn=accept?Math.round((parseFloat((stakeInput?stakeInput.value:'').replace(/[^0-9.]/g,''))||10)*100):null;wsSend({type:'buyBack',accept,buyIn});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
+let pendingInGame={};
+function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
+function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(\''+p.id+'\',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(\''+p.id+'\',false)">Reject</button></span>';list.appendChild(row);}}
+function inGameApprove(id,accept){wsSend({type:'approve',id,accept});delete pendingInGame[id];refreshInGameJoinNotif();}
+function showTurnIndicator(txt){document.getElementById('turnIndicator').textContent=txt;document.getElementById('turnIndicator').style.display='block';}
+function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
 
-function mkPlayer(ws, id, name, seat, room, chips) {
-  const startChips = chips != null ? chips : (room ? room.buyIn : START_CHIPS);
-  return {
-    ws, id, name, chips: startChips, seat, cards: [], bet: 0,
-    folded: false, disconnected: false, autoFold: false,
-    pendingCashOut: false, _disconnectTimer: null,
-    buyInCount: 1, buyInTotal: startChips
-  };
-}
-
-function buyInTag(s) {
-  return `[Buy-ins: ${s.buyInCount} | Total in: \u00a3${(s.buyInTotal/100).toFixed(2)}]`;
-}
-
-// ─── Game history helpers ──────────────────────────────────────────────────────
-
-// Register or refresh a seated player in the room's permanent game history.
-// Called once per player at the start of every hand to keep buyInTotal current.
-function ensurePlayerHistory(room, s) {
-  if (!room.gameHistory) room.gameHistory = [];
-  const existing = room.gameHistory.find(h => h.id === s.id);
-  if (!existing) {
-    room.gameHistory.push({
-      id: s.id, name: s.name,
-      buyInTotal: s.buyInTotal || room.buyIn,
-      chips: s.chips, status: 'active',
-    });
-  } else {
-    existing.name       = s.name;
-    existing.buyInTotal = s.buyInTotal || existing.buyInTotal;
-    if (existing.status !== 'cashout' && existing.status !== 'evicted') {
-      existing.status = 'active';
-    }
+const TURN_SECS=15;
+let _countdownInterval=null;
+function startCountdown(isMe,playerName){
+  clearInterval(_countdownInterval);
+  let secs=TURN_SECS;
+  const foldBtn=document.getElementById('foldBtn');
+  function tick(){
+    if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}
+    else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}
+    if(secs<=0){clearInterval(_countdownInterval);return;}
+    secs--;
   }
+  tick();
+  _countdownInterval=setInterval(tick,1000);
+}
+function stopCountdown(){
+  clearInterval(_countdownInterval);
+  const foldBtn=document.getElementById('foldBtn');
+  if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}
+}
+function setActions(v){
+  const panel=document.getElementById('actionPanel');
+  if(panel)panel.style.display=v?'flex':'none';
+  ['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});
+  const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';
+  if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
+}
+function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
+function showMsg(m,ms=2400){
+  const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);
+  const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}
+}
+function addChat(txt){
+  const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);
+  if(chatCollapsed){const box=document.getElementById('chatBox');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),2200);}
+}
+let handNumber=0;
+
+function sendKeepAlive(){
+  if(!myRoomId||!myId)return;
+  fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber)
+    .then(r=>r.text())
+    .then(txt=>{addLog('\uD83D\uDCE1 Keep-alive sent \u2014 server: '+txt,'log-action');})
+    .catch(()=>{addLog('\u26A0 Keep-alive ping failed','log-action');});
+}
+function startKeepAliveTimer(){
+  if(window._keepAliveTimer)return;
+  window._keepAliveTimer=setInterval(sendKeepAlive, 4*60*1000);
+  setTimeout(sendKeepAlive, 30000);
+}
+function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
+
+const _ledger=[];
+function addLedgerEvent(txt){
+  _ledger.push({t:new Date().toLocaleTimeString(),msg:txt});
+  refreshLedger();
+}
+function refreshLedger(){
+  const el=document.getElementById('ledgerLog');
+  if(!el)return;
+  el.innerHTML='';
+  _ledger.slice().reverse().forEach(e=>{
+    const d=document.createElement('div');
+    d.style.cssText='padding:3px 0;border-bottom:1px solid rgba(200,160,32,0.1);font-size:10px;color:#e0c060;';
+    d.innerHTML='<span style="color:#888;font-size:9px">'+e.t+'</span> '+e.msg;
+    el.appendChild(d);
+  });
 }
 
-// Record a player's final state when they exit (cashout / eviction / bust).
-function recordPlayerExit(room, s, status) {
-  if (!room.gameHistory) room.gameHistory = [];
-  const idx = room.gameHistory.findIndex(h => h.id === s.id);
-  const record = {
-    id: s.id, name: s.name,
-    buyInTotal: s.buyInTotal || room.buyIn,
-    chips: s.chips, status,
-  };
-  if (idx >= 0) { room.gameHistory[idx] = record; }
-  else          { room.gameHistory.push(record);   }
+const _eliminated={};
+function recordElimination(id,name,startChips,finalChips){
+  if(_eliminated[id])return;
+  const net=finalChips-startChips;
+  const netStr=(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2);
+  _eliminated[id]={name,startChips,finalChips,net};
+  const msg='\uD83D\uDCCA '+name+' eliminated — net: '+netStr+' (started \u00a3'+(startChips/100).toFixed(2)+', left with \u00a3'+(finalChips/100).toFixed(2)+')';
+  addLog(msg,'log-fold');
+  addLedgerEvent('\uD83D\uDCCF '+msg);
+  refreshEliminatedBadge();
+}
+function refreshEliminatedBadge(){
+  const el=document.getElementById('eliminatedList');
+  if(!el)return;
+  el.innerHTML='';
+  Object.values(_eliminated).forEach(p=>{
+    const net=p.net;
+    const d=document.createElement('div');
+    d.style.cssText='padding:4px 6px;background:rgba(200,160,32,0.07);border-radius:5px;margin:3px 0;font-size:10px;color:#c8a060;';
+    d.innerHTML='<b style="color:#ffd700">'+p.name+'</b> &nbsp;net: <span style="color:'+(net>=0?'#40e870':'#e05050')+'">'+(net>=0?'+':'')+'\u00a3'+(Math.abs(net)/100).toFixed(2)+'</span>';
+    el.appendChild(d);
+  });
+  const hdr=document.getElementById('eliminatedHdr');
+  if(hdr)hdr.textContent='OUT ('+ Object.keys(_eliminated).length+')';
 }
 
-// Write a full cumulative game summary to the current hand's log file.
-// Uses fs.appendFileSync directly (no timestamp prefix) so box-drawing stays clean.
-function writeGameSummary(room) {
-  if (!room.G || !room.G.logPath) return;
+const _startChips={};
+function noteStartChips(id,chips){if(!_startChips[id])_startChips[id]=chips;}
 
-  // Start with exited players from history, then overlay live seat data
-  const registry = new Map();
-  (room.gameHistory || []).forEach(h => registry.set(h.id, { ...h }));
-  room.seats.forEach(s => {
-    if (!s) return;
-    const prev = registry.get(s.id) || {};
-    registry.set(s.id, {
-      id: s.id, name: s.name,
-      buyInTotal: s.buyInTotal || prev.buyInTotal || room.buyIn,
-      chips: s.chips,
-      status: s.spectator      ? 'spectating' :
-              s.pendingBuyBack ? 'bust'        : 'active',
-    });
-  });
+let gamePaused=false;
+function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
 
-  if (registry.size === 0) return;
+function applyBuyIn(){const inp=document.getElementById("buyInInput");const btn=document.getElementById("buyInBtn");if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0.20){inp.style.borderColor="#cc0000";return;}const pence=Math.round(val*100);wsSend({type:"setBuyIn",buyIn:pence});addLog("🔧 HOST: Buy-in set to £"+(pence/100).toFixed(2),"log-hand");addLedgerEvent("🔧 Buy-in changed to £"+(pence/100).toFixed(2));if(btn){btn.textContent="✓";btn.style.background="#1a6a1a";setTimeout(()=>{btn.textContent="SET";btn.style.background="#1a3a6a";},1500);}inp.style.borderColor="#c8a020";setTimeout(()=>{if(inp)inp.style.borderColor="";},1500);}
 
-  // Sort: active first, then by net P&L descending
-  const ORD = { active: 0, spectating: 1, cashout: 2, bust: 3, evicted: 4 };
-  const players = [...registry.values()].sort((a, b) => {
-    const od = (ORD[a.status] ?? 5) - (ORD[b.status] ?? 5);
-    if (od) return od;
-    return ((b.chips ?? 0) - (b.buyInTotal || 0)) -
-           ((a.chips ?? 0) - (a.buyInTotal || 0));
-  });
-
-  let totalIn = 0, totalOut = 0;
-  players.forEach(p => { totalIn += p.buyInTotal || 0; totalOut += p.chips ?? 0; });
-
-  // Column widths: name=18, buyIn=10, chips=10, net=10, status=10  (+ borders = 62 interior)
-  const W   = 62;
-  const pad = (s, n) => { s = String(s); return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length); };
-  const fmt = n => '\u00a3' + (n / 100).toFixed(2);
-  const net = n => (n >= 0 ? '+' : '-') + '\u00a3' + (Math.abs(n) / 100).toFixed(2);
-  const SEP = '\u2560' + '\u2550'.repeat(W) + '\u2563\n';
-
-  const dataRow = (name, bi, chips, n, status) =>
-    '\u2551  ' + pad(name, 18) + ' ' + pad(fmt(bi), 10) + ' ' +
-    pad(fmt(chips), 10) + ' ' + pad(net(n), 10) + ' ' + pad(status, 8) + '\u2551\n';
-
-  const titleStr = '  GAME SUMMARY \u2014 After Hand #' + String(room.handNum).padStart(4, '0');
-  const titleRow = '\u2551' + titleStr + ' '.repeat(W - titleStr.length) + '\u2551\n';
-  const hdrStr   = '  ' + pad('Player', 18) + ' ' + pad('Bought In', 10) + ' ' +
-                   pad('Has / Out', 10) + ' ' + pad('Net P&L', 10) + ' ' + pad('Status', 8);
-  const hdrRow   = '\u2551' + hdrStr + '\u2551\n';
-
-  let out = '\n\u2554' + '\u2550'.repeat(W) + '\u2557\n';
-  out += titleRow + SEP + hdrRow + SEP;
-
-  players.forEach(p => {
-    const c = p.chips ?? 0;
-    out += dataRow(p.name, p.buyInTotal || 0, c, c - (p.buyInTotal || 0), p.status || 'active');
-  });
-
-  const totalNet = totalOut - totalIn;
-  const balTag   = Math.abs(totalNet) <= 1 ? 'BALANCED' : 'ERR ' + net(totalNet);
-  out += SEP + dataRow('TOTALS', totalIn, totalOut, totalNet, balTag);
-  out += '\u255a' + '\u2550'.repeat(W) + '\u255d\n';
-
-  try { fs.appendFileSync(room.G.logPath, out); } catch {}
+function toggleStackEditor(){
+  const panel=document.getElementById('stackEditor');
+  if(panel.style.display==='block'){panel.style.display='none';return;}
+  const seated=[];
+  if(lastState&&lastState.players){lastState.players.forEach(p=>{if(p&&p.id&&p.name)seated.push({id:p.id,name:p.name,chips:p.chips});});}
+  if(seated.length===0&&lastLobbyMsg&&lastLobbyMsg.seats){lastLobbyMsg.seats.forEach(s=>{if(s&&s.id&&s.name)seated.push({id:s.id,name:s.name,chips:s.chips});});}
+  const rows=document.getElementById('stackEditorRows');rows.innerHTML='';
+  if(seated.length===0){rows.innerHTML='<div style="color:#888;font-size:12px">No players found</div>';}
+  else{seated.forEach((p,i)=>{const row=document.createElement('div');row.className='se-row';row.innerHTML='<span class="se-name">'+p.name+'</span><span style="color:#888;font-size:10px">£</span><input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="0.01" value="'+(p.chips/100).toFixed(2)+'"><button class="se-btn" id="se-btn-'+i+'" onclick="doSetStack('+i+',\''+p.id+'\')">SET</button>';rows.appendChild(row);});}
+  panel.style.display='block';
 }
 
-// ─── Game helpers ─────────────────────────────────────────────────────────────
-function shuffle(d) {
-  for (let i = d.length - 1; i > 0; i--) {
-    const j = crypto.randomInt(0, i + 1);
-    [d[i], d[j]] = [d[j], d[i]];
+function doSetStack(idx,playerId){const inp=document.getElementById("se-inp-"+idx);const btn=document.getElementById("se-btn-"+idx);if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0){inp.style.borderColor="#cc0000";return;}const pence=Math.round(val*100);const allP=[];if(lastState&&lastState.players)lastState.players.forEach(p=>{if(p&&p.name)allP.push(p);});if(!allP.length&&lastLobbyMsg&&lastLobbyMsg.seats)lastLobbyMsg.seats.forEach(s=>{if(s&&s.name)allP.push(s);});const pn=allP[idx]?allP[idx].name:"Player";wsSend({type:"setStack",playerId:playerId,chips:pence});addLog("🔧 HOST ADJUSTMENT: "+pn+" stack set to £"+(pence/100).toFixed(2),"log-hand");addLedgerEvent("🔧 Host set "+pn+" stack to £"+(pence/100).toFixed(2));btn.textContent="✓";btn.style.background="#1a6a1a";inp.style.borderColor="#c8a020";setTimeout(()=>{btn.textContent="SET";btn.style.background="";inp.style.borderColor="";},2000);}
+function handlePaused(isPaused,byName){gamePaused=isPaused;const btn=document.getElementById('pauseBtn');const banner=document.getElementById('pauseBanner');if(isPaused){btn.classList.add('active');btn.textContent='\u25b6';banner.style.display='block';addLog('\u23f8 Game PAUSED by '+(byName||'a player')+' \u2014 any player can resume','log-hand');}else{btn.classList.remove('active');btn.textContent='\u23f8';banner.style.display='none';addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');}}
+let myAutoFold=false;
+function toggleAutoFold(){myAutoFold=!myAutoFold;wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});const btn=document.getElementById('autoFoldBtn');if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}}
+function showBet(serverSeat,amount){if(amount<=0||is2D)return;const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);const existH=seatBetChips[serverSeat].length*0.060;const chips=buildChipStack(amount);seatBetChips[serverSeat].push(...chips);animChipArc(chips,src,dst,38,0.32+existH,null);}
+let activityCollapsed=true;
+function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';}
+let chatCollapsed=true;
+function toggleChat(){chatCollapsed=!chatCollapsed;const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');inner.style.display=chatCollapsed?'none':'block';toggle.textContent=chatCollapsed?'\u25b6 expand':'\u25bc collapse';}
+let eliminatedCollapsed=true;
+function toggleEliminated(){eliminatedCollapsed=!eliminatedCollapsed;const el=document.getElementById('eliminatedList'),toggle=document.getElementById('eliminatedToggle');el.style.display=eliminatedCollapsed?'none':'block';toggle.textContent=eliminatedCollapsed?'\u25b6 expand':'\u25bc collapse';}
+let ledgerCollapsed=true;
+function toggleLedger(){ledgerCollapsed=!ledgerCollapsed;const el=document.getElementById('ledgerLog'),toggle=document.getElementById('ledgerToggle');el.style.display=ledgerCollapsed?'none':'block';toggle.textContent=ledgerCollapsed?'\u25b6 expand':'\u25bc collapse';}
+
+function toggleFullscreen(){if(!document.fullscreenElement&&!document.webkitFullscreenElement){const el=document.documentElement;if(el.requestFullscreen){el.requestFullscreen().catch(()=>{});}else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();}}else{if(document.exitFullscreen){document.exitFullscreen();}else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}}}
+
+window.addEventListener('load',()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn){const fsAvailable=!!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);if(!fsAvailable)fsBtn.style.display='none';}});
+
+function doCashOut(){if(!confirm('Cash out and leave the table with your remaining chips?'))return;_intentionalClose=true;wsSend({type:'cashOut'});}
+document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
+document.addEventListener('webkitfullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
+
+// ── Action button wiring ───────────────────────────────────────────────────────
+document.getElementById('callBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
+document.getElementById('raiseBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
+document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
+
+// ── Swipe-to-confirm All In ───────────────────────────────────────────────────
+(function(){
+  const track = document.getElementById('allInBtn');
+  const thumb = document.getElementById('allInThumb');
+  const fill  = document.getElementById('allInFill');
+  if(!track||!thumb||!fill) return;
+
+  const THUMB_W    = 36;
+  const CONFIRM_AT = 0.88;
+  const SNAP_MS    = 320;
+
+  let active = false, startX = 0, travelX = 0;
+
+  function maxTravel(){ return track.offsetWidth - THUMB_W - 8; }
+
+  function setPos(px){
+    const mx = maxTravel();
+    const clamped = Math.max(0, Math.min(px, mx));
+    thumb.style.left = (4 + clamped) + 'px';
+    fill.style.width  = (clamped / mx * 100) + '%';
   }
-  return d;
-}
 
-function buildDeck() {
-  const d = [];
-  for (const s of SUITS) for (const r of RANKS) d.push({ s, r });
-  return shuffle(d);
-}
+  function snapBack(){
+    thumb.classList.remove('dragging');
+    thumb.style.left = '4px';
+    fill.style.transition = 'width ' + SNAP_MS + 'ms cubic-bezier(0.34,1.56,0.64,1)';
+    fill.style.width = '0%';
+    setTimeout(() => { fill.style.transition = 'none'; }, SNAP_MS + 50);
+  }
 
-function activePlaying(room) {
-  return room.seats
-    .map((s, i) => {
-      if (!s) return null;
-      if (s.sittingOut) return null;
-      if (s.autoFold) return null;
-      if (s.spectator) return null;
-      if (s.pendingBuyBack) return null;
-      if (s.chips <= 0) return null;
-      return i;
-    })
-    .filter(i => i !== null);
-}
+  function confirmAllIn(){
+    thumb.classList.remove('dragging');
+    const mx = maxTravel();
+    thumb.style.left = (4 + mx) + 'px';
+    fill.style.width = '100%';
+    fill.classList.add('flash');
+    ensureAudio();
+    snd_win();
+    setTimeout(() => {
+      fill.classList.remove('flash');
+      snapBack();
+      const me = lastState && lastState.players && lastState.players[mySeat];
+      const allInAmount = me ? me.chips : drumGetPence();
+      if(window.drumClearDrag) drumClearDrag();
+      setActions(false);
+      showMsg('');
+      wsSend({ type:'action', action:'raise', amount:allInAmount });
+    }, 220);
+  }
 
-function nextSeat(from, active) {
-  const sorted = [...active].sort((a, b) => a - b);
-  const nxt = sorted.find(i => i > from);
-  return nxt !== undefined ? nxt : sorted[0];
-}
+  function shakeHint(){
+    thumb.classList.remove('shake');
+    void thumb.offsetWidth;
+    thumb.classList.add('shake');
+    setTimeout(() => thumb.classList.remove('shake'), 560);
+  }
 
-function buildActOrder(room, startSeat, active) {
-  const sorted = [...active].sort((a, b) => a - b);
-  let startIdx = sorted.indexOf(startSeat);
-  if (startIdx === -1) startIdx = 0;
-  const ordered = [...sorted.slice(startIdx), ...sorted.slice(0, startIdx)];
-  return ordered.filter(i => {
-    const p = room.seats[i];
-    return p && !p.folded && !p.autoFold && !p.voluntaryAutoFold && p.chips > 0;
-  });
-}
+  track.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    track.setPointerCapture(e.pointerId);
+    active  = true;
+    startX  = e.clientX;
+    travelX = 0;
+    thumb.classList.add('dragging');
+    fill.style.transition = 'none';
+  }, { passive: false });
 
-function canActCount(room) {
-  if (!room.G) return 0;
-  return room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    s.chips > 0
-  ).length;
-}
+  track.addEventListener('pointermove', e => {
+    if(!active) return;
+    e.preventDefault();
+    travelX = Math.max(0, e.clientX - startX);
+    setPos(travelX);
+  }, { passive: false });
 
-function checkRoundEnd(room) {
-  const alive = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-  if (alive.length <= 1) { endRound(room); return true; }
-  return false;
-}
-
-// ─── Hand flow ────────────────────────────────────────────────────────────────
-function startNewHand(room) {
-  clearActionTimer(room);
-  if (room.paused) { room.paused = false; broadcastAll(room, { type: 'gameResumed' }); }
-  room.actionTimerSeat = -1;
-  room.actionTimerRemaining = ACTION_TIMEOUT;
-  room.actionTimerStarted = 0;
-
-  // Process pending cash-outs
-  room.seats.forEach((s, i) => { if (s && s.pendingCashOut) executeCashOut(room, s); });
-
-  // Hand-based absence tracking
-  const ABSENT_HAND_LIMIT = 3;
-  room.seats.forEach((s, idx) => {
-    if (!s) return;
-    if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
-
-    if (s.disconnected && s.autoFold) {
-      s._missedHands = (s._missedHands || 0) + 1;
-      writeLog(room, `ABSENT: ${s.name} missed hand ${s._missedHands}/${ABSENT_HAND_LIMIT}`);
-      logEvent(room, `\uD83D\uDCA4 ${s.name} absent \u2014 missed ${s._missedHands}/${ABSENT_HAND_LIMIT} hand${s._missedHands>1?'s':''}`);
-
-      if (s._missedHands >= ABSENT_HAND_LIMIT) {
-        svrLog(`EVICT \u2014 ${s.name} room ${room.id} seat ${s.seat+1} after ${ABSENT_HAND_LIMIT} missed hands`);
-        logEvent(room, `\u274C ${s.name} removed after ${ABSENT_HAND_LIMIT} missed hands`);
-        writeLog(room, `EVICTED: ${s.name} (Seat ${s.seat+1}) | ${buyInTag(s)}`);
-        recordPlayerExit(room, s, 'evicted');   // record before seat is nulled
-        broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'absent-eviction' });
-
-        if (room.hostId === s.id) {
-          const newHost = room.seats.find(h => h && h.id !== s.id && h.ws?.readyState === 1);
-          if (newHost) {
-            room.hostId = newHost.id;
-            writeLog(room, `HOST TRANSFER: ${s.name} evicted \u2192 ${newHost.name} is new host`);
-            send(newHost.ws, { type: 'logEvent', text: '\uD83D\uDC51 You are now the host.' });
-          } else { room.hostId = null; }
-        }
-        room.seats[idx] = null;
-        broadcastAll(room, lobbySnapshot(room));
-        scheduleRoomCleanup(room);
-      }
+  track.addEventListener('pointerup', () => {
+    if(!active) return;
+    active = false;
+    const mx = maxTravel();
+    if(travelX >= mx * CONFIRM_AT){
+      confirmAllIn();
+    } else if(travelX < 6){
+      snapBack();
+      shakeHint();
     } else {
-      s._missedHands = 0;
-      s.sittingOut = false;
+      snapBack();
     }
   });
 
-  // Snapshot all currently seated players into game history
-  room.seats.forEach(s => { if (s) ensurePlayerHistory(room, s); });
+  track.addEventListener('pointercancel', () => {
+    if(!active) return;
+    active = false;
+    snapBack();
+  });
+})();
 
-  const active = activePlaying(room);
+document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
+document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
+document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim(),buyIn=parseFloat(document.getElementById('loginBuyInInput').value.replace(/[^0-9.]/g,''))||10;if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}if(buyIn<=0){document.getElementById('loginErr').textContent='Please enter a valid buy-in amount.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=Math.round(buyIn*100);localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
+['nameInput','roomInput','loginBuyInInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
+document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
-  if (active.length < 2) {
-    writeLog(room, `WAITING: not enough active players | active=${active.length}`);
-    broadcastAll(room, { type: 'waitingForPlayers' });
-    room.gameActive = false;
-    broadcastAll(room, lobbySnapshot(room));
-    return;
+// ── Scroll wheel dials ─────────────────────────────────────────────────────────
+(function(){
+  const POUNDS = Array.from({length:100},(_,i)=>i);
+  const PENCE  = [0,20,40,60,80];
+
+  let poundsIdx = 0, penceIdx = 0, minRaisePence = 40;
+
+  function renderDial(innerId, list, idx){
+    const inner = document.getElementById(innerId);
+    if(!inner) return;
+    inner.innerHTML = '';
+    for(let offset = -3; offset <= 3; offset++){
+      const i = idx + offset;
+      const div = document.createElement('div');
+      div.className = 'dial-item' +
+        (offset===0 ? ' selected' : Math.abs(offset)===1 ? ' adj1' : ' adj2');
+      div.textContent = (i>=0 && i<list.length)
+        ? String(list[i]).padStart(2,'0')
+        : '';
+      inner.appendChild(div);
+    }
+    inner.style.top = '-64px';
   }
 
-  room.dealerSeat = room.dealerSeat < 0 ? active[0] : nextSeat(room.dealerSeat, active);
-  room.handNum = (room.handNum || 0) + 1;
+  function renderAll(){
+    renderDial('dialPoundsInner', POUNDS, poundsIdx);
+    renderDial('dialPenceInner',  PENCE,  penceIdx);
+  }
 
-  const isHeadsUp = active.length === 2;
-  const sbSeat = isHeadsUp ? room.dealerSeat : nextSeat(room.dealerSeat, active);
-  const bbSeat = nextSeat(sbSeat, active);
-  const preflopStart = nextSeat(bbSeat, active);
+  function updateDisplay(){
+    const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
+    const val = Math.max(raw, minRaisePence);
+    const btn = document.getElementById('raiseBtn');
+    if(btn){
+      const verb = btn.dataset.verb || 'RAISE';
+      btn.textContent = verb + ' \u00a3' + Math.floor(val/100) + '.' + String(val%100).padStart(2,'0');
+    }
+  }
 
-  const logPath = handLogPath(room.id, room.handNum);
+  function snapToValue(totalPence){
+    const p = Math.max(0, totalPence);
+    poundsIdx = Math.min(Math.floor(p / 100), POUNDS.length - 1);
+    const rem = p % 100;
+    let best = 0;
+    for(let i = 0; i < PENCE.length; i++){
+      if(PENCE[i] <= rem) best = i;
+    }
+    penceIdx = best;
+    renderAll();
+  }
 
-  room.G = {
-    deck: buildDeck(), phase: 'preflop', pot: 0,
-    currentBet: BB, lastRaiseIncrement: BB,
-    community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath
+  let _userDraggedSinceLastMin = false;
+
+  window.drumReset = function(minPence){
+    minRaisePence = Math.max(minPence || 40, 20);
+    _userDraggedSinceLastMin = false;
+    snapToValue(minRaisePence);
+    updateDisplay();
   };
 
-  room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; s.totalBet = 0; } });
-
-  const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
-  const dsIdx = active.indexOf(dealStartSeat);
-  const dealOrder = dsIdx >= 0 ? [...active.slice(dsIdx), ...active.slice(0, dsIdx)] : active;
-
-  // Hand header log
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-GB', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const timeStr = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const totalChips = active.reduce((s,i) => s + room.seats[i].chips, 0);
-  const playerLines = active.map(i => {
-    const s = room.seats[i];
-    const tags = [];
-    if (i === room.dealerSeat) tags.push('DEALER');
-    if (i === sbSeat) tags.push('SB');
-    if (i === bbSeat) tags.push('BB');
-    if (s.voluntaryAutoFold) tags.push('AUTO-FOLD');
-    const tagStr = tags.length ? ' ['+tags.join('+')+']' : '';
-    return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | Stack: \u00a3${(s.chips/100).toFixed(2).padStart(7)}${tagStr}\n             ${buyInTag(s)}`;
-  }).join('\n');
-
-  fs.writeFileSync(logPath,
-    '\u2554' + '\u2550'.repeat(62) + '\u2557\n' +
-    '\u2551  SYFM POKER \u2014 HAND LOG' + ' '.repeat(39) + '\u2551\n' +
-    '\u2560' + '\u2550'.repeat(62) + '\u2563\n' +
-    `\u2551  Room: ${room.id.padEnd(10)} Hand: #${String(room.handNum).padEnd(6)} Date: ${dateStr.slice(0,20).padEnd(20)}\u2551\n` +
-    `\u2551  Time: ${timeStr.padEnd(54)}\u2551\n` +
-    '\u2560' + '\u2550'.repeat(62) + '\u2563\n' +
-    '\u2551  PLAYERS AT THE TABLE' + ' '.repeat(40) + '\u2551\n' +
-    '\u2560' + '\u2550'.repeat(62) + '\u2563\n' +
-    playerLines.split('\n').map(l => '\u2551' + l.padEnd(63) + '\u2551').join('\n') + '\n' +
-    '\u2560' + '\u2550'.repeat(62) + '\u2563\n' +
-    `\u2551  Format: ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | Blinds: SB \u00a3${(SB/100).toFixed(2)} / BB \u00a3${(BB/100).toFixed(2)} | Total chips: \u00a3${(totalChips/100).toFixed(2)}`.padEnd(63) + '\u2551\n' +
-    '\u255a' + '\u2550'.repeat(62) + '\u255d\n\n'
-  );
-
-  // Post blinds
-  room.seats[sbSeat].chips -= SB; room.seats[sbSeat].bet = SB; room.seats[sbSeat].totalBet = SB;
-  room.seats[bbSeat].chips -= BB; room.seats[bbSeat].bet = BB; room.seats[bbSeat].totalBet = BB;
-  room.G.pot = SB + BB;
-  room._chipsInPlayAtHandStart = room.seats.filter(Boolean).reduce((sum, s) => sum + s.chips, 0) + room.G.pot;
-
-  writeLog(room, `BLINDS | ${room.seats[sbSeat].name.padEnd(18)} posts SB £${(SB/100).toFixed(2)} | Stack: £${(room.seats[sbSeat].chips/100).toFixed(2)}`);
-  writeLog(room, `BLINDS | ${room.seats[bbSeat].name.padEnd(18)} posts BB £${(BB/100).toFixed(2)} | Stack: £${(room.seats[bbSeat].chips/100).toFixed(2)}`);
-  writeLog(room, `BLINDS | Pot after blinds: £${(room.G.pot/100).toFixed(2)} | Total chips in play: £${(room._chipsInPlayAtHandStart/100).toFixed(2)}`);
-
-  // Deal cards to all active players (including voluntaryAutoFold — they pay blinds too)
-  for (let rd = 0; rd < 2; rd++)
-    for (const si of dealOrder)
-      room.seats[si].cards.push(room.G.deck.shift());
-
-  writeLog(room, '\u250c\u2500 HOLE CARDS DEALT \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510');
-  dealOrder.forEach(i => {
-    const s = room.seats[i];
-    const tags = [];
-    if (i === room.dealerSeat) tags.push('D');
-    if (i === sbSeat) tags.push('SB');
-    if (i === bbSeat) tags.push('BB');
-    if (s.voluntaryAutoFold) tags.push('VAF');
-    const tagStr = tags.length ? ' ['+tags.join('+')+']' : '';
-    writeLog(room, `\u2502 ${('Seat '+(i+1)+' '+s.name).padEnd(22)}${tagStr.padEnd(8)}: ${s.cards.map(c=>c.r+c.s).join('  ')} \u2502`);
-  });
-  writeLog(room, '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518');
-
-  room.G.toAct = buildActOrder(room, preflopStart, active);
-
-  // ── CRITICAL: Fold voluntaryAutoFold players immediately after deal ──────────
-  // They paid their blinds, they got their cards, but they never look at them.
-  // Setting folded=true here ensures they CANNOT WIN at showdown under any path.
-  // buildActOrder already excludes them from toAct so they are never prompted.
-  active.forEach(i => {
-    const s = room.seats[i];
-    if (s && s.voluntaryAutoFold && !s.folded) {
-      s.folded = true;
-      broadcastAll(room, {
-        type: 'playerAction', seat: i, action: 'fold',
-        amount: 0, name: s.name + ' (auto-fold)'
-      });
-      writeLog(room, `FOLD   | ${s.name.padEnd(18)} | voluntary auto-fold \u2014 blinds paid, hand folded immediately`);
+  window.drumSetMin = function(minPence){
+    minRaisePence = Math.max(minPence || 40, 20);
+    const currentVal = POUNDS[poundsIdx] * 100 + PENCE[penceIdx];
+    if(!_userDraggedSinceLastMin || currentVal < minRaisePence){
+      snapToValue(minRaisePence);
     }
-  });
+    _userDraggedSinceLastMin = false;
+    updateDisplay();
+  };
 
-  broadcastAll(room, {
-    type: 'newHand', dealerSeat: room.dealerSeat, sbSeat, bbSeat,
-    pot: room.G.pot, activeSeats: dealOrder, bb: BB
-  });
+  window.drumGetPence = function(){
+    const raw = POUNDS[poundsIdx]*100 + PENCE[penceIdx];
+    return Math.max(raw, minRaisePence);
+  };
 
-  room.seats.forEach(s => {
-    if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id));
-  });
+  window.drumClearDrag = function(){
+    _userDraggedSinceLastMin = false;
+  };
 
-  writeLog(room, '\u250c\u2500 PREFLOP \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
-  writeLog(room, `\u2502  Act order: ${room.G.toAct.map(i=>room.seats[i].name).join(' \u2192 ')}`);
-  writeLog(room, '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
-  promptToAct(room);
-}
-
-function promptToAct(room) {
-  const G = room.G;
-  if (!G) return;
-
-  while (G.toAct.length) {
-    const si = G.toAct[0];
-    const p = room.seats[si];
-    if (!p || p.folded || p.autoFold || p.voluntaryAutoFold || p.chips === 0) {
-      G.toAct.shift();
-    } else { break; }
-  }
-
-  const activeInHand = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-
-  if (activeInHand.length <= 1) {
-    room.seats.filter(s =>
-      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-      (s.autoFold || s.voluntaryAutoFold)
-    ).forEach(af => {
-      if (!af.folded) {
-        af.folded = true;
-        const label = af.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)';
-        broadcastAll(room, { type: 'playerAction', seat: af.seat, action: 'fold', amount: 0, name: af.name + ` (${label})` });
-        const idx = G.toAct.indexOf(af.seat);
-        if (idx !== -1) G.toAct.splice(idx, 1);
-      }
-    });
-    broadcastState(room);
-    endRound(room);
-    return;
-  }
-
-  const unfolded = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-  const canAct = unfolded.filter(s => s.chips > 0);
-
-  if (canAct.length === 0 || G.toAct.length === 0) { advPhase(room); return; }
-
-  if (canAct.length === 1 && G.toAct.length > 0) {
-    const soloSeat = G.toAct[0];
-    const solo = room.seats[soloSeat];
-    if (solo) {
-      const callAmt = Math.min(G.currentBet - solo.bet, solo.chips);
-      if (callAmt === 0) {
-        const othersAllIn = unfolded.filter(s => s.seat !== soloSeat && s.chips === 0);
-        if (othersAllIn.length === unfolded.length - 1) { advPhase(room); return; }
-      }
-    }
-  }
-
-  const seat = G.toAct[0];
-  const p = room.seats[seat];
-  if (!p) { G.toAct.shift(); setTimeout(() => promptToAct(room), 100); return; }
-
-  if (p.disconnected || p.autoFold || p.voluntaryAutoFold) {
-    clearActionTimer(room);
-    doFold(room, seat, p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)');
-    return;
-  }
-
-  const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
-  const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
-  const firstBet = G.currentBet === 0;
-
-  writeLog(room, `PROMPT: ${p.name.padEnd(18)} (Seat ${seat+1}) | ${callAmt===0?'CHECK':'CALL \u00a3'+(callAmt/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
-
-  broadcastAll(room, { type: 'yourTurn', seat, callAmt, minRaise, pot: G.pot, currentBet: G.currentBet, firstBet });
-  startActionTimer(room, seat);
-}
-
-function doFold(room, seat, reason) {
-  const p = room.seats[seat];
-  if (!p) return;
-  p.folded = true;
-  const label = reason ? ` (${reason})` : '';
-  const playersLeft = room.seats.filter(s => s && !s.folded && !s.autoFold && !s.voluntaryAutoFold).length;
-  broadcastAll(room, { type: 'playerAction', seat, action: 'fold', amount: 0, name: p.name + label });
-  writeLog(room, `FOLD   | ${p.name.padEnd(18)} | ${(reason||'voluntary').padEnd(22)} | Stack: \u00a3${(p.chips/100).toFixed(2)} | Players left: ${playersLeft}`);
-  if (room.G) {
-    const idx = room.G.toAct.indexOf(seat);
-    if (idx !== -1) room.G.toAct.splice(idx, 1);
-  }
-  broadcastState(room);
-  if (!checkRoundEnd(room)) setTimeout(() => promptToAct(room), 200);
-}
-
-function handleAction(room, seat, action, amount) {
-  const p = room.seats[seat];
-  const G = room.G;
-  if (!p || !G) return;
-  const stackBefore = p.chips;
-
-  function chipCheck(label) {
-    const total = room.seats.filter(Boolean).reduce((s, p) => s + p.chips, 0) + G.pot;
-    const expected = room._chipsInPlayAtHandStart || 0;
-    const diff = total - expected;
-    writeLog(room, `       | Chip check [${label}]: stacks+pot=\u00a3${(total/100).toFixed(2)} expected=\u00a3${(expected/100).toFixed(2)}${diff!==0?' \u26a0 DIFF='+(diff>0?'+':'')+(diff/100).toFixed(2):'  \u2713'}`);
-  }
-
-  if (action === 'fold') {
-    doFold(room, seat, null);
-
-  } else if (action === 'check' || action === 'call') {
-    const ca = Math.min(G.currentBet - p.bet, p.chips);
-    p.chips -= ca; p.bet += ca; p.totalBet = (p.totalBet||0) + ca; G.pot += ca;
-    const act = ca === 0 ? 'check' : 'call';
-    broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    writeLog(room, `${act.toUpperCase().padEnd(6)} | ${p.name.padEnd(18)} | \u00a3${(stackBefore/100).toFixed(2)} \u2192 \u00a3${(p.chips/100).toFixed(2)} | Called: \u00a3${(ca/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
-    chipCheck(act);
-    broadcastState(room);
-    G.toAct.shift();
-    setTimeout(() => promptToAct(room), 200);
-
-  } else if (action === 'raise') {
-    const callAmount     = G.currentBet - p.bet;
-    const minFromStack   = Math.min(callAmount + G.lastRaiseIncrement, p.chips);
-    const raiseFromStack = Math.min(Math.max(amount || minFromStack, minFromStack), p.chips);
-    const prevCurrentBet = G.currentBet;
-    p.chips -= raiseFromStack;
-    p.bet   += raiseFromStack;
-    p.totalBet = (p.totalBet||0) + raiseFromStack;
-    G.pot   += raiseFromStack;
-    G.currentBet = Math.max(G.currentBet, p.bet);
-    if (G.currentBet > prevCurrentBet) G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
-
-    broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
-    writeLog(room, `RAISE  | ${p.name.padEnd(18)} | \u00a3${(stackBefore/100).toFixed(2)} \u2192 \u00a3${(p.chips/100).toFixed(2)} | callAmt: \u00a3${(callAmount/100).toFixed(2)} | raised: \u00a3${(raiseFromStack/100).toFixed(2)} | playerBet: \u00a3${(p.bet/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
-    chipCheck('raise');
-    broadcastState(room);
-
-    const active = activePlaying(room).sort((a, b) => a - b);
-    const raiserIdx = active.indexOf(seat);
-    const rotated = raiserIdx >= 0
-      ? [...active.slice(raiserIdx + 1), ...active.slice(0, raiserIdx + 1)]
-      : active;
-    G.toAct = rotated.filter(i => {
-      if (i === seat) return false;
-      const op = room.seats[i];
-      return op && !op.folded && !op.autoFold && !op.voluntaryAutoFold && op.chips > 0 && op.bet < G.currentBet;
-    });
-    writeLog(room, `RAISE  | New toAct: ${G.toAct.map(i=>room.seats[i]?.name||'?').join(' \u2192 ')}`);
-    setTimeout(() => promptToAct(room), 200);
-  }
-}
-
-function broadcastState(room) {
-  room.seats.forEach(s => { if (s?.ws?.readyState === 1) send(s.ws, tableSnapshot(room, s.id)); });
-}
-
-function advPhase(room) {
-  const G = room.G;
-  clearActionTimer(room);
-  room.seats.forEach(s => { if (s) s.bet = 0; });
-  G.currentBet = 0;
-  G.lastRaiseIncrement = BB;
-
-  const next = { preflop: 'flop', flop: 'turn', turn: 'river' };
-
-  if (G.phase in next) {
-    const prevPhase = G.phase;
-    G.phase = next[G.phase];
-    const count = G.phase === 'flop' ? 3 : 1;
-    const newCards = [];
-    for (let i = 0; i < count; i++) { const c = G.deck.shift(); G.community.push(c); newCards.push(c); }
-
-    writeLog(room, `PHASE: ${prevPhase.toUpperCase()} \u2192 ${G.phase.toUpperCase()} | Cards: ${newCards.map(c=>c.r+c.s).join(' ')} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
-    const stackSummary = room.seats.filter(Boolean).map(s => `${s.name}=\u00a3${(s.chips/100).toFixed(2)}`).join(' | ');
-    writeLog(room, `       | Stacks: ${stackSummary}`);
-    broadcastAll(room, { type: 'communityDealt', phase: G.phase, cards: G.community, newCards });
-    broadcastState(room);
-
-    const active = activePlaying(room);
-    const unfolded = room.seats.filter(s =>
-      s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-      !s.autoFold && !s.voluntaryAutoFold
-    );
-
-    if (unfolded.length <= 1) { endRound(room); return; }
-
-    const canAct = active.filter(i => { const p = room.seats[i]; return p && !p.folded && p.chips > 0; });
-
-    if (canAct.length <= 1 && G.phase !== 'river') {
-      setTimeout(() => advPhase(room), 1200);
-      return;
-    }
-
-    if (canAct.length <= 1) {
-      setTimeout(() => { G.phase = 'showdown'; showdown(room); }, 1200);
-      return;
-    }
-
-    const postStart = G.isHeadsUp ? G.bbSeat : nextSeat(room.dealerSeat, active);
-    G.toAct = buildActOrder(room, postStart, active);
-    writeLog(room, `Act order: ${G.toAct.map(i => room.seats[i].name).join(' \u2192 ')}`);
-    setTimeout(() => promptToAct(room), 600);
-
-  } else {
-    G.phase = 'showdown';
-    showdown(room);
-  }
-}
-
-function endRound(room) {
-  clearActionTimer(room);
-  const remaining = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-  if (remaining.length === 1) {
-    writeLog(room, `RESULT: ${remaining[0].name} wins uncontested`);
-    finish(room, [remaining[0]], 'Last player standing');
-  } else if (remaining.length === 0) {
-    writeLog(room, `RESULT: No eligible winner \u2014 hand skipped`);
-    setTimeout(() => startNewHand(room), 3000);
-  }
-}
-
-function showdown(room) {
-  clearActionTimer(room);
-
-  // ── CRITICAL: autoFold / voluntaryAutoFold players are NEVER eligible to win ──
-  // They folded at hand start (folded=true set in startNewHand). This double-guard
-  // ensures they cannot win via any code path — checked by both !s.folded AND
-  // !s.autoFold && !s.voluntaryAutoFold.
-  const active = room.seats.filter(s =>
-    s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack &&
-    !s.autoFold && !s.voluntaryAutoFold
-  );
-
-  if (active.length === 1) {
-    writeLog(room, `RESULT: ${active[0].name} wins at showdown uncontested`);
-    finish(room, [active[0]], 'Last player standing');
-    return;
-  }
-  if (active.length === 0) {
-    writeLog(room, `RESULT: No players at showdown \u2014 hand skipped`);
-    setTimeout(() => startNewHand(room), 3000);
-    return;
-  }
-
-  broadcastAll(room, { type: 'showdown', reveals: active.map(s => ({ seat: s.seat, name: s.name, cards: s.cards })) });
-  broadcastState(room);
-
-  writeLog(room, '\u2554' + '\u2550'.repeat(62) + '\u2557');
-  writeLog(room, '\u2551  SHOWDOWN' + ' '.repeat(52) + '\u2551');
-  writeLog(room, '\u2560' + '\u2550'.repeat(62) + '\u2563');
-  writeLog(room, `\u2551  Board: ${room.G.community.map(c=>c.r+c.s).join('  ').padEnd(53)}\u2551`);
-  writeLog(room, '\u2560' + '\u2550'.repeat(62) + '\u2563');
-
-  let bestScore = -1;
-  const scored = active.map(p => {
-    const allCards = [...p.cards, ...room.G.community];
-    const sc = evalBest(allCards);
-    const bf = bestFiveCards(allCards);
-    if (sc > bestScore) bestScore = sc;
-    return { p, sc, bf };
-  });
-
-  for (const { p, sc, bf } of scored) {
-    writeLog(room, `\u2551  ${('Seat '+(p.seat+1)+' '+p.name).padEnd(22)} | Hole: ${p.cards.map(c=>c.r+c.s).join(' ').padEnd(10)} | Best: ${bf.map(c=>c.r+c.s).join(' ').padEnd(14)} | ${handName(sc).padEnd(16)}\u2551`);
-  }
-
-  const winners = scored.filter(({ sc }) => sc === bestScore).map(({ p }) => p);
-  const winHandName = handName(bestScore);
-
-  writeLog(room, '\u2560' + '\u2550'.repeat(62) + '\u2563');
-  if (winners.length === 1) {
-    writeLog(room, `\u2551  \uD83C\uDFC6 WINNER: ${winners[0].name} with ${winHandName}`.padEnd(63) + '\u2551');
-  } else {
-    writeLog(room, `\u2551  \uD83E\uDD1D SPLIT: ${winners.map(w=>w.name).join(' & ')} \u2014 ${winHandName}`.padEnd(63) + '\u2551');
-  }
-  writeLog(room, '\u255a' + '\u2550'.repeat(62) + '\u255d');
-
-  setTimeout(() => finish(room, winners, winHandName), 1200);
-}
-
-function finish(room, winners, label) {
-  if (!winners || winners.length === 0) return;
-  clearActionTimer(room);
-
-  const G = room.G;
-  const totalPot = G.pot;
-  G.pot = 0;
-
-  const allSeats = room.seats.filter(Boolean);
-  const contributors = allSeats
-    .filter(s => (s.totalBet||0) > 0)
-    .sort((a, b) => (a.totalBet||0) - (b.totalBet||0));
-
-  // Log total bets per player for reconciliation
-  writeLog(room, '\u250c\u2500 POT BREAKDOWN \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
-  writeLog(room, `\u2502 Total pot: \u00a3${(totalPot/100).toFixed(2)}`);
-  allSeats.forEach(s => {
-    const status = s.folded ? 'folded' : 'active';
-    writeLog(room, `\u2502 ${s.name.padEnd(18)} totalBet=\u00a3${((s.totalBet||0)/100).toFixed(2)} stack=\u00a3${(s.chips/100).toFixed(2)} [${status}]`);
-  });
-  const betSum = allSeats.reduce((sum, s) => sum + (s.totalBet||0), 0);
-  writeLog(room, `\u2502 Sum of all totalBets: \u00a3${(betSum/100).toFixed(2)} ${betSum!==totalPot?'\u26a0 MISMATCH with pot! diff=\u00a3'+((betSum-totalPot)/100).toFixed(2):'\u2713 matches pot'}`);
-
-  const potLevels = [];
-  let alreadyTaken = 0;
-
-  for (let i = 0; i < contributors.length; i++) {
-    const cap = contributors[i].totalBet;
-    if (cap <= alreadyTaken) continue;
-    const levelPot = (cap - alreadyTaken) * (contributors.length - i);
-    const eligibleIds = new Set(
-      allSeats
-        .filter(s => !s.folded && !s.autoFold && !s.voluntaryAutoFold && (s.totalBet||0) >= cap)
-        .map(s => s.id)
-    );
-    const potLabel = potLevels.length === 0 ? 'main' : `side${potLevels.length}`;
-    writeLog(room, `\u2502 ${potLabel} pot: cap=\u00a3${(cap/100).toFixed(2)} x${contributors.length-i} players = \u00a3${(levelPot/100).toFixed(2)} | eligible: ${allSeats.filter(s=>eligibleIds.has(s.id)).map(s=>s.name).join(', ')}`);
-    potLevels.push({ amount: levelPot, eligibleIds, cap });
-    alreadyTaken = cap;
-  }
-
-  const levelTotal = potLevels.reduce((sum, l) => sum + l.amount, 0);
-  if (levelTotal !== totalPot && potLevels.length > 0) {
-    writeLog(room, `\u2502 \u26a0 Level total \u00a3${(levelTotal/100).toFixed(2)} != pot \u00a3${(totalPot/100).toFixed(2)} | adjusting last level by \u00a3${((totalPot-levelTotal)/100).toFixed(2)}`);
-    potLevels[potLevels.length - 1].amount += (totalPot - levelTotal);
-  }
-  writeLog(room, '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500');
-
-  let totalAwarded = 0;
-  const awardLog = [];
-
-  potLevels.forEach((level, li) => {
-    if (level.amount <= 0) return;
-    const eligibleWinners = winners.filter(w => level.eligibleIds.has(w.id));
-
-    if (eligibleWinners.length === 0) {
-      const eligible = allSeats.filter(s => !s.folded && !s.autoFold && !s.voluntaryAutoFold && level.eligibleIds.has(s.id));
-      if (eligible.length > 0) {
-        eligible[0].chips += level.amount;
-        awardLog.push(`  ${eligible[0].name} wins \u00a3${(level.amount/100).toFixed(2)} (returned)`);
-        totalAwarded += level.amount;
-      }
-      return;
-    }
-
-    if (eligibleWinners.length === 1) {
-      eligibleWinners[0].chips += level.amount;
-      const potLabel = potLevels.length > 1 ? (li === 0 ? 'main pot' : `side pot ${li}`) : 'pot';
-      awardLog.push(`  ${eligibleWinners[0].name} wins \u00a3${(level.amount/100).toFixed(2)} \u2014 ${label} (${potLabel})`);
-      totalAwarded += level.amount;
+  window.drumStep = function(drum, dir){
+    ensureAudio(); snd_chip();
+    if(drum==='pounds'){
+      poundsIdx = Math.max(0, Math.min(POUNDS.length-1, poundsIdx+dir));
+      renderDial('dialPoundsInner', POUNDS, poundsIdx);
     } else {
-      const perPlayer = Math.floor(level.amount / eligibleWinners.length);
-      const remainder = level.amount - perPlayer * eligibleWinners.length;
-      const sorted = [...eligibleWinners].sort((a, b) => a.seat - b.seat);
-      sorted.forEach((w, i) => { w.chips += perPlayer + (i === 0 ? remainder : 0); totalAwarded += perPlayer + (i === 0 ? remainder : 0); });
-      awardLog.push(`  \uD83E\uDD1D ${sorted.map(w=>w.name).join(' & ')} split \u00a3${(level.amount/100).toFixed(2)} \u2014 ${label}`);
+      penceIdx = Math.max(0, Math.min(PENCE.length-1, penceIdx+dir));
+      renderDial('dialPenceInner', PENCE, penceIdx);
     }
-  });
+    updateDisplay();
+  };
 
-  const returned = totalPot - totalAwarded;
-  if (returned > 0) {
-    const overContributor = allSeats
-      .filter(s => !s.folded && !s.autoFold && !s.voluntaryAutoFold)
-      .sort((a, b) => (b.totalBet||0) - (a.totalBet||0))[0];
-    if (overContributor) {
-      overContributor.chips += returned;
-      awardLog.push(`  \u00a3${(returned/100).toFixed(2)} returned to ${overContributor.name} (unmatched all-in)`);
+  function attachWheel(wheelId, drum){
+    const el = document.getElementById(wheelId);
+    if(!el) return;
+    const PX_PER_STEP = 26;
+    let active = false, startY = 0, startIdx = 0;
+    function getIdx(){ return drum==='pounds' ? poundsIdx : penceIdx; }
+    function getList(){ return drum==='pounds' ? POUNDS : PENCE; }
+    function setIdx(i){ if(drum==='pounds') poundsIdx=i; else penceIdx=i; }
+    function onStart(y){ active=true; startY=y; startIdx=getIdx(); _userDraggedSinceLastMin=true; }
+    function onMove(y){
+      if(!active) return;
+      const dy=startY-y;
+      const steps=Math.round(dy/PX_PER_STEP);
+      const list=getList();
+      const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));
+      if(ni!==getIdx()){ snd_chip(); setIdx(ni); if(drum==='pounds')renderDial('dialPoundsInner',POUNDS,poundsIdx); else renderDial('dialPenceInner',PENCE,penceIdx); updateDisplay(); }
     }
+    function onEnd(){ active=false; }
+    el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);onStart(e.clientY);},{passive:false});
+    el.addEventListener('pointermove',e=>{if(active){e.preventDefault();onMove(e.clientY);}},{passive:false});
+    el.addEventListener('pointerup',()=>{onEnd();});
+    el.addEventListener('pointercancel',()=>{onEnd();});
   }
 
-  potLevels.forEach((level, li) => {
-    if (level.amount <= 0) return;
-    const eligibleWinners = winners.filter(w => level.eligibleIds.has(w.id));
-    if (eligibleWinners.length === 1) {
-      broadcastAll(room, { type: 'winner', seat: eligibleWinners[0].seat, name: eligibleWinners[0].name, amount: level.amount, label });
-    } else if (eligibleWinners.length > 1) {
-      const perPlayer = Math.floor(level.amount / eligibleWinners.length);
-      const remainder = level.amount - perPlayer * eligibleWinners.length;
-      eligibleWinners.sort((a,b)=>a.seat-b.seat).forEach((w,i) => {
-        broadcastAll(room, { type: 'winner', seat: w.seat, name: w.name, amount: perPlayer+(i===0?remainder:0), label: `Split \u2014 ${label}` });
-      });
-    }
+  window.addEventListener('load',()=>{
+    renderAll();
+    updateDisplay();
+    attachWheel('dialPounds', 'pounds');
+    attachWheel('dialPence',  'pence');
   });
+})();
 
-  awardLog.forEach(line => writeLog(room, line));
-  broadcastState(room);
+// ── Cookie notice gate ─────────────────────────────────────────────────────────
+function cookieAccept(){document.getElementById('cookieOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';}
+function cookieDeny(){window.location.replace('https://www.disney.com');}
 
-  // Chip conservation check
-  const chipsAfter = room.seats.filter(Boolean).reduce((sum, s) => sum + s.chips, 0) + (G.pot || 0);
-  const chipsBefore = room._chipsInPlayAtHandStart || 0;
-  if (chipsBefore > 0 && chipsAfter !== chipsBefore) {
-    const diff = chipsAfter - chipsBefore;
-    writeLog(room, `\u26a0\ufe0f  CHIP CONSERVATION ERROR: ${diff>0?'+':''}${(diff/100).toFixed(2)} discrepancy!`);
-    svrLog(`CHIP ERROR room ${room.id} hand ${room.handNum}: ${diff>0?'+':''}${diff} pence`);
-  }
-
-  writeLog(room, 'CHIP COUNTS AFTER HAND:');
-  room.seats.filter(Boolean).sort((a,b) => b.chips - a.chips).forEach(s => {
-    writeLog(room, `  Seat ${s.seat+1} ${s.name.padEnd(18)} \u00a3${(s.chips/100).toFixed(2)} | ${buyInTag(s)}`);
-  });
-
-  // Write cumulative game summary to this hand's log
-  writeGameSummary(room);
-
-  const logPath = room.G.logPath;
-  if (logPath) setTimeout(() => ftpUpload(logPath), 500);
-
-  setTimeout(() => {
-    const busted = room.seats.filter(s => s && s.chips <= 0 && !s.pendingBuyBack && !s.spectator);
-    if (busted.length === 0) { startNewHand(room); return; }
-
-    let pendingCount = busted.length;
-    function onBuyBackResolved() { pendingCount--; if (pendingCount <= 0) startNewHand(room); }
-
-    busted.forEach(s => {
-      s.pendingBuyBack = true;
-      s.sittingOut = true;
-      writeLog(room, `BUST: ${s.name} \u2014 offering buy-back | ${buyInTag(s)}`);
-      logEvent(room, `\ud83d\udcb8 ${s.name} is out of chips \u2014 buy-back offer sent`);
-      send(s.ws, { type: 'buyBackOffer', chips: room.buyIn });
-
-      if (s._buyBackTimer) clearTimeout(s._buyBackTimer);
-      s._buyBackTimer = setTimeout(() => {
-        if (!s.pendingBuyBack) return;
-        s.pendingBuyBack = false;
-        s.sittingOut = true;
-        s.spectator = true;
-        recordPlayerExit(room, s, 'bust');   // timed out on buy-back, 0 chips
-        writeLog(room, `SPECTATOR (timeout): ${s.name} did not respond`);
-        logEvent(room, `\ud83d\udc40 ${s.name} timed out on buy-back \u2014 now spectating`);
-        send(s.ws, { type: 'spectating' });
-        broadcastState(room);
-        onBuyBackResolved();
-      }, 15000);
-
-      s._onBuyBackResolved = onBuyBackResolved;
-    });
-  }, 4000);
-}
-
-// ─── Hand evaluator ───────────────────────────────────────────────────────────
-function rv(r) { return RVAL[r] || parseInt(r) || 0; }
-
-function evalBest(cards) {
-  const cs = combs(cards, Math.min(cards.length, 5));
-  let best = -1;
-  for (const c of cs) { const s = score5(c); if (s > best) best = s; }
-  return best;
-}
-
-function bestFiveCards(cards) {
-  const cs = combs(cards, Math.min(cards.length, 5));
-  let best = -1, bestCombo = cards.slice(0, 5);
-  for (const c of cs) { const s = score5(c); if (s > best) { best = s; bestCombo = c; } }
-  return bestCombo;
-}
-
-function combs(arr, k) {
-  if (arr.length <= k) return [arr];
-  if (k === 1) return arr.map(x => [x]);
-  const out = [];
-  for (let i = 0; i <= arr.length - k; i++)
-    for (const c of combs(arr.slice(i + 1), k - 1)) out.push([arr[i], ...c]);
-  return out;
-}
-
-function score5(cards) {
-  const sorted = [...cards].sort((a, b) => rv(b.r) - rv(a.r));
-  const ranks  = sorted.map(c => rv(c.r));
-  const suits  = sorted.map(c => c.s);
-  const cnt = {};
-  for (const r of ranks) cnt[r] = (cnt[r] || 0) + 1;
-  const groups = Object.entries(cnt).map(([r, n]) => ({ r: Number(r), n })).sort((a, b) => b.n - a.n || b.r - a.r);
-  const tbRanks = groups.flatMap(g => Array(g.n).fill(g.r));
-  const flush = suits.every(s => s === suits[0]);
-  const uniq  = [...new Set(ranks)].sort((a, b) => b - a);
-  let isStraight = false, sHigh = 0;
-  if (uniq.length === 5) {
-    if (uniq[0] - uniq[4] === 4) { isStraight = true; sHigh = uniq[0]; }
-    else if (uniq[0] === 14 && uniq[1] === 5 && uniq[2] === 4 && uniq[3] === 3 && uniq[4] === 2) { isStraight = true; sHigh = 5; }
-  }
-  const pack = rArr => rArr.reduce((acc, r, i) => acc + r * Math.pow(15, 4 - i), 0);
-  const freq = groups[0].n, freq2 = groups[1]?.n || 0;
-  if (flush && isStraight && sHigh === 14) return 9e8 + pack(ranks);
-  if (flush && isStraight)                  return 8e8 + sHigh * 1e6;
-  if (freq === 4)                           return 7e8 + pack(tbRanks);
-  if (freq === 3 && freq2 === 2)            return 6e8 + pack(tbRanks);
-  if (flush)                                return 5e8 + pack(ranks);
-  if (isStraight)                           return 4e8 + sHigh * 1e6;
-  if (freq === 3)                           return 3e8 + pack(tbRanks);
-  if (freq === 2 && freq2 === 2)            return 2e8 + pack(tbRanks);
-  if (freq === 2)                           return 1e8 + pack(tbRanks);
-  return pack(ranks);
-}
-
-function handName(s) {
-  if (s >= 9e8) return 'Royal Flush';
-  if (s >= 8e8) return 'Straight Flush';
-  if (s >= 7e8) return 'Four of a Kind';
-  if (s >= 6e8) return 'Full House';
-  if (s >= 5e8) return 'Flush';
-  if (s >= 4e8) return 'Straight';
-  if (s >= 3e8) return 'Three of a Kind';
-  if (s >= 2e8) return 'Two Pair';
-  if (s >= 1e8) return 'One Pair';
-  return 'High Card';
-}
-
-// ─── Start ────────────────────────────────────────────────────────────────────
-server.listen(PORT, () => {
-  const startMsg = `SYFM Poker server started | port=${PORT} | pid=${process.pid} | node=${process.version}`;
-  console.log(`\n\u2663 ${startMsg}`);
-  svrLog(startMsg);
-  svrLog(`HTTP: http://localhost:${PORT}`);
-  svrLog(`Logs: http://localhost:${PORT}/logs`);
-  svrLog(`FTP:  ${process.env.FTP_HOST || '(not configured)'}`);
-});
-
-// ─── Graceful shutdown ────────────────────────────────────────────────────────
-function gracefulShutdown(signal) {
-  svrLog(`SHUTDOWN: ${signal} | rooms=${rooms.size} | ws=${wss.clients.size}`);
-  rooms.forEach(room => { writeLog(room, `SERVER SHUTDOWN: ${signal}`); });
-  const shutdownMsg = JSON.stringify({ type: 'serverShutdown', reason: 'Server is restarting. Please refresh to reconnect.' });
-  wss.clients.forEach(client => { try { if (client.readyState === 1) client.send(shutdownMsg); } catch {} });
-  rooms.forEach(room => destroyRoom(room));
-  wss.close(() => { server.close(() => { svrLog('SHUTDOWN: clean exit'); process.exit(0); }); });
-  setTimeout(() => process.exit(1), 5000).unref();
-}
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+const scn=createScene();
+engine.runRenderLoop(()=>scn.render());
+</script>
+</body>
+</html>
