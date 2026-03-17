@@ -930,7 +930,7 @@ const ftm=new BABYLON.PBRMaterial('ftm',scene);
 ftm.albedoColor=new BABYLON.Color3(0.02,0.16,0.07);
 ftm.roughness=0.96;ftm.metallic=0;
 ftm.sheen.isEnabled=true;ftm.sheen.intensity=0.38;ftm.sheen.color=new BABYLON.Color3(0.08,0.28,0.12);
-const syEmTex=new BABYLON.DynamicTexture('syEmTex',{width:1024,height:512},scene,false);syEmTex.hasAlpha=true;const sec=syEmTex.getContext();sec.clearRect(0,0,1024,512);sec.fillStyle='rgba(255,200,0,0.08)';sec.font='bold 200px Arial Black';sec.textAlign='center';sec.textBaseline='middle';sec.fillText('SYFM',512,256);syEmTex.update();
+const syEmTex=new BABYLON.DynamicTexture('syEmTex',{width:1024,height:512},scene,false);syEmTex.hasAlpha=true;const sec=syEmTex.getContext();sec.clearRect(0,0,1024,512);sec.fillStyle='rgba(255,200,0,0.04)';sec.font='bold 200px Arial Black';sec.textAlign='center';sec.textBaseline='middle';sec.fillText('SYFM',512,256);syEmTex.update();
 ftm.emissiveTexture=syEmTex;ftm.emissiveColor=new BABYLON.Color3(1,1,1);
 felt.material=ftm;felt.receiveShadows=true;
 const inlay=BABYLON.MeshBuilder.CreateTorus('inlay',{diameter:9.8,thickness:0.04,tessellation:T,radialSegments:6},scene);
