@@ -210,20 +210,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .p2d-waiting{color:#888;font-size:9px;font-style:italic}
 /* loginBuyInInput removed — stake is set per game mode in the lobby */
 
-/* ── Player stack panel (left side, in-game) ── */
-#playerStackPanel{position:fixed;left:0;top:58px;width:162px;max-height:calc(100vh - 120px);overflow-y:auto;background:rgba(0,0,0,0.86);border-right:1px solid #3a2810;border-bottom:1px solid #3a2810;border-radius:0 0 10px 0;z-index:105;display:none}
+/* ── Player stack panel (right side, above control bar) ── */
+#playerStackPanel{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(58px + env(safe-area-inset-bottom,0px));width:220px;max-height:calc(100vh - 180px);overflow-y:auto;background:rgba(0,0,0,0.88);border:1px solid #3a2810;border-radius:10px;z-index:105;display:none}
 #playerStackPanel::-webkit-scrollbar{width:3px}
 #playerStackPanel::-webkit-scrollbar-thumb{background:#4a3010;border-radius:3px}
-.psp-header{font-size:9px;color:#6a5030;letter-spacing:1.5px;text-transform:uppercase;padding:5px 8px 3px;border-bottom:1px solid #2a1a08}
-.psp-row{padding:5px 8px 4px;border-bottom:1px solid rgba(200,160,32,0.07);position:relative}
+.psp-header{font-size:10px;color:#6a5030;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px 4px;border-bottom:1px solid #2a1a08}
+.psp-row{padding:6px 10px 5px;border-bottom:1px solid rgba(200,160,32,0.07);position:relative}
 .psp-row.psp-me{background:rgba(0,80,0,0.22)}
 .psp-row.psp-acting{background:rgba(180,80,0,0.22)}
-.psp-row.psp-folded{opacity:0.38}
-.psp-name{font-size:10px;font-weight:bold;color:#c8b870;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:146px;line-height:1.3}
+.psp-row.psp-folded{opacity:0.35}
+.psp-name{font-size:13px;font-weight:bold;color:#c8b870;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;line-height:1.3}
 .psp-name.psp-me{color:#ffd700}
-.psp-name .psp-act-arrow{color:#ff8040;margin-right:2px;font-size:9px}
-.psp-stack{font-size:11px;font-weight:bold;color:#80cfff;line-height:1.2}
-.psp-bet{font-size:10px;color:#40e860;line-height:1.2}
+.psp-name .psp-act-arrow{color:#ff8040;margin-right:3px;font-size:11px}
+.psp-stack{font-size:13px;font-weight:bold;color:#80cfff;line-height:1.25}
+.psp-bet{font-size:12px;color:#40e860;line-height:1.25}
 
 /* ── Tournament results overlay ── */
 .tournament-results{max-width:520px}
@@ -266,6 +266,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
   .cbtn-pause,.cbtn-cashout,.cbtn-autofold,.cbtn-fs{padding:7px 8px !important;font-size:11px !important}
   #sideBoxes{width:160px !important;top:104px !important;right:4px !important}
   #tableSlider{display:none !important}
+  #playerStackPanel{width:180px !important;right:calc(4px + env(safe-area-inset-right,0px)) !important;bottom:calc(52px + env(safe-area-inset-bottom,0px)) !important;max-height:200px !important}
+  .psp-name{font-size:12px !important}
+  .psp-stack{font-size:12px !important}
+  .psp-bet{font-size:11px !important}
 }
 </style>
 </head>
@@ -447,7 +451,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 
 <!-- Game UI -->
 <div id="gameUI">
-  <!-- Left: player stack panel -->
+  <!-- Right: player stack panel, sits above control bar -->
   <div id="playerStackPanel">
     <div class="psp-header">&#x1F4CA; Players</div>
     <div id="playerStackList"></div>
@@ -464,12 +468,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <div id="drumWidget">
       <div class="dial-row">
         <div class="dial-wrap">
-          <div class="dial-label">pounds &pound;</div>
+          <div class="dial-label" id="dialLabelPounds">pounds &pound;</div>
           <div class="dial-wheel" id="dialPounds"><div class="dial-inner" id="dialPoundsInner"></div></div>
         </div>
         <div class="dial-sep">.</div>
         <div class="dial-wrap">
-          <div class="dial-label">pence</div>
+          <div class="dial-label" id="dialLabelPence">pence</div>
           <div class="dial-wheel" id="dialPence"><div class="dial-inner" id="dialPenceInner"></div></div>
         </div>
       </div>
@@ -780,7 +784,8 @@ case 'rejected':document.getElementById('waitingOverlay').style.display='none';d
 case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\uD83C\uDFC6\uD83D\uDCA6 '+msg.name+' wins '+fc(msg.amount)+' \u2014 '+(msg.label||''),'log-win');showMsg('\uD83C\uDFC6 '+msg.name+' wins '+fc(msg.amount)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
-case 'gameStarting':startKeepAliveTimer();currentGameType=msg.gameType||'cash';document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}if(currentGameType==='tournament'){addLog('\uD83C\uDFC6 TOURNAMENT STARTED','log-hand');}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
+case 'gameStarting':startKeepAliveTimer();currentGameType=msg.gameType||'cash';
+  {const lp=document.getElementById('dialLabelPounds'),lc=document.getElementById('dialLabelPence');if(lp&&lc){if(currentGameType==='tournament'){lp.textContent='';lc.textContent='';}else{lp.innerHTML='pounds &pound;';lc.textContent='pence';}}}document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}if(currentGameType==='tournament'){addLog('\uD83C\uDFC6 TOURNAMENT STARTED','log-hand');}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
 case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';coBtn.style.display=(msg.gameType==='tournament')?'none':'';
   if(window.drumReset) window.drumReset((msg.bb||20) * 2);
   // Update blind badge
@@ -865,8 +870,6 @@ let _countdownInterval=null;
 function startCountdown(isMe,playerName){clearInterval(_countdownInterval);let secs=TURN_SECS;const foldBtn=document.getElementById('foldBtn');function tick(){if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}if(secs<=0){clearInterval(_countdownInterval);return;}secs--;}tick();_countdownInterval=setInterval(tick,1000);}
 function stopCountdown(){clearInterval(_countdownInterval);const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
 function setActions(v){const panel=document.getElementById('actionPanel');if(panel)panel.style.display=v?'flex':'none';['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
-  // Hide player stack panel while action panel is open (left-side overlap)
-  const psp=document.getElementById('playerStackPanel');if(psp)psp.style.display=v?'none':(lastState&&lastState.players&&lastState.players.some(Boolean)?'block':'none');
 }function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}}
 function addChat(txt){const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);if(chatCollapsed){const box=document.getElementById('chatBox');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),2200);}}
