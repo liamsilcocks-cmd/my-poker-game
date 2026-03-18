@@ -166,7 +166,7 @@ function getOrCreateRoom(roomId) {
       gameHistory: [],
       // ── Tournament fields ──
       gameType: 'cash',
-      tournamentChips: 1500,
+      tournamentChips: 8000,
       blindLevelDuration: 10,
       blindLevel: 0,
       blindLevelTimer: null,
@@ -238,7 +238,7 @@ function lobbySnapshot(room) {
     type: 'lobby', roomId: room.id, hostId: room.hostId, gameActive: room.gameActive,
     buyIn: room.buyIn,
     gameType: room.gameType || 'cash',
-    tournamentChips: room.tournamentChips || 1500,
+    tournamentChips: room.tournamentChips || 8000,
     blindLevelDuration: room.blindLevelDuration || 10,
     seats: room.seats.map(s => s ? { id: s.id, name: s.name, chips: s.chips, seat: s.seat } : null),
     pending: room.pendingJoins.map(p => ({ id: p.id, name: p.name }))
@@ -824,7 +824,9 @@ function startNewHand(room) {
   const preflopStart = nextSeat(bbSeat, active);
   const logPath = handLogPath(room.id, room.handNum);
 
-  room.G = { deck: buildDeck(), phase: 'preflop', pot: 0, currentBet: curBB, lastRaiseIncrement: curBB, community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath, curSB, curBB };
+  room.G = { deck: buildDeck(), phase: 'preflop', pot: 0, currentBet: curBB, lastRaiseIncrement: curBB, community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath, curSB, curBB,
+             firstRaiseAction: true  // Redtooth: first raise must be ≥ 2×BB; after first raise use lastRaiseIncrement
+           };
   room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; s.totalBet = 0; } });
 
   const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
@@ -904,7 +906,9 @@ function promptToAct(room) {
   if (!p) { G.toAct.shift(); setTimeout(() => promptToAct(room), 100); return; }
   if (p.disconnected || p.autoFold || p.voluntaryAutoFold) { clearActionTimer(room); doFold(room, seat, p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)'); return; }
   const callAmt = Math.min(G.currentBet - p.bet, p.chips);
-  const minRaise = Math.min(callAmt + G.lastRaiseIncrement, p.chips);
+  // Redtooth: first raise must be ≥ 2×BB; after that, ≥ last raise increment
+  const raiseIncrement = G.firstRaiseAction ? G.curBB : G.lastRaiseIncrement;
+  const minRaise = Math.min(callAmt + raiseIncrement, p.chips);
   const firstBet = G.currentBet === 0;
   broadcastAll(room, { type: 'yourTurn', seat, callAmt, minRaise, pot: G.pot, currentBet: G.currentBet, firstBet });
   startActionTimer(room, seat);
@@ -934,12 +938,17 @@ function handleAction(room, seat, action, amount) {
     broadcastState(room); G.toAct.shift(); setTimeout(() => promptToAct(room), 200);
   } else if (action === 'raise') {
     const callAmount = G.currentBet - p.bet;
-    const minFromStack = Math.min(callAmount + G.lastRaiseIncrement, p.chips);
+    // Redtooth: first raise ≥ 2×BB; after that ≥ last raise increment
+    const raiseIncrement = G.firstRaiseAction ? G.curBB : G.lastRaiseIncrement;
+    const minFromStack = Math.min(callAmount + raiseIncrement, p.chips);
     const raiseFromStack = Math.min(Math.max(amount || minFromStack, minFromStack), p.chips);
     const prevCurrentBet = G.currentBet;
     p.chips -= raiseFromStack; p.bet += raiseFromStack; p.totalBet = (p.totalBet||0) + raiseFromStack; G.pot += raiseFromStack;
     G.currentBet = Math.max(G.currentBet, p.bet);
-    if (G.currentBet > prevCurrentBet) G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
+    if (G.currentBet > prevCurrentBet) {
+      G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
+      G.firstRaiseAction = false;  // first raise happened — subsequent use difference
+    }
     broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
     writeLog(room, `RAISE | ${p.name} | \u00a3${(raiseFromStack/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
     broadcastState(room);
@@ -956,6 +965,7 @@ function broadcastState(room) { room.seats.forEach(s => { if (s?.ws?.readyState 
 function advPhase(room) {
   const G = room.G; clearActionTimer(room);
   room.seats.forEach(s => { if (s) s.bet = 0; }); G.currentBet = 0; G.lastRaiseIncrement = G.curBB || BB;
+  G.firstRaiseAction = true;  // reset — first bet on new street is a fresh open
   const next = { preflop: 'flop', flop: 'turn', turn: 'river' };
   if (G.phase in next) {
     const prevPhase = G.phase; G.phase = next[G.phase];
