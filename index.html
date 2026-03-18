@@ -208,7 +208,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
 .p2d-token.toact{background:#cc2020;color:#fff;animation:p2dPulse 0.8s ease-in-out infinite}
 @keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .p2d-waiting{color:#888;font-size:9px;font-style:italic}
-#loginBuyInInput::-webkit-inner-spin-button,#loginBuyInInput::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+/* loginBuyInInput removed — stake is set per game mode in the lobby */
+
+/* ── Player stack panel (left side, in-game) ── */
+#playerStackPanel{position:fixed;left:0;top:58px;width:162px;max-height:calc(100vh - 120px);overflow-y:auto;background:rgba(0,0,0,0.86);border-right:1px solid #3a2810;border-bottom:1px solid #3a2810;border-radius:0 0 10px 0;z-index:105;display:none}
+#playerStackPanel::-webkit-scrollbar{width:3px}
+#playerStackPanel::-webkit-scrollbar-thumb{background:#4a3010;border-radius:3px}
+.psp-header{font-size:9px;color:#6a5030;letter-spacing:1.5px;text-transform:uppercase;padding:5px 8px 3px;border-bottom:1px solid #2a1a08}
+.psp-row{padding:5px 8px 4px;border-bottom:1px solid rgba(200,160,32,0.07);position:relative}
+.psp-row.psp-me{background:rgba(0,80,0,0.22)}
+.psp-row.psp-acting{background:rgba(180,80,0,0.22)}
+.psp-row.psp-folded{opacity:0.38}
+.psp-name{font-size:10px;font-weight:bold;color:#c8b870;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:146px;line-height:1.3}
+.psp-name.psp-me{color:#ffd700}
+.psp-name .psp-act-arrow{color:#ff8040;margin-right:2px;font-size:9px}
+.psp-stack{font-size:11px;font-weight:bold;color:#80cfff;line-height:1.2}
+.psp-bet{font-size:10px;color:#40e860;line-height:1.2}
 
 /* ── Tournament results overlay ── */
 .tournament-results{max-width:520px}
@@ -330,7 +345,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
     <p>Enter your name and a room number to play</p>
     <input type="text" id="nameInput" placeholder="Your name" maxlength="18" autocomplete="off">
     <input type="number" id="roomInput" placeholder="Room number (e.g. 1234)" min="1" max="999999">
-    <input type="text" id="loginBuyInInput" value="Stake &pound;10" autocomplete="off">
     <button class="btn-gold" id="joinBtn">JOIN ROOM</button>
     <p id="loginErr" style="color:#e05050;margin-top:10px;font-size:.9rem"></p>
   </div>
@@ -402,8 +416,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       </div>
       <div class="tournament-settings" id="tournamentSettings">
         <div class="ts-row">
-          <span class="ts-label">Starting chips</span>
-          <input class="ts-input" type="number" id="tsChips" min="100" max="100000" step="100" value="1500" onchange="pushGameTypeSettings()">
+          <span class="ts-label">Starting chips (each)</span>
+          <input class="ts-input" type="number" id="tsChips" min="100" max="999999" step="100" value="8000" onchange="pushGameTypeSettings()">
         </div>
         <div class="ts-row">
           <span class="ts-label">Blind level (mins)</span>
@@ -418,12 +432,26 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       </div>
     </div>
     <p id="lobbyStatus" style="color:#c8a060;margin-top:14px;font-size:.9rem"></p>
+    <!-- Stake input for cash game (non-host players) -->
+    <div id="cashStakeSection" style="display:none;margin-top:12px;background:rgba(200,160,32,0.08);border:1px solid #4a3010;border-radius:10px;padding:12px 14px;text-align:left">
+      <div style="color:#c8a060;font-size:.85rem;margin-bottom:6px">&#x1F4B0; Your buy-in for this cash game:</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="color:#ffd700;font-size:1.1rem;font-weight:bold">&pound;</span>
+        <input type="number" id="cashStakeInput" min="1" step="1" value="10" style="flex:1;padding:8px 10px;border-radius:6px;background:#0d0704;border:1px solid #6a5010;color:#ffd700;font-size:1rem;text-align:center;outline:none" oninput="onCashStakeChange(this.value)">
+      </div>
+      <div style="color:#6a5030;font-size:.78rem;margin-top:6px">Host can adjust stacks during the game.</div>
+    </div>
     <button class="btn-gold" id="startBtn" style="display:none;margin-top:18px">&#x25B6; START GAME</button>
   </div>
 </div>
 
 <!-- Game UI -->
 <div id="gameUI">
+  <!-- Left: player stack panel -->
+  <div id="playerStackPanel">
+    <div class="psp-header">&#x1F4CA; Players</div>
+    <div id="playerStackList"></div>
+  </div>
   <div id="topBar">
     <div id="phase">PRE-FLOP</div>
     <div id="pot">POT: &pound;0.00</div>
@@ -626,6 +654,45 @@ buildCardMats();buildCardPool();buildChipPool();buildPlayerLabels();buildTokens(
 return scene;}
 let seatActions={};
 
+// ── Chip display: cash shows £X.XX, tournament shows raw integer ──────────────
+function formatChips(amount, gameType) {
+  if (!gameType || gameType === 'cash') return '\u00a3' + (amount / 100).toFixed(2);
+  return amount.toLocaleString();
+}
+
+// ── Player stack panel (left side, updates every state tick) ──────────────────
+function updatePlayerStackPanel(st) {
+  const panel = document.getElementById('playerStackPanel');
+  const list  = document.getElementById('playerStackList');
+  if (!panel || !list || !st || !st.players) return;
+  const seated = st.players.map((p, i) => p ? { ...p, idx: i } : null).filter(Boolean);
+  if (seated.length === 0) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  list.innerHTML = '';
+  const myIdx = seated.findIndex(p => p.idx === mySeat);
+  const sorted = myIdx >= 0 ? [...seated.slice(myIdx), ...seated.slice(0, myIdx)] : seated;
+  sorted.forEach(p => {
+    const isMe = p.idx === mySeat, isActing = st.toActSeat === p.idx;
+    const row = document.createElement('div');
+    row.className = 'psp-row' + (isMe?' psp-me':'') + (isActing?' psp-acting':'') + (p.folded?' psp-folded':'');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'psp-name' + (isMe?' psp-me':'');
+    if (isActing) { const a = document.createElement('span'); a.className='psp-act-arrow'; a.textContent='\u25b6 '; nameEl.appendChild(a); }
+    nameEl.appendChild(document.createTextNode(p.name));
+    const stackEl = document.createElement('div');
+    stackEl.className = 'psp-stack';
+    stackEl.textContent = formatChips(p.chips, st.gameType);
+    row.appendChild(nameEl); row.appendChild(stackEl);
+    if (p.bet > 0) {
+      const betEl = document.createElement('div');
+      betEl.className = 'psp-bet';
+      betEl.textContent = 'Bet: ' + formatChips(p.bet, st.gameType);
+      row.appendChild(betEl);
+    }
+    list.appendChild(row);
+  });
+}
+
 function applyState(st){
   if(!st)return;
   lastState=st;
@@ -635,9 +702,10 @@ function applyState(st){
   for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}
   for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(p.folded){if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;return;}if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}else{if(m.material!==cardBackMat)m.material=cardBackMat;}});}
   const p0=st.players[mySeat];
-  if(p0)document.getElementById('myInfo').innerHTML='Stack \u00a3'+(p0.chips/100).toFixed(2)+(p0.bet>0?'<br><span style="color:#80cfff">Bet \u00a3'+(p0.bet/100).toFixed(2)+'</span>':'');
-  document.getElementById('pot').textContent='POT: \u00a3'+((st.pot||0)/100).toFixed(2);
+  if(p0)document.getElementById('myInfo').innerHTML='Stack '+formatChips(p0.chips,st.gameType)+(p0.bet>0?'<br><span style="color:#80cfff">Bet '+formatChips(p0.bet,st.gameType)+'</span>':'');
+  document.getElementById('pot').textContent='POT: '+formatChips(st.pot||0,st.gameType);
   document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');
+  updatePlayerStackPanel(st);
   // Update blind badge from state
   if(st.gameType==='tournament'&&st.currentSB&&st.currentBB){updateBlindBadge(st.currentSB,st.currentBB,st.blindLevelRemainingMs);}
   // Tournament: hide cash out button
@@ -675,7 +743,7 @@ function selectGameType(type){
 }
 function pushGameTypeSettings(){
   if(!isHost)return;
-  const chips=Math.round((parseFloat(document.getElementById('tsChips').value)||15)*100);
+  const chips=Math.max(100,parseInt(document.getElementById('tsChips').value)||8000);
   const mins=parseInt(document.getElementById('tsBlindMins').value)||10;
   wsSend({type:'setGameType',gameType:pendingGameType,tournamentChips:chips,blindLevelDuration:mins});
 }
@@ -710,7 +778,7 @@ case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest
 case 'winner':snd_win();hideTurnIndicator();addLog('\uD83C\uDFC6\uD83D\uDCA6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+' \u2014 '+(msg.label||''),'log-win');showMsg('\uD83C\uDFC6 '+msg.name+' wins \u00a3'+(msg.amount/100).toFixed(2)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
 case 'gameStarting':startKeepAliveTimer();currentGameType=msg.gameType||'cash';document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}if(currentGameType==='tournament'){addLog('\uD83C\uDFC6 TOURNAMENT STARTED','log-hand');}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
 case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';coBtn.style.display=(msg.gameType==='tournament')?'none':'';
-  if(window.drumReset) window.drumReset(msg.bb || 40);
+  if(window.drumReset) window.drumReset((msg.bb||20) * 2);
   // Update blind badge
   if(msg.gameType==='tournament'){updateBlindBadge(msg.sb||10,msg.bb||20,null);}
   handNumber++;addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+(msg.gameType==='tournament'?' | Level '+(msg.blindLevel+1)+' \u00a3'+(msg.sb/100).toFixed(2)+'/\u00a3'+(msg.bb/100).toFixed(2):''),' log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,msg.sb||10);},120);setTimeout(()=>{showBet(bbSeat,msg.bb||20);},280);if(lastState)applyState(lastState);});break;}
@@ -770,10 +838,14 @@ function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getEleme
   const gts=document.getElementById('gameTypeSection');
   if(gts){gts.style.display=isHost?'block':'none';}
   // Sync lobby state with server settings
-  if(msg.gameType){pendingGameType=msg.gameType;const btnC=document.getElementById('typeBtnCash'),btnT=document.getElementById('typeBtnTournament');if(btnC)btnC.classList.toggle('active',msg.gameType==='cash');if(btnT)btnT.classList.toggle('active',msg.gameType==='tournament');const ts=document.getElementById('tournamentSettings');if(ts)ts.classList.toggle('visible',msg.gameType==='tournament');if(msg.tournamentChips){const ci=document.getElementById('tsChips');if(ci)ci.value=msg.tournamentChips/100;}if(msg.blindLevelDuration){const bi=document.getElementById('tsBlindMins');if(bi)bi.value=msg.blindLevelDuration;}}
-  const statusEl=document.getElementById('lobbyStatus');const gameMode=msg.gameType==='tournament'?'\uD83C\uDFC6 Tournament':'&#x1F4B0; Cash Game';if(isHost)statusEl.innerHTML=seated.length<2?'Waiting for more players to join\u2026':'Ready to start! Mode: '+gameMode;else statusEl.textContent='Waiting for host to start the game\u2026';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
+  if(msg.gameType){pendingGameType=msg.gameType;const btnC=document.getElementById('typeBtnCash'),btnT=document.getElementById('typeBtnTournament');if(btnC)btnC.classList.toggle('active',msg.gameType==='cash');if(btnT)btnT.classList.toggle('active',msg.gameType==='tournament');const ts=document.getElementById('tournamentSettings');if(ts)ts.classList.toggle('visible',msg.gameType==='tournament');if(msg.tournamentChips){const ci=document.getElementById('tsChips');if(ci)ci.value=msg.tournamentChips;}if(msg.blindLevelDuration){const bi=document.getElementById('tsBlindMins');if(bi)bi.value=msg.blindLevelDuration;}}
+  // Cash stake input for non-host players in cash game
+  const css=document.getElementById('cashStakeSection');
+  if(css){const showStake=!isHost&&msg.gameType==='cash';css.style.display=showStake?'block':'none';}
+  const statusEl=document.getElementById('lobbyStatus');const gameMode=msg.gameType==='tournament'?'\uD83C\uDFC6 Tournament (\u007b\u007b chips\u007d\u007d starting chips)'.replace('\u007b\u007b chips\u007d\u007d',(msg.tournamentChips||8000).toLocaleString()):'\uD83D\uDCB0 Cash Game (buy-in \u00a3'+((msg.buyIn||1000)/100).toFixed(2)+')';if(isHost)statusEl.innerHTML=seated.length<2?'Waiting for more players to join\u2026':'Ready to start! Mode: '+gameMode;else statusEl.innerHTML='Waiting for host to start\u2026 <span style="color:#ffd700">'+gameMode+'</span>';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
 
 function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
+function onCashStakeChange(val){myBuyIn=Math.round((parseFloat(val)||10)*100);}
 function updateLedgerStacks(){if(!lastState||!lastState.players)return;const seated=lastState.players.filter(Boolean);if(!seated.length)return;let txt='\uD83D\uDCCA After hand #'+handNumber+': '+seated.map(p=>p.name+' \u00a3'+(p.chips/100).toFixed(2)).join(' | ');addLedgerEvent(txt);}
 function exitGame(){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}document.getElementById('buyBackOverlay').style.display='none';_intentionalClose=true;wsSend({type:'exitGame'});}
 function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}const stakeInput=document.getElementById('buyBackStakeInput');const buyIn=accept?Math.round((parseFloat((stakeInput?stakeInput.value:'').replace(/[^0-9.]/g,''))||10)*100):null;wsSend({type:'buyBack',accept,buyIn});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
@@ -787,8 +859,10 @@ const TURN_SECS=15;
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){clearInterval(_countdownInterval);let secs=TURN_SECS;const foldBtn=document.getElementById('foldBtn');function tick(){if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}if(secs<=0){clearInterval(_countdownInterval);return;}secs--;}tick();_countdownInterval=setInterval(tick,1000);}
 function stopCountdown(){clearInterval(_countdownInterval);const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
-function setActions(v){const panel=document.getElementById('actionPanel');if(panel)panel.style.display=v?'flex':'none';['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}}
-function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
+function setActions(v){const panel=document.getElementById('actionPanel');if(panel)panel.style.display=v?'flex':'none';['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
+  // Hide player stack panel while action panel is open (left-side overlap)
+  const psp=document.getElementById('playerStackPanel');if(psp)psp.style.display=v?'none':(lastState&&lastState.players&&lastState.players.some(Boolean)?'block':'none');
+}function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}}
 function addChat(txt){const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);if(chatCollapsed){const box=document.getElementById('chatBox');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),2200);}}
 let handNumber=0;
@@ -849,8 +923,8 @@ document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClea
 
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim(),buyIn=parseFloat(document.getElementById('loginBuyInInput').value.replace(/[^0-9.]/g,''))||10;if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}if(buyIn<=0){document.getElementById('loginErr').textContent='Please enter a valid buy-in amount.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=Math.round(buyIn*100);localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
-['nameInput','roomInput','loginBuyInInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
+document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=1000;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
+['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
 document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
 // ── Scroll wheel dials ─────────────────────────────────────────────────────────
