@@ -971,7 +971,12 @@ function startNewHand(room) {
     + preDealBuffer.map(l => `[${ts}] ${l}\n`).join('')
     + holeCardLines.map(l => `[${ts}] ${l}\n`).join('');
 
-  fs.writeFileSync(logPath, initialContent);
+try {
+    fs.writeFileSync(logPath, initialContent);
+    svrLog(`LOG CREATED: ${path.basename(logPath)}`);
+  } catch (err) {
+    svrLog(`LOG CREATE FAILED: ${logPath} — ${err.message}`);
+  }
 
   // ── Chip snapshot before action ────────────────────────────────────────────
   writeLog(room, 'STACKS BEFORE PREFLOP ACTION:');
