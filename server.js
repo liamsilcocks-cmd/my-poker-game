@@ -56,8 +56,46 @@ function writeLog(room, line) {
   try { fs.appendFileSync(room.G.logPath, `[${ts}] ${line}\n`); } catch {}
 }
 
+// Write to log even without an active hand (e.g. join/leave events written to session log)
+function writeRoomLog(room, line) {
+  const ts = new Date().toTimeString().slice(0, 8);
+  // Write to the current hand log if available
+  if (room.G && room.G.logPath) {
+    try { fs.appendFileSync(room.G.logPath, `[${ts}] ${line}\n`); } catch {}
+  }
+  // Always write to server log
+  svrLog(`[ROOM ${room.id}] ${line}`);
+}
+
 function logEvent(room, text) { broadcastAll(room, { type: 'logEvent', text }); }
 function logBoth(room, text)  { writeLog(room, text); logEvent(room, text); }
+
+// Helper: format a card for log display e.g. A♠ K♥
+function fmtCard(c) { return `${c.r}${c.s}`; }
+function fmtCards(cards) { return cards.map(fmtCard).join(' '); }
+function fmtPounds(pence) { return `£${(pence / 100).toFixed(2)}`; }
+
+// Write a separator line to the hand log
+function writeSep(room, char) {
+  char = char || '─';
+  writeLog(room, char.repeat(64));
+}
+
+// Write chip stack snapshot for all active players
+function writeChipSnapshot(room, label) {
+  if (!room.G) return;
+  writeLog(room, `  ${label || 'CHIP COUNTS'}:`);
+  room.seats.forEach(s => {
+    if (!s) return;
+    const tags = [];
+    if (s.folded)      tags.push('FOLDED');
+    if (s.spectator)   tags.push('SPECTATOR');
+    if (s.sittingOut)  tags.push('SITTING OUT');
+    if (s.chips === 0) tags.push('ALL-IN');
+    const tagStr = tags.length ? ` [${tags.join('+')}]` : '';
+    writeLog(room, `    Seat ${String(s.seat+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtPounds(s.chips).padStart(8)}${tagStr}`);
+  });
+}
 
 async function ftpUpload(localPath) {
   const host = process.env.FTP_HOST, user = process.env.FTP_USER, pass = process.env.FTP_PASS;
@@ -74,6 +112,12 @@ async function ftpUpload(localPath) {
   } catch (err) {
     svrLog(`FTP: upload FAILED for ${fname} - ${err.message}`);
   } finally { client.close(); }
+}
+
+// Clean up IP address (strip IPv6-mapped IPv4 prefix)
+function cleanIp(raw) {
+  if (!raw) return 'unknown';
+  return raw.replace(/^::ffff:/, '');
 }
 
 // ─── HTTP server ──────────────────────────────────────────────────────────────
@@ -364,9 +408,14 @@ function resumeGame(room, byName) {
 }
 
 // ─── Connections ──────────────────────────────────────────────────────────────
-wss.on('connection', ws => {
+wss.on('connection', (ws, req) => {
+  // Capture client IP - check X-Forwarded-For for proxied connections (e.g. Render.com)
+  const forwardedFor = req.headers['x-forwarded-for'];
+  const clientIp = forwardedFor
+    ? cleanIp(forwardedFor.split(',')[0].trim())
+    : cleanIp(ws._socket?.remoteAddress);
   let myId = null, myRoomId = null;
-  svrLog(`WS OPEN (total: ${wss.clients.size})`);
+  svrLog(`WS OPEN (total: ${wss.clients.size}) | IP: ${clientIp}`);
 
   ws.on('message', raw => {
     let msg;
@@ -380,7 +429,7 @@ wss.on('connection', ws => {
         myId = msg.id || ('p_' + Math.random().toString(36).slice(2, 8));
         const name = (msg.name || 'Player').slice(0, 18).trim() || 'Player';
         const room = getOrCreateRoom(myRoomId);
-        svrLog(`JOIN - room ${myRoomId} | id=${myId} | name="${name}"`);
+        svrLog(`JOIN - room ${myRoomId} | id=${myId} | name="${name}" | IP=${clientIp}`);
 
         const existing = room.seats.find(s => s?.id === myId);
         if (existing) {
@@ -389,22 +438,25 @@ wss.on('connection', ws => {
           const needsHostApproval = existing.autoFold && (existing._missedHands || 0) >= 1;
           if (needsHostApproval) {
             if (!room.pendingJoins.find(p => p.id === myId)) {
-              room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true });
+              room.pendingJoins.push({ ws, id: myId, name: existing.name, isRejoin: true, ip: clientIp });
             } else {
               const pj = room.pendingJoins.find(p => p.id === myId);
-              if (pj) pj.ws = ws;
+              if (pj) { pj.ws = ws; pj.ip = clientIp; }
             }
             send(ws, { type: 'waiting', id: myId, reason: `You missed ${existing._missedHands} hand(s). Waiting for host to re-admit you.` });
             const host = room.seats.find(s => s?.id === room.hostId);
             if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name: existing.name });
             broadcastAll(room, lobbySnapshot(room));
+            writeRoomLog(room, `REJOIN REQUEST (pending host approval): ${existing.name} | Seat ${existing.seat+1} | IP: ${clientIp} | Missed hands: ${existing._missedHands}`);
           } else {
             existing.ws = ws; existing.disconnected = false; existing.autoFold = false;
             existing._disconnectedAt = null; existing._missedHands = 0;
+            existing.ip = clientIp;
             send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
             send(ws, lobbySnapshot(room));
             if (room.G) send(ws, tableSnapshot(room, myId));
-            writeLog(room, `RECONNECT: ${name} (Seat ${existing.seat+1}) back | Was gone ~${(wasDisconnectedMs/1000).toFixed(1)}s`);
+            const goneFor = (wasDisconnectedMs/1000).toFixed(1);
+            writeRoomLog(room, `RECONNECT: ${name} | Seat ${existing.seat+1} | IP: ${clientIp} | Was disconnected for ${goneFor}s`);
             logEvent(room, `\uD83D\uDD04 ${existing.name} reconnected`);
           }
           return;
@@ -413,9 +465,10 @@ wss.on('connection', ws => {
         const hasSeatedPlayers = room.seats.some(s => s !== null);
         if (!hasSeatedPlayers && room.pendingJoins.length === 0) {
           const hostBuyIn = (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : START_CHIPS;
-          room.seats[0] = mkPlayer(ws, myId, name, 0, room, hostBuyIn);
+          room.seats[0] = mkPlayer(ws, myId, name, 0, room, hostBuyIn, clientIp);
           room.hostId = myId;
-          svrLog(`NEW ROOM - ${name} created room ${myRoomId} as host`);
+          svrLog(`NEW ROOM - ${name} created room ${myRoomId} as host | IP: ${clientIp}`);
+          writeRoomLog(room, `ROOM CREATED by ${name} | ID: ${myId} | IP: ${clientIp} | Buy-in: ${fmtPounds(hostBuyIn)}`);
           send(ws, { type: 'joined', id: myId, seat: 0, isHost: true });
           broadcastAll(room, lobbySnapshot(room));
           return;
@@ -423,11 +476,13 @@ wss.on('connection', ws => {
 
         if (room.pendingJoins.find(p => p.id === myId)) {
           const pj = room.pendingJoins.find(p => p.id === myId);
-          pj.ws = ws; send(ws, { type: 'waiting', id: myId }); return;
+          pj.ws = ws; pj.ip = clientIp; send(ws, { type: 'waiting', id: myId }); return;
         }
 
-        room.pendingJoins.push({ ws, id: myId, name, buyIn: (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : null });
+        const pendingBuyIn = (msg.buyIn && msg.buyIn > 0) ? Math.round(msg.buyIn) : null;
+        room.pendingJoins.push({ ws, id: myId, name, buyIn: pendingBuyIn, ip: clientIp });
         send(ws, { type: 'waiting', id: myId });
+        svrLog(`JOIN REQUEST (pending): ${name} | IP: ${clientIp} | room: ${myRoomId}`);
         const host = room.seats.find(s => s?.id === room.hostId);
         if (host?.ws?.readyState === 1) send(host.ws, { type: 'joinRequest', id: myId, name });
         break;
@@ -444,17 +499,20 @@ wss.on('connection', ws => {
           if (existSeat) {
             if (existSeat._disconnectTimer) { clearTimeout(existSeat._disconnectTimer); existSeat._disconnectTimer = null; }
             existSeat.ws = p.ws; existSeat.disconnected = false; existSeat.autoFold = false;
-            existSeat._missedHands = 0; existSeat._disconnectedAt = null;
+            existSeat._missedHands = 0; existSeat._disconnectedAt = null; existSeat.ip = p.ip || existSeat.ip;
             send(p.ws, { type: 'joined', id: p.id, seat: existSeat.seat, isHost: p.id === room.hostId });
             send(p.ws, lobbySnapshot(room));
             if (room.G) send(p.ws, tableSnapshot(room, p.id));
+            writeRoomLog(room, `RE-ADMITTED: ${existSeat.name} | Seat ${existSeat.seat+1} | IP: ${existSeat.ip || 'unknown'}`);
             logEvent(room, `\u2705 ${existSeat.name} re-admitted to the table`);
           } else {
             const seat = room.seats.findIndex(s => s === null);
             if (seat === -1) { send(p.ws, { type: 'rejected', reason: 'Table is full' }); broadcastAll(room, lobbySnapshot(room)); return; }
             const startChips = room.gameType === 'tournament' ? room.tournamentChips : (p.buyIn || room.buyIn);
-            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat, room, startChips);
+            room.seats[seat] = mkPlayer(p.ws, p.id, p.name, seat, room, startChips, p.ip);
             send(p.ws, { type: 'joined', id: p.id, seat, isHost: false });
+            writeRoomLog(room, `PLAYER JOINED: ${p.name} | Seat ${seat+1} | IP: ${p.ip || 'unknown'} | Chips: ${fmtPounds(startChips)}`);
+            logEvent(room, `\u2705 ${p.name} joined the table (Seat ${seat+1})`);
             if (room.gameActive) {
               if (room.gameType === 'tournament') {
                 room.seats[seat].spectator = true; room.seats[seat].sittingOut = true;
@@ -467,6 +525,7 @@ wss.on('connection', ws => {
             }
           }
         } else {
+          svrLog(`JOIN REJECTED: ${p.name} | IP: ${p.ip || 'unknown'} | room: ${room.id}`);
           send(p.ws, { type: 'rejected', reason: 'Host declined your request' });
         }
         broadcastAll(room, lobbySnapshot(room));
@@ -533,12 +592,13 @@ wss.on('connection', ws => {
           p.chips = buyInChips; p.pendingBuyBack = false; p.spectator = false;
           p.buyInCount = (p.buyInCount || 1) + 1; p.buyInTotal = (p.buyInTotal || room.buyIn) + buyInChips;
           p.sittingOut = true;
-          writeLog(room, `BUY-BACK: ${p.name} bought back in`);
+          writeLog(room, `BUY-BACK: ${p.name} | Seat ${p.seat+1} | Bought back in for ${fmtPounds(buyInChips)} | Total invested: ${fmtPounds(p.buyInTotal)} (${p.buyInCount} buy-ins)`);
           logEvent(room, `\u2705 ${p.name} bought back in`);
           send(p.ws, { type: 'buyBackAccepted', chips: buyInChips });
         } else {
           p.pendingBuyBack = false; p.sittingOut = true; p.spectator = true;
           recordPlayerExit(room, p, 'bust');
+          writeLog(room, `BUY-BACK DECLINED: ${p.name} | Seat ${p.seat+1} | IP: ${p.ip || 'unknown'} | Finished with ${fmtPounds(0)}`);
           logEvent(room, `\ud83d\udc40 ${p.name} declined buy-back - now spectating`);
           send(p.ws, { type: 'spectating' });
         }
@@ -554,7 +614,7 @@ wss.on('connection', ws => {
         if (!p) return;
         p.voluntaryAutoFold = msg.enabled === true;
         const afStatus = p.voluntaryAutoFold ? 'ENABLED' : 'DISABLED';
-        writeLog(room, `AUTO-FOLD ${afStatus}: ${p.name}`);
+        writeLog(room, `AUTO-FOLD ${afStatus}: ${p.name} | Seat ${p.seat+1}`);
         logEvent(room, `\uD83D\uDD01 AUTO-FOLD ${afStatus}: ${p.name}`);
         if (p.voluntaryAutoFold && room.G && room.G.toAct[0] === p.seat) {
           clearActionTimer(room); doFold(room, p.seat, 'auto-fold');
@@ -582,7 +642,8 @@ wss.on('connection', ws => {
         const resolve = s._onBuyBackResolved; s._onBuyBackResolved = null;
         s.pendingBuyBack = false;
         recordPlayerExit(room, s, 'bust');
-        svrLog(`EXIT GAME - ${s.name} room ${room.id}`);
+        svrLog(`EXIT GAME - ${s.name} room ${room.id} | IP: ${s.ip || 'unknown'} | Chips at exit: ${fmtPounds(s.chips)}`);
+        writeRoomLog(room, `PLAYER LEFT (exit): ${s.name} | Seat ${s.seat+1} | IP: ${s.ip || 'unknown'} | Chips: ${fmtPounds(s.chips)} | Invested: ${fmtPounds(s.buyInTotal||0)} (${s.buyInCount||1} buy-in(s)) | Net: ${fmtPounds(s.chips-(s.buyInTotal||0))}`);
         logEvent(room, `\uD83D\uDEAA ${s.name} has left the game`);
         broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, chips: 0, reason: 'exit' });
         room.seats[s.seat] = null;
@@ -605,6 +666,7 @@ wss.on('connection', ws => {
         if (inActiveHand) {
           s.pendingCashOut = true; send(ws, { type: 'cashOutPending' });
           logEvent(room, `\uD83D\uDCB0 ${s.name} will cash out after this hand`);
+          writeLog(room, `CASH OUT REQUESTED: ${s.name} | Seat ${s.seat+1} | Chips: ${fmtPounds(s.chips)} | Will take effect end of hand`);
           if (room.G.toAct[0] === s.seat) { clearActionTimer(room); doFold(room, s.seat, 'cash out'); }
           else if (!s.folded) {
             s.folded = true;
@@ -620,7 +682,7 @@ wss.on('connection', ws => {
       case 'chat': {
         const room = rooms.get(myRoomId); if (!room) return;
         const s = room.seats.find(s => s?.id === myId); if (!s) return;
-        writeLog(room, `CHAT: ${s.name}: ${(msg.text||'').slice(0,120)}`);
+        writeLog(room, `CHAT [${s.name}]: ${(msg.text||'').slice(0,120)}`);
         broadcastAll(room, { type: 'chat', name: s.name, text: (msg.text || '').slice(0, 120) });
         break;
       }
@@ -629,6 +691,7 @@ wss.on('connection', ws => {
         const room = rooms.get(myRoomId); if (!room || room.hostId !== myId) return;
         const newBuyIn = Math.max(20, Math.round(Number(msg.buyIn)));
         room.buyIn = newBuyIn;
+        writeRoomLog(room, `BUY-IN CHANGED: ${fmtPounds(newBuyIn)} (set by host)`);
         logEvent(room, `\uD83D\uDCB0 Buy-in set to \u00a3${(newBuyIn/100).toFixed(2)} by host`);
         broadcastAll(room, lobbySnapshot(room));
         break;
@@ -638,7 +701,9 @@ wss.on('connection', ws => {
         const room = rooms.get(myRoomId); if (!room || room.hostId !== myId) return;
         const target = room.seats.find(s => s?.id === msg.playerId); if (!target) return;
         const newChips = Math.max(0, Math.round(Number(msg.chips)));
+        const oldChips = target.chips;
         target.chips = newChips;
+        writeRoomLog(room, `STACK ADJUSTED (by host): ${target.name} | Seat ${target.seat+1} | ${fmtPounds(oldChips)} -> ${fmtPounds(newChips)}`);
         logEvent(room, `\uD83D\uDD27 ${target.name}'s stack set to \u00a3${(newChips/100).toFixed(2)} by host`);
         broadcastState(room); broadcastAll(room, lobbySnapshot(room));
         break;
@@ -647,13 +712,14 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
-    svrLog(`WS CLOSE - id=${myId||'(pre-join)'} room=${myRoomId||'none'}`);
+    svrLog(`WS CLOSE - id=${myId||'(pre-join)'} room=${myRoomId||'none'} | IP: ${clientIp}`);
     if (!myId || !myRoomId) return;
     const room = rooms.get(myRoomId); if (!room) return;
 
     const pi = room.pendingJoins.findIndex(p => p.id === myId && p.ws === ws);
     if (pi !== -1) {
       const pj = room.pendingJoins[pi]; room.pendingJoins.splice(pi, 1);
+      svrLog(`PENDING JOIN CANCELLED: ${pj.name} | IP: ${clientIp}`);
       broadcastAll(room, lobbySnapshot(room)); scheduleRoomCleanup(room); return;
     }
 
@@ -661,6 +727,7 @@ wss.on('connection', ws => {
     if (!s || s.ws !== ws) return;
     s.disconnected = true; s.ws = null; s._disconnectedAt = Date.now();
     s._missedHands = s._missedHands || 0;
+    writeRoomLog(room, `DISCONNECTED: ${s.name} | Seat ${s.seat+1} | IP: ${clientIp} | Chips at disconnect: ${fmtPounds(s.chips)}`);
     logEvent(room, `\u26A0 ${s.name} disconnected`);
     s.autoFold = true; broadcastState(room);
     if (room.G && room.G.toAct[0] === s.seat) { clearActionTimer(room); doFold(room, s.seat, 'disconnected'); }
@@ -673,13 +740,15 @@ wss.on('connection', ws => {
     scheduleRoomCleanup(room);
   });
 
-  ws.on('error', err => { svrLog(`WS ERROR - id=${myId||'(pre-join)'}: ${err.message}`); });
+  ws.on('error', err => { svrLog(`WS ERROR - id=${myId||'(pre-join)'} | IP: ${clientIp}: ${err.message}`); });
 });
 
 function executeCashOut(room, s) {
   const chips = s.chips, seatIdx = s.seat;
   recordPlayerExit(room, s, 'cashout');
-  svrLog(`CASH OUT - ${s.name} room ${room.id}`);
+  const net = chips - (s.buyInTotal || 0);
+  svrLog(`CASH OUT - ${s.name} room ${room.id} | IP: ${s.ip || 'unknown'} | Chips: ${fmtPounds(chips)}`);
+  writeRoomLog(room, `PLAYER CASHED OUT: ${s.name} | Seat ${seatIdx+1} | IP: ${s.ip || 'unknown'} | Cash out: ${fmtPounds(chips)} | Total invested: ${fmtPounds(s.buyInTotal||0)} (${s.buyInCount||1} buy-in(s)) | Net P&L: ${fmtPounds(net)}`);
   logEvent(room, `\uD83D\uDCB0 ${s.name} cashed out with \u00a3${(chips/100).toFixed(2)}`);
   broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: seatIdx, chips: s.chips, reason: 'cashout' });
   room.seats[seatIdx] = null;
@@ -690,9 +759,9 @@ function executeCashOut(room, s) {
   broadcastAll(room, lobbySnapshot(room)); broadcastState(room); scheduleRoomCleanup(room);
 }
 
-function mkPlayer(ws, id, name, seat, room, chips) {
+function mkPlayer(ws, id, name, seat, room, chips, ip) {
   const startChips = chips != null ? chips : (room ? room.buyIn : START_CHIPS);
-  return { ws, id, name, chips: startChips, seat, cards: [], bet: 0, folded: false, disconnected: false, autoFold: false, pendingCashOut: false, _disconnectTimer: null, buyInCount: 1, buyInTotal: startChips };
+  return { ws, id, name, chips: startChips, seat, cards: [], bet: 0, folded: false, disconnected: false, autoFold: false, pendingCashOut: false, _disconnectTimer: null, buyInCount: 1, buyInTotal: startChips, ip: ip || 'unknown' };
 }
 
 function buyInTag(s) { return `[Buy-ins: ${s.buyInCount} | Total in: \u00a3${(s.buyInTotal/100).toFixed(2)}]`; }
@@ -700,14 +769,14 @@ function buyInTag(s) { return `[Buy-ins: ${s.buyInCount} | Total in: \u00a3${(s.
 function ensurePlayerHistory(room, s) {
   if (!room.gameHistory) room.gameHistory = [];
   const existing = room.gameHistory.find(h => h.id === s.id);
-  if (!existing) { room.gameHistory.push({ id: s.id, name: s.name, buyInTotal: s.buyInTotal || room.buyIn, chips: s.chips, status: 'active' }); }
+  if (!existing) { room.gameHistory.push({ id: s.id, name: s.name, buyInTotal: s.buyInTotal || room.buyIn, chips: s.chips, status: 'active', ip: s.ip || 'unknown' }); }
   else { existing.name = s.name; existing.buyInTotal = s.buyInTotal || existing.buyInTotal; if (existing.status !== 'cashout' && existing.status !== 'evicted') existing.status = 'active'; }
 }
 
 function recordPlayerExit(room, s, status) {
   if (!room.gameHistory) room.gameHistory = [];
   const idx = room.gameHistory.findIndex(h => h.id === s.id);
-  const record = { id: s.id, name: s.name, buyInTotal: s.buyInTotal || room.buyIn, chips: s.chips, status };
+  const record = { id: s.id, name: s.name, buyInTotal: s.buyInTotal || room.buyIn, chips: s.chips, status, ip: s.ip || 'unknown' };
   if (idx >= 0) room.gameHistory[idx] = record; else room.gameHistory.push(record);
 }
 
@@ -718,7 +787,7 @@ function writeGameSummary(room) {
   room.seats.forEach(s => {
     if (!s) return;
     const prev = registry.get(s.id) || {};
-    registry.set(s.id, { id: s.id, name: s.name, buyInTotal: s.buyInTotal || prev.buyInTotal || room.buyIn, chips: s.chips, status: s.spectator ? 'spectating' : s.pendingBuyBack ? 'bust' : 'active' });
+    registry.set(s.id, { id: s.id, name: s.name, buyInTotal: s.buyInTotal || prev.buyInTotal || room.buyIn, chips: s.chips, status: s.spectator ? 'spectating' : s.pendingBuyBack ? 'bust' : 'active', ip: s.ip || prev.ip || 'unknown' });
   });
   if (registry.size === 0) return;
   const ORD = { active: 0, spectating: 1, cashout: 2, bust: 3, evicted: 4 };
@@ -729,16 +798,17 @@ function writeGameSummary(room) {
   });
   let totalIn = 0, totalOut = 0;
   players.forEach(p => { totalIn += p.buyInTotal || 0; totalOut += p.chips ?? 0; });
-  const W = 62, pad = (s, n) => { s = String(s); return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length); };
+  const W = 78, pad = (s, n) => { s = String(s); return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length); };
   const fmt = n => '\u00a3' + (n / 100).toFixed(2), net = n => (n >= 0 ? '+' : '-') + '\u00a3' + (Math.abs(n) / 100).toFixed(2);
   const SEP = '\u2560' + '\u2550'.repeat(W) + '\u2563\n';
-  const dataRow = (name, bi, chips, n, status) => '\u2551  ' + pad(name, 18) + ' ' + pad(fmt(bi), 10) + ' ' + pad(fmt(chips), 10) + ' ' + pad(net(n), 10) + ' ' + pad(status, 8) + '\u2551\n';
+  const dataRow = (name, bi, chips, n, status, ip) =>
+    '\u2551  ' + pad(name, 18) + ' ' + pad(fmt(bi), 10) + ' ' + pad(fmt(chips), 10) + ' ' + pad(net(n), 10) + ' ' + pad(status, 10) + ' ' + pad(ip||'', 16) + '\u2551\n';
   let out = '\n\u2554' + '\u2550'.repeat(W) + '\u2557\n';
   out += '\u2551' + ('  GAME SUMMARY - After Hand #' + String(room.handNum).padStart(4, '0')).padEnd(W) + '\u2551\n' + SEP;
-  out += '\u2551' + ('  ' + pad('Player', 18) + ' ' + pad('Bought In', 10) + ' ' + pad('Has / Out', 10) + ' ' + pad('Net P&L', 10) + ' ' + pad('Status', 8)).padEnd(W) + '\u2551\n' + SEP;
-  players.forEach(p => { const c = p.chips ?? 0; out += dataRow(p.name, p.buyInTotal || 0, c, c - (p.buyInTotal || 0), p.status || 'active'); });
+  out += '\u2551' + ('  ' + pad('Player', 18) + ' ' + pad('Bought In', 10) + ' ' + pad('Has / Out', 10) + ' ' + pad('Net P&L', 10) + ' ' + pad('Status', 10) + ' ' + pad('IP Address', 16)).padEnd(W) + '\u2551\n' + SEP;
+  players.forEach(p => { const c = p.chips ?? 0; out += dataRow(p.name, p.buyInTotal || 0, c, c - (p.buyInTotal || 0), p.status || 'active', p.ip || 'unknown'); });
   const totalNet = totalOut - totalIn, balTag = Math.abs(totalNet) <= 1 ? 'BALANCED' : 'ERR ' + net(totalNet);
-  out += SEP + dataRow('TOTALS', totalIn, totalOut, totalNet, balTag) + '\u255a' + '\u2550'.repeat(W) + '\u255d\n';
+  out += SEP + dataRow('TOTALS', totalIn, totalOut, totalNet, balTag, '') + '\u255a' + '\u2550'.repeat(W) + '\u255d\n';
   try { fs.appendFileSync(room.G.logPath, out); } catch {}
 }
 
@@ -790,7 +860,8 @@ function startNewHand(room) {
       s._missedHands = (s._missedHands || 0) + 1;
       logEvent(room, `\uD83D\uDCA4 ${s.name} absent - missed ${s._missedHands}/${ABSENT_HAND_LIMIT} hand${s._missedHands>1?'s':''}`);
       if (s._missedHands >= ABSENT_HAND_LIMIT) {
-        svrLog(`EVICT - ${s.name} room ${room.id}`);
+        svrLog(`EVICT - ${s.name} room ${room.id} | IP: ${s.ip || 'unknown'}`);
+        writeRoomLog(room, `PLAYER EVICTED (${ABSENT_HAND_LIMIT} missed hands): ${s.name} | Seat ${s.seat+1} | IP: ${s.ip || 'unknown'} | Chips: ${fmtPounds(s.chips)}`);
         logEvent(room, `\u274C ${s.name} removed after ${ABSENT_HAND_LIMIT} missed hands`);
         recordPlayerExit(room, s, 'evicted');
         broadcastAll(room, { type: 'playerLeft', id: s.id, name: s.name, seat: s.seat, reason: 'absent-eviction' });
@@ -824,9 +895,11 @@ function startNewHand(room) {
   const preflopStart = nextSeat(bbSeat, active);
   const logPath = handLogPath(room.id, room.handNum);
 
-  room.G = { deck: buildDeck(), phase: 'preflop', pot: 0, currentBet: curBB, lastRaiseIncrement: curBB, community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath, curSB, curBB,
-             firstRaiseAction: true  // Redtooth: first raise must be ≥ 2×BB; after first raise use lastRaiseIncrement
-           };
+  room.G = {
+    deck: buildDeck(), phase: 'preflop', pot: 0, currentBet: curBB, lastRaiseIncrement: curBB,
+    community: [], toAct: [], sbSeat, bbSeat, isHeadsUp, logPath, curSB, curBB,
+    firstRaiseAction: true  // Redtooth: first raise must be ≥ 2×BB; after first raise use lastRaiseIncrement
+  };
   room.seats.forEach(s => { if (s) { s.cards = []; s.bet = 0; s.folded = false; s.totalBet = 0; } });
 
   const dealStartSeat = isHeadsUp ? bbSeat : sbSeat;
@@ -840,34 +913,74 @@ function startNewHand(room) {
 
   const playerLines = active.map(i => {
     const s = room.seats[i];
-    const tags = []; if (i === room.dealerSeat) tags.push('DEALER'); if (i === sbSeat) tags.push('SB'); if (i === bbSeat) tags.push('BB'); if (s.voluntaryAutoFold) tags.push('AUTO-FOLD');
-    return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | \u00a3${(s.chips/100).toFixed(2).padStart(7)}${tags.length?' ['+tags.join('+')+']':''}`;
+    const tags = [];
+    if (i === room.dealerSeat) tags.push('DEALER');
+    if (i === sbSeat) tags.push('SB');
+    if (i === bbSeat) tags.push('BB');
+    if (s.voluntaryAutoFold) tags.push('AUTO-FOLD');
+    return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtPounds(s.chips).padStart(8)}${tags.length?' ['+tags.join('+')+']':''} | IP: ${s.ip || 'unknown'}`;
   }).join('\n');
 
+  // ── Write the hand header ──────────────────────────────────────────────────
   fs.writeFileSync(logPath,
-    '\u2554' + '\u2550'.repeat(62) + '\u2557\n\u2551  SYFM POKER - HAND LOG' + ' '.repeat(39) + '\u2551\n\u2560' + '\u2550'.repeat(62) + '\u2563\n' +
+    '\u2554' + '\u2550'.repeat(70) + '\u2557\n\u2551  SYFM POKER - HAND LOG' + ' '.repeat(47) + '\u2551\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
     `\u2551  Room: ${room.id.padEnd(10)} Hand: #${String(room.handNum).padEnd(6)} ${now.toLocaleDateString('en-GB').padEnd(14)}\u2551\n` +
-    `\u2551  Time: ${now.toLocaleTimeString('en-GB').padEnd(54)}\u2551\n\u2560` + '\u2550'.repeat(62) + '\u2563\n\u2551  PLAYERS\u2551\n\u2560' + '\u2550'.repeat(62) + '\u2563\n' +
-    playerLines.split('\n').map(l => '\u2551' + l.padEnd(63) + '\u2551').join('\n') + '\n\u2560' + '\u2550'.repeat(62) + '\u2563\n' +
-    `\u2551  ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | ${blindTag}`.padEnd(63) + '\u2551\n\u255a' + '\u2550'.repeat(62) + '\u255d\n\n'
+    `\u2551  Time: ${now.toLocaleTimeString('en-GB').padEnd(62)}\u2551\n\u2560` + '\u2550'.repeat(70) + '\u2563\n\u2551  PLAYERS\u2551\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
+    playerLines.split('\n').map(l => '\u2551' + l.padEnd(71) + '\u2551').join('\n') + '\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
+    `\u2551  ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | ${blindTag}`.padEnd(71) + '\u2551\n' +
+    `\u2551  Dealer: Seat ${String(room.dealerSeat+1).padStart(2)} (${(room.seats[room.dealerSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
+    `\u2551  SB:     Seat ${String(sbSeat+1).padStart(2)} (${(room.seats[sbSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
+    `\u2551  BB:     Seat ${String(bbSeat+1).padStart(2)} (${(room.seats[bbSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
+    '\u255a' + '\u2550'.repeat(70) + '\u255d\n\n'
   );
 
+  // ── Post blinds ───────────────────────────────────────────────────────────
   room.seats[sbSeat].chips -= curSB; room.seats[sbSeat].bet = curSB; room.seats[sbSeat].totalBet = curSB;
   room.seats[bbSeat].chips -= curBB; room.seats[bbSeat].bet = curBB; room.seats[bbSeat].totalBet = curBB;
   room.G.pot = curSB + curBB;
   room._chipsInPlayAtHandStart = room.seats.filter(Boolean).reduce((sum, s) => sum + s.chips, 0) + room.G.pot;
 
-  writeLog(room, `BLINDS | ${room.seats[sbSeat].name} posts SB \u00a3${(curSB/100).toFixed(2)}`);
-  writeLog(room, `BLINDS | ${room.seats[bbSeat].name} posts BB \u00a3${(curBB/100).toFixed(2)}`);
+  writeLog(room, `BLINDS POSTED`);
+  writeLog(room, `  SB: ${room.seats[sbSeat].name} (Seat ${sbSeat+1}) posts ${fmtPounds(curSB)} | Stack after: ${fmtPounds(room.seats[sbSeat].chips)}`);
+  writeLog(room, `  BB: ${room.seats[bbSeat].name} (Seat ${bbSeat+1}) posts ${fmtPounds(curBB)} | Stack after: ${fmtPounds(room.seats[bbSeat].chips)}`);
+  writeLog(room, `  Pot: ${fmtPounds(room.G.pot)}`);
+  writeLog(room, '');
 
+  // ── Deal hole cards ────────────────────────────────────────────────────────
   for (let rd = 0; rd < 2; rd++) for (const si of dealOrder) room.seats[si].cards.push(room.G.deck.shift());
 
-  room.G.toAct = buildActOrder(room, preflopStart, active);
+  writeLog(room, '─'.repeat(70));
+  writeLog(room, 'HOLE CARDS DEALT:');
+  active.forEach(i => {
+    const s = room.seats[i];
+    if (s && s.cards && s.cards.length > 0) {
+      const tags = [];
+      if (i === room.dealerSeat) tags.push('BTN');
+      if (i === sbSeat) tags.push('SB');
+      if (i === bbSeat) tags.push('BB');
+      const tagStr = tags.length ? ` [${tags.join('/')}]` : '';
+      writeLog(room, `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtCards(s.cards)}${tagStr} | Stack: ${fmtPounds(s.chips)}`);
+    }
+  });
+  writeLog(room, '');
 
+  // ── Chip snapshot before action ────────────────────────────────────────────
+  writeLog(room, 'STACKS BEFORE PREFLOP ACTION:');
+  active.forEach(i => {
+    const s = room.seats[i];
+    writeLog(room, `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtPounds(s.chips).padStart(8)} | Bet in: ${fmtPounds(s.bet)}`);
+  });
+  writeLog(room, '');
+  writeLog(room, '─'.repeat(70));
+  writeLog(room, 'PREFLOP ACTION:');
+
+  // ── Auto-fold any voluntary-auto-fold players ──────────────────────────────
+  room.G.toAct = buildActOrder(room, preflopStart, active);
   active.forEach(i => {
     const s = room.seats[i];
     if (s && s.voluntaryAutoFold && !s.folded) {
       s.folded = true;
+      writeLog(room, `  AUTO-FOLD: ${s.name} (Seat ${i+1})`);
       broadcastAll(room, { type: 'playerAction', seat: i, action: 'fold', amount: 0, name: s.name + ' (auto-fold)' });
     }
   });
@@ -919,8 +1032,12 @@ function doFold(room, seat, reason) {
   p.folded = true;
   const label = reason ? ` (${reason})` : '';
   broadcastAll(room, { type: 'playerAction', seat, action: 'fold', amount: 0, name: p.name + label });
-  writeLog(room, `FOLD | ${p.name} | ${reason||'voluntary'}`);
-  if (room.G) { const idx = room.G.toAct.indexOf(seat); if (idx !== -1) room.G.toAct.splice(idx, 1); }
+  const G = room.G;
+  // Log pot and remaining players
+  const potStr = G ? ` | Pot: ${fmtPounds(G.pot)}` : '';
+  const stackStr = ` | Stack: ${fmtPounds(p.chips)}`;
+  writeLog(room, `  FOLD: ${p.name} (Seat ${seat+1})${label}${stackStr}${potStr}`);
+  if (G) { const idx = G.toAct.indexOf(seat); if (idx !== -1) G.toAct.splice(idx, 1); }
   broadcastState(room);
   if (!checkRoundEnd(room)) setTimeout(() => promptToAct(room), 200);
 }
@@ -934,7 +1051,12 @@ function handleAction(room, seat, action, amount) {
     p.chips -= ca; p.bet += ca; p.totalBet = (p.totalBet||0) + ca; G.pot += ca;
     const act = ca === 0 ? 'check' : 'call';
     broadcastAll(room, { type: 'playerAction', seat, action: act, amount: ca, name: p.name, pot: G.pot });
-    writeLog(room, `${act.toUpperCase()} | ${p.name} | \u00a3${(ca/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    if (act === 'check') {
+      writeLog(room, `  CHECK: ${p.name} (Seat ${seat+1}) | Stack: ${fmtPounds(p.chips)} | Pot: ${fmtPounds(G.pot)}`);
+    } else {
+      const allIn = p.chips === 0 ? ' [ALL-IN]' : '';
+      writeLog(room, `  CALL:  ${p.name} (Seat ${seat+1}) | Amount: ${fmtPounds(ca)}${allIn} | Stack: ${fmtPounds(p.chips)} | Pot: ${fmtPounds(G.pot)}`);
+    }
     broadcastState(room); G.toAct.shift(); setTimeout(() => promptToAct(room), 200);
   } else if (action === 'raise') {
     const callAmount = G.currentBet - p.bet;
@@ -949,8 +1071,9 @@ function handleAction(room, seat, action, amount) {
       G.lastRaiseIncrement = G.currentBet - prevCurrentBet;
       G.firstRaiseAction = false;  // first raise happened — subsequent use difference
     }
+    const allIn = p.chips === 0 ? ' [ALL-IN]' : '';
     broadcastAll(room, { type: 'playerAction', seat, action: 'raise', amount: raiseFromStack, name: p.name, pot: G.pot });
-    writeLog(room, `RAISE | ${p.name} | \u00a3${(raiseFromStack/100).toFixed(2)} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+    writeLog(room, `  RAISE: ${p.name} (Seat ${seat+1}) | Amount: ${fmtPounds(raiseFromStack)} | Total bet: ${fmtPounds(p.bet)} | Stack: ${fmtPounds(p.chips)}${allIn} | Pot: ${fmtPounds(G.pot)}`);
     broadcastState(room);
     const active = activePlaying(room).sort((a, b) => a - b);
     const raiserIdx = active.indexOf(seat);
@@ -971,7 +1094,33 @@ function advPhase(room) {
     const prevPhase = G.phase; G.phase = next[G.phase];
     const count = G.phase === 'flop' ? 3 : 1; const newCards = [];
     for (let i = 0; i < count; i++) { const c = G.deck.shift(); G.community.push(c); newCards.push(c); }
-    writeLog(room, `PHASE: ${prevPhase.toUpperCase()} -> ${G.phase.toUpperCase()} | Cards: ${newCards.map(c=>c.r+c.s).join(' ')} | Pot: \u00a3${(G.pot/100).toFixed(2)}`);
+
+    // ── Detailed phase logging ────────────────────────────────────────────
+    writeLog(room, '');
+    writeLog(room, '─'.repeat(70));
+    if (G.phase === 'flop') {
+      writeLog(room, `FLOP: ${fmtCards(newCards)} | Pot: ${fmtPounds(G.pot)}`);
+      writeLog(room, `  Board: ${fmtCards(G.community)}`);
+    } else if (G.phase === 'turn') {
+      writeLog(room, `TURN: ${fmtCards(newCards)} | Pot: ${fmtPounds(G.pot)}`);
+      writeLog(room, `  Board: ${fmtCards(G.community)}`);
+    } else if (G.phase === 'river') {
+      writeLog(room, `RIVER: ${fmtCards(newCards)} | Pot: ${fmtPounds(G.pot)}`);
+      writeLog(room, `  Board: ${fmtCards(G.community)}`);
+    }
+    writeLog(room, '');
+
+    // Log stacks of remaining active players at start of each new street
+    const stillIn = room.seats.filter(s => s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack && !s.autoFold && !s.voluntaryAutoFold);
+    writeLog(room, `STACKS AT START OF ${G.phase.toUpperCase()}:`);
+    stillIn.forEach(s => {
+      const allIn = s.chips === 0 ? ' [ALL-IN]' : '';
+      writeLog(room, `  Seat ${String(s.seat+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtPounds(s.chips).padStart(8)}${allIn}`);
+    });
+    writeLog(room, '');
+    writeLog(room, `${G.phase.toUpperCase()} ACTION:`);
+    // ──────────────────────────────────────────────────────────────────────
+
     broadcastAll(room, { type: 'communityDealt', phase: G.phase, cards: G.community, newCards });
     broadcastState(room);
     const active = activePlaying(room);
@@ -989,8 +1138,14 @@ function advPhase(room) {
 function endRound(room) {
   clearActionTimer(room);
   const remaining = room.seats.filter(s => s && !s.folded && !s.sittingOut && !s.spectator && !s.pendingBuyBack && !s.autoFold && !s.voluntaryAutoFold);
-  if (remaining.length === 1) finish(room, [remaining[0]], 'Last player standing');
-  else if (remaining.length === 0) setTimeout(() => startNewHand(room), 3000);
+  if (remaining.length === 1) {
+    writeLog(room, '');
+    writeLog(room, '─'.repeat(70));
+    writeLog(room, `HAND WON UNCONTESTED: ${remaining[0].name} (Seat ${remaining[0].seat+1}) | Pot: ${fmtPounds(room.G?.pot || 0)}`);
+    finish(room, [remaining[0]], 'Last player standing');
+  } else if (remaining.length === 0) {
+    setTimeout(() => startNewHand(room), 3000);
+  }
 }
 
 function showdown(room) {
@@ -1000,12 +1155,38 @@ function showdown(room) {
   if (active.length === 0) { setTimeout(() => startNewHand(room), 3000); return; }
   broadcastAll(room, { type: 'showdown', reveals: active.map(s => ({ seat: s.seat, name: s.name, cards: s.cards })) });
   broadcastState(room);
+
   let bestScore = -1;
-  const scored = active.map(p => { const allCards = [...p.cards, ...room.G.community]; const sc = evalBest(allCards); const bf = bestFiveCards(allCards); if (sc > bestScore) bestScore = sc; return { p, sc, bf }; });
-  writeLog(room, 'SHOWDOWN: ' + scored.map(({p, sc}) => `${p.name}=${handName(sc)}`).join(', '));
+  const scored = active.map(p => {
+    const allCards = [...p.cards, ...room.G.community];
+    const sc = evalBest(allCards);
+    const bf = bestFiveCards(allCards);
+    if (sc > bestScore) bestScore = sc;
+    return { p, sc, bf };
+  });
+
+  // ── Detailed showdown logging ──────────────────────────────────────────────
+  writeLog(room, '');
+  writeLog(room, '─'.repeat(70));
+  writeLog(room, `SHOWDOWN | Board: ${fmtCards(room.G.community)} | Pot: ${fmtPounds(room.G.pot)}`);
+  writeLog(room, '');
+  scored.forEach(({ p, sc, bf }) => {
+    const bestHandStr = fmtCards(bf);
+    const handRank = handName(sc);
+    const isWinner = sc === bestScore;
+    const winMark = isWinner ? ' *** WINNER ***' : '';
+    writeLog(room, `  Seat ${String(p.seat+1).padStart(2)} | ${p.name.padEnd(18)} | Hole: ${fmtCards(p.cards)} | Best 5: ${bestHandStr} | Hand: ${handRank}${winMark}`);
+  });
+  writeLog(room, '');
+  // ──────────────────────────────────────────────────────────────────────────
+
   const winners = scored.filter(({ sc }) => sc === bestScore).map(({ p }) => p);
   const winHandName = handName(bestScore);
-  writeLog(room, `WINNER: ${winners.map(w=>w.name).join(' & ')} with ${winHandName}`);
+  if (winners.length > 1) {
+    writeLog(room, `SPLIT POT: ${winners.map(w => w.name).join(' & ')} | Hand: ${winHandName} | Pot: ${fmtPounds(room.G.pot)}`);
+  } else {
+    writeLog(room, `WINNER: ${winners[0].name} (Seat ${winners[0].seat+1}) | Hand: ${winHandName} | Pot: ${fmtPounds(room.G.pot)}`);
+  }
   setTimeout(() => finish(room, winners, winHandName), 1200);
 }
 
@@ -1024,6 +1205,16 @@ function finish(room, winners, label) {
   }
   const levelTotal = potLevels.reduce((sum, l) => sum + l.amount, 0);
   if (levelTotal !== totalPot && potLevels.length > 0) potLevels[potLevels.length - 1].amount += (totalPot - levelTotal);
+
+  // Log side pot info if applicable
+  if (potLevels.length > 1) {
+    writeLog(room, '');
+    writeLog(room, `SIDE POTS (${potLevels.length} pots):`);
+    potLevels.forEach((lv, idx) => {
+      const eligible = allSeats.filter(s => lv.eligibleIds.has(s.id)).map(s => s.name).join(', ');
+      writeLog(room, `  Pot ${idx+1}: ${fmtPounds(lv.amount)} | Eligible: ${eligible}`);
+    });
+  }
 
   let totalAwarded = 0;
   potLevels.forEach((level, li) => {
@@ -1046,9 +1237,30 @@ function finish(room, winners, label) {
   potLevels.forEach((level, li) => {
     if (level.amount <= 0) return;
     const ew = winners.filter(w => level.eligibleIds.has(w.id));
-    if (ew.length === 1) broadcastAll(room, { type: 'winner', seat: ew[0].seat, name: ew[0].name, amount: level.amount, label });
-    else if (ew.length > 1) { const pp = Math.floor(level.amount / ew.length), rem = level.amount - pp * ew.length; ew.sort((a,b)=>a.seat-b.seat).forEach((w,i) => broadcastAll(room, { type: 'winner', seat: w.seat, name: w.name, amount: pp+(i===0?rem:0), label: `Split - ${label}` })); }
+    if (ew.length === 1) {
+      writeLog(room, `  POT AWARDED: ${fmtPounds(level.amount)} -> ${ew[0].name} (Seat ${ew[0].seat+1}) | ${label}`);
+      broadcastAll(room, { type: 'winner', seat: ew[0].seat, name: ew[0].name, amount: level.amount, label });
+    } else if (ew.length > 1) {
+      const pp = Math.floor(level.amount / ew.length), rem = level.amount - pp * ew.length;
+      ew.sort((a,b)=>a.seat-b.seat).forEach((w,i) => {
+        const share = pp+(i===0?rem:0);
+        writeLog(room, `  POT SPLIT: ${fmtPounds(share)} -> ${w.name} (Seat ${w.seat+1}) | Split - ${label}`);
+        broadcastAll(room, { type: 'winner', seat: w.seat, name: w.name, amount: share, label: `Split - ${label}` });
+      });
+    }
   });
+
+  // ── Chip counts after hand ─────────────────────────────────────────────────
+  writeLog(room, '');
+  writeLog(room, 'CHIP COUNTS AFTER HAND:');
+  allSeats.forEach(s => {
+    const invested = s.buyInTotal || 0;
+    const net = s.chips - invested;
+    const netStr = (net >= 0 ? '+' : '') + fmtPounds(net);
+    writeLog(room, `  Seat ${String(s.seat+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtPounds(s.chips).padStart(8)} | Net overall: ${netStr}`);
+  });
+  writeLog(room, '');
+  // ──────────────────────────────────────────────────────────────────────────
 
   broadcastState(room);
   writeGameSummary(room);
@@ -1067,7 +1279,7 @@ function finish(room, winners, label) {
         if (!room.tournamentPlacement) room.tournamentPlacement = [];
         room.tournamentPlacement.push({ id: s.id, name: s.name, place });
         recordPlayerExit(room, s, 'bust');
-        writeLog(room, `TOURNAMENT BUST: ${s.name} - place ${place}`);
+        writeLog(room, `TOURNAMENT ELIMINATION: ${s.name} (Seat ${s.seat+1}) | Place: ${place} | IP: ${s.ip || 'unknown'}`);
         logEvent(room, `\uD83C\uDFC6 ${s.name} has been eliminated (place ${place})`);
         send(s.ws, { type: 'tournamentEliminated', place, totalPlayers, placement: room.tournamentPlacement });
       });
@@ -1077,7 +1289,10 @@ function finish(room, winners, label) {
       const stillIn = room.seats.filter(s => s && !s.spectator && s.chips > 0);
       if (stillIn.length === 1) {
         const champion = stillIn[0];
-        writeLog(room, `TOURNAMENT WINNER: ${champion.name}`);
+        writeLog(room, '');
+        writeLog(room, '═'.repeat(70));
+        writeLog(room, `TOURNAMENT WINNER: ${champion.name} (Seat ${champion.seat+1}) | IP: ${champion.ip || 'unknown'}`);
+        writeLog(room, '═'.repeat(70));
         logEvent(room, `\uD83C\uDFC6 TOURNAMENT OVER - Winner: ${champion.name}`);
         room.tournamentPlacement.push({ id: champion.id, name: champion.name, place: 1 });
         broadcastAll(room, { type: 'tournamentOver', winner: champion.name, winnerSeat: champion.seat, placement: room.tournamentPlacement });
@@ -1094,6 +1309,7 @@ function finish(room, winners, label) {
       function onBuyBackResolved() { pendingCount--; if (pendingCount <= 0) startNewHand(room); }
       busted.forEach(s => {
         s.pendingBuyBack = true; s.sittingOut = true;
+        writeLog(room, `BUY-BACK OFFER SENT: ${s.name} (Seat ${s.seat+1}) | IP: ${s.ip || 'unknown'} | Offer: ${fmtPounds(room.buyIn)}`);
         logEvent(room, `\ud83d\udcb8 ${s.name} is out of chips - buy-back offer sent`);
         send(s.ws, { type: 'buyBackOffer', chips: room.buyIn });
         if (s._buyBackTimer) clearTimeout(s._buyBackTimer);
@@ -1101,6 +1317,7 @@ function finish(room, winners, label) {
           if (!s.pendingBuyBack) return;
           s.pendingBuyBack = false; s.sittingOut = true; s.spectator = true;
           recordPlayerExit(room, s, 'bust');
+          writeLog(room, `BUY-BACK TIMEOUT: ${s.name} (Seat ${s.seat+1}) - declined (timed out)`);
           logEvent(room, `\ud83d\udc40 ${s.name} timed out on buy-back - now spectating`);
           send(s.ws, { type: 'spectating' }); broadcastState(room); onBuyBackResolved();
         }, 15000);
