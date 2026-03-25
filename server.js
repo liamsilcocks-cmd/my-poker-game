@@ -921,36 +921,26 @@ function startNewHand(room) {
     return `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtPounds(s.chips).padStart(8)}${tags.length?' ['+tags.join('+')+']':''} | IP: ${s.ip || 'unknown'}`;
   }).join('\n');
 
-  // ── Write the hand header ──────────────────────────────────────────────────
-  fs.writeFileSync(logPath,
-    '\u2554' + '\u2550'.repeat(70) + '\u2557\n\u2551  SYFM POKER - HAND LOG' + ' '.repeat(47) + '\u2551\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
-    `\u2551  Room: ${room.id.padEnd(10)} Hand: #${String(room.handNum).padEnd(6)} ${now.toLocaleDateString('en-GB').padEnd(14)}\u2551\n` +
-    `\u2551  Time: ${now.toLocaleTimeString('en-GB').padEnd(62)}\u2551\n\u2560` + '\u2550'.repeat(70) + '\u2563\n\u2551  PLAYERS\u2551\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
-    playerLines.split('\n').map(l => '\u2551' + l.padEnd(71) + '\u2551').join('\n') + '\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
-    `\u2551  ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | ${blindTag}`.padEnd(71) + '\u2551\n' +
-    `\u2551  Dealer: Seat ${String(room.dealerSeat+1).padStart(2)} (${(room.seats[room.dealerSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
-    `\u2551  SB:     Seat ${String(sbSeat+1).padStart(2)} (${(room.seats[sbSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
-    `\u2551  BB:     Seat ${String(bbSeat+1).padStart(2)} (${(room.seats[bbSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
-    '\u255a' + '\u2550'.repeat(70) + '\u255d\n\n'
-  );
-
-  // ── Post blinds ───────────────────────────────────────────────────────────
+  // ── Post blinds (before file exists — collect into buffer) ───────────────
   room.seats[sbSeat].chips -= curSB; room.seats[sbSeat].bet = curSB; room.seats[sbSeat].totalBet = curSB;
   room.seats[bbSeat].chips -= curBB; room.seats[bbSeat].bet = curBB; room.seats[bbSeat].totalBet = curBB;
   room.G.pot = curSB + curBB;
   room._chipsInPlayAtHandStart = room.seats.filter(Boolean).reduce((sum, s) => sum + s.chips, 0) + room.G.pot;
 
-  writeLog(room, `BLINDS POSTED`);
-  writeLog(room, `  SB: ${room.seats[sbSeat].name} (Seat ${sbSeat+1}) posts ${fmtPounds(curSB)} | Stack after: ${fmtPounds(room.seats[sbSeat].chips)}`);
-  writeLog(room, `  BB: ${room.seats[bbSeat].name} (Seat ${bbSeat+1}) posts ${fmtPounds(curBB)} | Stack after: ${fmtPounds(room.seats[bbSeat].chips)}`);
-  writeLog(room, `  Pot: ${fmtPounds(room.G.pot)}`);
-  writeLog(room, '');
+  const preDealBuffer = [];
+  preDealBuffer.push(`BLINDS POSTED`);
+  preDealBuffer.push(`  SB: ${room.seats[sbSeat].name} (Seat ${sbSeat+1}) posts ${fmtPounds(curSB)} | Stack after: ${fmtPounds(room.seats[sbSeat].chips)}`);
+  preDealBuffer.push(`  BB: ${room.seats[bbSeat].name} (Seat ${bbSeat+1}) posts ${fmtPounds(curBB)} | Stack after: ${fmtPounds(room.seats[bbSeat].chips)}`);
+  preDealBuffer.push(`  Pot: ${fmtPounds(room.G.pot)}`);
+  preDealBuffer.push('');
 
   // ── Deal hole cards ────────────────────────────────────────────────────────
   for (let rd = 0; rd < 2; rd++) for (const si of dealOrder) room.seats[si].cards.push(room.G.deck.shift());
 
-  writeLog(room, '─'.repeat(70));
-  writeLog(room, 'HOLE CARDS DEALT:');
+  // ── Build hole card lines ──────────────────────────────────────────────────
+  const holeCardLines = [];
+  holeCardLines.push('─'.repeat(70));
+  holeCardLines.push('HOLE CARDS DEALT:');
   active.forEach(i => {
     const s = room.seats[i];
     if (s && s.cards && s.cards.length > 0) {
@@ -959,10 +949,29 @@ function startNewHand(room) {
       if (i === sbSeat) tags.push('SB');
       if (i === bbSeat) tags.push('BB');
       const tagStr = tags.length ? ` [${tags.join('/')}]` : '';
-      writeLog(room, `  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtCards(s.cards)}${tagStr} | Stack: ${fmtPounds(s.chips)}`);
+      holeCardLines.push(`  Seat ${String(i+1).padStart(2)} | ${s.name.padEnd(18)} | ${fmtCards(s.cards)}${tagStr} | Stack: ${fmtPounds(s.chips)}`);
     }
   });
-  writeLog(room, '');
+  holeCardLines.push('');
+
+  // ── NOW create the log file — header + buffered pre-deal + hole cards ──────
+  const ts = new Date().toTimeString().slice(0, 8);
+  const headerBlock =
+    '\u2554' + '\u2550'.repeat(70) + '\u2557\n\u2551  SYFM POKER - HAND LOG' + ' '.repeat(47) + '\u2551\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
+    `\u2551  Room: ${room.id.padEnd(10)} Hand: #${String(room.handNum).padEnd(6)} ${now.toLocaleDateString('en-GB').padEnd(14)}\u2551\n` +
+    `\u2551  Time: ${now.toLocaleTimeString('en-GB').padEnd(62)}\u2551\n\u2560` + '\u2550'.repeat(70) + '\u2563\n\u2551  PLAYERS\u2551\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
+    playerLines.split('\n').map(l => '\u2551' + l.padEnd(71) + '\u2551').join('\n') + '\n\u2560' + '\u2550'.repeat(70) + '\u2563\n' +
+    `\u2551  ${isHeadsUp ? 'HEADS-UP' : active.length+'-handed'} | ${blindTag}`.padEnd(71) + '\u2551\n' +
+    `\u2551  Dealer: Seat ${String(room.dealerSeat+1).padStart(2)} (${(room.seats[room.dealerSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
+    `\u2551  SB:     Seat ${String(sbSeat+1).padStart(2)} (${(room.seats[sbSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
+    `\u2551  BB:     Seat ${String(bbSeat+1).padStart(2)} (${(room.seats[bbSeat]?.name || '?').padEnd(18)})`.padEnd(71) + '\u2551\n' +
+    '\u255a' + '\u2550'.repeat(70) + '\u255d\n\n';
+
+  const initialContent = headerBlock
+    + preDealBuffer.map(l => `[${ts}] ${l}\n`).join('')
+    + holeCardLines.map(l => `[${ts}] ${l}\n`).join('');
+
+  fs.writeFileSync(logPath, initialContent);
 
   // ── Chip snapshot before action ────────────────────────────────────────────
   writeLog(room, 'STACKS BEFORE PREFLOP ACTION:');
