@@ -17,6 +17,107 @@ const START_CHIPS = 1000;
 const ACTION_TIMEOUT = 15000;
 const ROOM_EMPTY_TTL_MS = 60_000;
 
+// ─── Bot configuration ────────────────────────────────────────────────
+const BOT_NAMES = ['RoboRaise','FoldBot','DeepStack','BluffBot','AutoAce','PokerAI','AllInBot','CallBot','SkyNet'];
+
+function mkBot(id, name, seat, room, chips) {
+  const styles = ['aggressive', 'passive', 'balanced'];
+  return {
+    ws: null, id, name, chips, seat, cards: [], bet: 0, folded: false,
+    disconnected: false, autoFold: false, pendingCashOut: false,
+    _disconnectTimer: null, _buyBackTimer: null, _onBuyBackResolved: null,
+    buyInCount: 1, buyInTotal: chips, ip: 'bot',
+    secret: generateSecret(), isBot: true,
+    sittingOut: false, spectator: false, voluntaryAutoFold: false,
+    pendingBuyBack: false, totalBet: 0,
+    botStyle: styles[Math.floor(Math.random() * styles.length)]
+  };
+}
+
+function evalPreflopStrength(cards) {
+  const [c1, c2] = cards;
+  const r1 = RVAL[c1.r], r2 = RVAL[c2.r];
+  const suited = c1.s === c2.s;
+  const hi = Math.max(r1, r2), lo = Math.min(r1, r2);
+  if (r1 === r2) return 0.28 + (hi - 2) / 12 * 0.72;
+  const hiScore = (hi - 2) / 12;
+  const loScore = (lo - 2) / 12;
+  let score = hiScore * 0.52 + loScore * 0.28;
+  if (suited) score += 0.06;
+  const gap = hi - lo - 1;
+  if (gap === 0) score += 0.08;
+  else if (gap === 1) score += 0.04;
+  return Math.min(0.87, score);
+}
+
+function handTier(score) {
+  if (score >= 9e8) return 1.00;
+  if (score >= 8e8) return 0.95;
+  if (score >= 7e8) return 0.88;
+  if (score >= 6e8) return 0.80;
+  if (score >= 5e8) return 0.72;
+  if (score >= 4e8) return 0.63;
+  if (score >= 3e8) return 0.54;
+  if (score >= 2e8) return 0.42;
+  if (score >= 1e8) return 0.30;
+  return 0.14;
+}
+
+function decideBotAction(room, seat) {
+  const G = room.G;
+  const p = room.seats[seat];
+  if (!p || !G) return { action: 'fold' };
+  const callAmt = Math.min(G.currentBet - p.bet, p.chips);
+  const potOdds = (G.pot + callAmt) > 0 ? callAmt / (G.pot + callAmt) : 0;
+  let strength;
+  if (G.phase === 'preflop') {
+    strength = evalPreflopStrength(p.cards);
+  } else {
+    const allCards = [...p.cards, ...G.community];
+    strength = handTier(evalBest(allCards));
+  }
+  const aggrMod = p.botStyle === 'aggressive' ? 0.12 : p.botStyle === 'passive' ? -0.10 : 0;
+  const noise = (Math.random() - 0.5) * 0.18;
+  const adj = Math.max(0, Math.min(1, strength + aggrMod + noise));
+  const raiseIncrement = G.firstRaiseAction ? G.curBB : G.lastRaiseIncrement;
+  const minRaise = Math.min(callAmt + raiseIncrement, p.chips);
+  if (callAmt === 0) {
+    if (adj > 0.60 && Math.random() > 0.35) {
+      const betFraction = 0.4 + Math.random() * 0.5;
+      const rawBet = Math.round(G.pot * betFraction / G.curBB) * G.curBB;
+      const betAmt = Math.max(minRaise, Math.min(rawBet, p.chips));
+      if (betAmt > 0 && betAmt <= p.chips) return { action: 'raise', amount: betAmt };
+    }
+    return { action: 'check' };
+  } else {
+    const foldThresh = p.botStyle === 'aggressive' ? 0.22 : p.botStyle === 'passive' ? 0.30 : 0.26;
+    const raiseThresh = p.botStyle === 'aggressive' ? 0.58 : p.botStyle === 'passive' ? 0.72 : 0.65;
+    if (adj < foldThresh || (adj < 0.42 && potOdds > 0.38)) {
+      return { action: 'fold' };
+    } else if (adj > raiseThresh && Math.random() > 0.38) {
+      const sizeMult = 2.2 + Math.random() * 1.6;
+      const rawRaise = Math.round(callAmt * sizeMult / G.curBB) * G.curBB;
+      const raiseAmt = Math.max(minRaise, Math.min(rawRaise, p.chips));
+      return { action: 'raise', amount: raiseAmt };
+    } else {
+      return { action: 'call' };
+    }
+  }
+}
+
+function scheduleBotAction(room, seat) {
+  const thinkMs = 900 + Math.random() * 1400;
+  startActionTimer(room, seat);
+  setTimeout(() => {
+    if (!room.G || room.G.toAct[0] !== seat) return;
+    const bot = room.seats[seat];
+    if (!bot || !bot.isBot) return;
+    clearActionTimer(room);
+    const { action, amount } = decideBotAction(room, seat);
+    handleAction(room, seat, action, amount);
+  }, thinkMs);
+}
+
 // ── Tournament blind structure (pence). ───────────────────────────────────────
 const TOURNAMENT_BLINDS = [
   { sb: 10,   bb: 20   },  // Level 1
@@ -285,7 +386,7 @@ function lobbySnapshot(room) {
     gameType: room.gameType || 'cash',
     tournamentChips: room.tournamentChips || 8000,
     blindLevelDuration: room.blindLevelDuration || 10,
-    seats: room.seats.map(s => s ? { id: s.id, name: s.name, chips: s.chips, seat: s.seat } : null),
+    seats: room.seats.map(s => s ? { id: s.id, name: s.name, chips: s.chips, seat: s.seat, isBot: s.isBot || false } : null),
     pending: room.pendingJoins.map(p => ({ id: p.id, name: p.name }))
   };
 }
@@ -328,6 +429,7 @@ function tableSnapshot(room, forId) {
                voluntaryAutoFold: s.voluntaryAutoFold || false,
                spectator: s.spectator || false,
                pendingBuyBack: s.pendingBuyBack || false,
+               isBot: s.isBot || false,
                cards: [], active: !s.sittingOut };
     })
   };
@@ -348,6 +450,7 @@ function tableSnapshot(room, forId) {
         voluntaryAutoFold: s.voluntaryAutoFold || false,
         spectator: s.spectator || false,
         pendingBuyBack: s.pendingBuyBack || false,
+        isBot: s.isBot || false,
         cards: showCards ? s.cards : s.cards.map(() => 'back'),
         active: !s.sittingOut
       };
@@ -558,6 +661,39 @@ wss.on('connection', (ws, req) => {
           svrLog(`JOIN REJECTED: ${p.name} | IP: ${p.ip || 'unknown'} | room: ${room.id}`);
           send(p.ws, { type: 'rejected', reason: 'Host declined your request' });
         }
+        broadcastAll(room, lobbySnapshot(room));
+        break;
+      }
+
+      case 'addBot': {
+        const room = rooms.get(myRoomId);
+        if (!room || room.hostId !== myId || room.gameActive) return;
+        const seat = room.seats.findIndex(s => s === null);
+        if (seat === -1) { send(ws, { type: 'error', msg: 'Table is full' }); return; }
+        const botId = generatePlayerId();
+        const usedNames = room.seats.filter(Boolean).map(s => s.name);
+        const avail = BOT_NAMES.filter(n => !usedNames.includes(n));
+        const botName = avail.length ? avail[Math.floor(Math.random() * avail.length)] : 'Bot' + (seat + 1);
+        const startChips = room.gameType === 'tournament' ? room.tournamentChips : room.buyIn;
+        room.seats[seat] = mkBot(botId, botName, seat, room, startChips);
+        writeRoomLog(room, `BOT ADDED: ${botName} | Seat ${seat + 1}`);
+        logEvent(room, `🤖 ${botName} (bot) joined the table`);
+        broadcastAll(room, lobbySnapshot(room));
+        break;
+      }
+
+      case 'removeBot': {
+        const room = rooms.get(myRoomId);
+        if (!room || room.hostId !== myId || room.gameActive) return;
+        const botSeats = room.seats.map((s, i) => (s?.isBot ? i : null)).filter(i => i !== null);
+        if (!botSeats.length) return;
+        const removeSeat = msg.seat != null && room.seats[msg.seat]?.isBot
+          ? msg.seat
+          : botSeats[botSeats.length - 1];
+        const bot = room.seats[removeSeat];
+        logEvent(room, `🤖 ${bot.name} (bot) removed`);
+        writeRoomLog(room, `BOT REMOVED: ${bot.name} | Seat ${removeSeat + 1}`);
+        room.seats[removeSeat] = null;
         broadcastAll(room, lobbySnapshot(room));
         break;
       }
@@ -893,6 +1029,7 @@ function startNewHand(room) {
   room.seats.forEach((s, idx) => {
     if (!s) return;
     if (s._disconnectTimer) { clearTimeout(s._disconnectTimer); s._disconnectTimer = null; }
+    if (s.isBot) { s.sittingOut = false; return; }  // bots never go absent
     if (s.disconnected && s.autoFold) {
       s._missedHands = (s._missedHands || 0) + 1;
       logEvent(room, `\uD83D\uDCA4 ${s.name} absent - missed ${s._missedHands}/${ABSENT_HAND_LIMIT} hand${s._missedHands>1?'s':''}`);
@@ -1069,6 +1206,8 @@ function promptToAct(room) {
   const seat = G.toAct[0]; const p = room.seats[seat];
   if (!p) { G.toAct.shift(); setTimeout(() => promptToAct(room), 100); return; }
   if (p.disconnected || p.autoFold || p.voluntaryAutoFold) { clearActionTimer(room); doFold(room, seat, p.voluntaryAutoFold ? 'auto-fold' : 'auto (disconnected)'); return; }
+  // ── Bot: server decides action internally
+  if (p.isBot) { scheduleBotAction(room, seat); return; }
   const callAmt = Math.min(G.currentBet - p.bet, p.chips);
   const raiseIncrement = G.firstRaiseAction ? G.curBB : G.lastRaiseIncrement;
   const minRaise = Math.min(callAmt + raiseIncrement, p.chips);
@@ -1348,6 +1487,14 @@ function finish(room, winners, label) {
       let pendingCount = busted.length;
       function onBuyBackResolved() { pendingCount--; if (pendingCount <= 0) startNewHand(room); }
       busted.forEach(s => {
+        // Bots instantly buy back in
+        if (s.isBot) {
+          s.chips = room.buyIn; s.buyInCount++; s.buyInTotal += room.buyIn;
+          writeLog(room, `BOT BUY-BACK: ${s.name} (Seat ${s.seat+1}) | Rebought for ${fmtPounds(room.buyIn)}`);
+          logEvent(room, `🤖 ${s.name} (bot) bought back in`);
+          onBuyBackResolved();
+          return;
+        }
         s.pendingBuyBack = true; s.sittingOut = true;
         writeLog(room, `BUY-BACK OFFER SENT: ${s.name} (Seat ${s.seat+1}) | IP: ${s.ip || 'unknown'} | Offer: ${fmtPounds(room.buyIn)}`);
         logEvent(room, `\ud83d\udcb8 ${s.name} is out of chips - buy-back offer sent`);
