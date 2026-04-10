@@ -1022,7 +1022,7 @@ function startNewHand(room) {
   clearActionTimer(room);
 
   // ── Bot-only hand limit: auto-pause if no humans are active ────────────
-  const BOT_ONLY_HAND_LIMIT = 20;
+  const BOT_ONLY_HAND_LIMIT = 5;
   const humanActive = room.seats.some(s =>
     s && !s.isBot && !s.disconnected && !s.spectator && !s.pendingBuyBack
   );
