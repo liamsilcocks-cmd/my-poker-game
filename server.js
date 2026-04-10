@@ -320,6 +320,7 @@ function getOrCreateRoom(roomId) {
       blindLevelRemaining: null,
       blindLevelPausedAt: null,
       tournamentPlacement: [],
+      botOnlyHandCount: 0,
     });
   }
   const room = rooms.get(roomId);
@@ -500,6 +501,7 @@ function pauseGame(room, byName) {
 
 function resumeGame(room, byName) {
   if (!room.paused) return;
+  room.botOnlyHandCount = 0;  // fresh start when a human resumes
   const pausedForMs = room._pausedAt ? Date.now() - room._pausedAt : 0;
   room.paused = false; room._pausedAt = null;
   broadcastAll(room, { type: 'gameResumed', byName });
@@ -1018,6 +1020,29 @@ function checkRoundEnd(room) {
 
 function startNewHand(room) {
   clearActionTimer(room);
+
+  // ── Bot-only hand limit: auto-pause if no humans are active ────────────
+  const BOT_ONLY_HAND_LIMIT = 20;
+  const humanActive = room.seats.some(s =>
+    s && !s.isBot && !s.disconnected && !s.spectator && !s.pendingBuyBack
+  );
+  if (humanActive) {
+    room.botOnlyHandCount = 0;  // reset whenever a human is present
+  } else {
+    room.botOnlyHandCount = (room.botOnlyHandCount || 0) + 1;
+    if (room.botOnlyHandCount >= BOT_ONLY_HAND_LIMIT) {
+      room.botOnlyHandCount = 0;
+      svrLog(`ROOM ${room.id} auto-paused: ${BOT_ONLY_HAND_LIMIT} bot-only hands played with no humans connected`);
+      pauseGame(room, 'Server (no humans connected)');
+      broadcastAll(room, {
+        type: 'logEvent',
+        text: `⏸ Game auto-paused after ${BOT_ONLY_HAND_LIMIT} bot-only hands — waiting for a player to resume`
+      });
+      return;  // don't deal another hand
+    }
+  }
+  // ───────────────────────────────────────────────────────────────────
+
   if (room.paused) { room.paused = false; broadcastAll(room, { type: 'gameResumed' }); }
   room.actionTimerSeat = -1; room.actionTimerRemaining = ACTION_TIMEOUT; room.actionTimerStarted = 0;
 
