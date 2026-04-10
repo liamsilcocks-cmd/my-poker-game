@@ -445,6 +445,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a0d05;font-family:
       </div>
       <div style="color:#6a5030;font-size:.78rem;margin-top:6px">Host can adjust stacks during the game.</div>
     </div>
+    <!-- Bot controls (host only, pre-game) -->
+    <div id="botSection" style="display:none;margin-top:12px;border-top:1px solid #3a2a10;padding-top:12px">
+      <h3 style="color:#c8a020;margin-bottom:8px">🤖 Bot Players</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn-gold" onclick="addBot()" style="margin-top:0;padding:10px;flex:1;font-size:.95rem">
+          &#x2795; Add Bot
+        </button>
+        <button class="btn-gold" onclick="removeBot()" style="margin-top:0;padding:10px;flex:1;font-size:.95rem;background:linear-gradient(135deg,#4a1a1a,#2a0808)">
+          &#x2796; Remove Bot
+        </button>
+      </div>
+      <div id="botCount" style="color:#888;font-size:.78rem;margin-top:5px;text-align:center"></div>
+    </div>
     <button class="btn-gold" id="startBtn" style="display:none;margin-top:18px">&#x25B6; START GAME</button>
   </div>
 </div>
@@ -687,6 +700,12 @@ function updatePlayerStackPanel(st) {
     nameEl.className = 'psp-name' + (isMe?' psp-me':'');
     if (isActing) { const a = document.createElement('span'); a.className='psp-act-arrow'; a.textContent='\u25b6 '; nameEl.appendChild(a); }
     nameEl.appendChild(document.createTextNode(p.name));
+    if (p.isBot) {
+      const botTag = document.createElement('span');
+      botTag.style.cssText = 'font-size:9px;color:#cc88ff;margin-left:4px';
+      botTag.textContent = '🤖';
+      nameEl.appendChild(botTag);
+    }
     const stackEl = document.createElement('div');
     stackEl.className = 'psp-stack';
     stackEl.textContent = formatChips(p.chips, st.gameType);
@@ -849,12 +868,22 @@ function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getEleme
   if(gts){gts.style.display=isHost?'block':'none';}
   // Sync lobby state with server settings
   if(msg.gameType){pendingGameType=msg.gameType;const btnC=document.getElementById('typeBtnCash'),btnT=document.getElementById('typeBtnTournament');if(btnC)btnC.classList.toggle('active',msg.gameType==='cash');if(btnT)btnT.classList.toggle('active',msg.gameType==='tournament');const ts=document.getElementById('tournamentSettings');if(ts)ts.classList.toggle('visible',msg.gameType==='tournament');if(msg.tournamentChips){const ci=document.getElementById('tsChips');if(ci)ci.value=msg.tournamentChips;}if(msg.blindLevelDuration){const bi=document.getElementById('tsBlindMins');if(bi)bi.value=msg.blindLevelDuration;}}
+  // Show bot section for host pre-game
+  const botSec = document.getElementById('botSection');
+  if (botSec) botSec.style.display = isHost ? 'block' : 'none';
+  const botCountEl = document.getElementById('botCount');
+  if (botCountEl) {
+    const numBots = seated.filter(s => s.isBot).length;
+    botCountEl.textContent = numBots > 0 ? numBots + ' bot' + (numBots > 1 ? 's' : '') + ' at the table' : 'No bots yet — up to ' + (9 - seated.length) + ' can join';
+  }
   // Cash stake input for non-host players in cash game
   const css=document.getElementById('cashStakeSection');
   if(css){const showStake=!isHost&&msg.gameType==='cash';css.style.display=showStake?'block':'none';}
   const statusEl=document.getElementById('lobbyStatus');const gameMode=msg.gameType==='tournament'?'\uD83C\uDFC6 Tournament (\u007b\u007b chips\u007d\u007d starting chips)'.replace('\u007b\u007b chips\u007d\u007d',(msg.tournamentChips||8000).toLocaleString()):'\uD83D\uDCB0 Cash Game (buy-in \u00a3'+((msg.buyIn||1000)/100).toFixed(2)+')';if(isHost)statusEl.innerHTML=seated.length<2?'Waiting for more players to join\u2026':'Ready to start! Mode: '+gameMode;else statusEl.innerHTML='Waiting for host to start\u2026 <span style="color:#ffd700">'+gameMode+'</span>';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
 
 function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
+function addBot() { wsSend({ type: 'addBot' }); }
+function removeBot() { wsSend({ type: 'removeBot' }); }
 function onCashStakeChange(val){myBuyIn=Math.round((parseFloat(val)||10)*100);}
 function updateLedgerStacks(){if(!lastState||!lastState.players)return;const seated=lastState.players.filter(Boolean);if(!seated.length)return;let txt='\uD83D\uDCCA After hand #'+handNumber+': '+seated.map(p=>p.name+' '+fc(p.chips)).join(' | ');addLedgerEvent(txt);}
 function exitGame(){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}document.getElementById('buyBackOverlay').style.display='none';_intentionalClose=true;wsSend({type:'exitGame'});}
