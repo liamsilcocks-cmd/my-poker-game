@@ -35,11 +35,12 @@ function mkBot(id, name, seat, room, chips) {
 }
 
 function evalPreflopStrength(cards) {
+  // Fast lookup table approach - accurate enough for preflop, no MC needed
   const [c1, c2] = cards;
   const r1 = RVAL[c1.r], r2 = RVAL[c2.r];
   const suited = c1.s === c2.s;
   const hi = Math.max(r1, r2), lo = Math.min(r1, r2);
-  if (r1 === r2) return 0.28 + (hi - 2) / 12 * 0.72;
+  if (r1 === r2) return 0.28 + (hi - 2) / 12 * 0.72; // pairs: 22=0.28 AA=1.0
   const hiScore = (hi - 2) / 12;
   const loScore = (lo - 2) / 12;
   let score = hiScore * 0.52 + loScore * 0.28;
@@ -50,68 +51,203 @@ function evalPreflopStrength(cards) {
   return Math.min(0.87, score);
 }
 
-function handTier(score) {
-  if (score >= 9e8) return 1.00;
-  if (score >= 8e8) return 0.95;
-  if (score >= 7e8) return 0.88;
-  if (score >= 6e8) return 0.80;
-  if (score >= 5e8) return 0.72;
-  if (score >= 4e8) return 0.63;
-  if (score >= 3e8) return 0.54;
-  if (score >= 2e8) return 0.42;
-  if (score >= 1e8) return 0.30;
-  return 0.14;
+// ── Monte Carlo equity engine ─────────────────────────────────────────────────
+// Runs N random simulations of the remaining cards and counts wins.
+// Returns win equity as 0.0 - 1.0
+function monteCarloEquity(holeCards, community, numOpponents, iterations) {
+  if (!holeCards || holeCards.length < 2) return 0.5;
+  numOpponents = Math.max(1, numOpponents);
+  iterations   = iterations || 200;
+
+  // Build the known dead cards set
+  const deadKeys = new Set();
+  holeCards.forEach(c  => deadKeys.add(c.r + c.s));
+  community.forEach(c  => { if (c && c !== 'back') deadKeys.add(c.r + c.s); });
+
+  // Build available deck (cards not yet seen)
+  const deck = [];
+  for (const s of SUITS) for (const r of RANKS) {
+    if (!deadKeys.has(r + s)) deck.push({ r, s });
+  }
+
+  const communityKnown = community.filter(c => c && c !== 'back');
+  const communityNeeded = 5 - communityKnown.length;
+
+  let wins = 0, ties = 0;
+
+  for (let i = 0; i < iterations; i++) {
+    // Shuffle available deck (Fisher-Yates)
+    for (let j = deck.length - 1; j > 0; j--) {
+      const k = Math.floor(Math.random() * (j + 1));
+      [deck[j], deck[k]] = [deck[k], deck[j]];
+    }
+
+    let deckIdx = 0;
+
+    // Deal community runout
+    const board = [...communityKnown];
+    for (let j = 0; j < communityNeeded; j++) board.push(deck[deckIdx++]);
+
+    // Deal opponent hole cards (2 each)
+    const opponentHands = [];
+    for (let o = 0; o < numOpponents; o++) {
+      opponentHands.push([deck[deckIdx++], deck[deckIdx++]]);
+    }
+
+    // Evaluate our hand
+    const ourScore = evalBest([...holeCards, ...board]);
+
+    // Check if we win outright
+    let bestOppScore = -1;
+    for (const oppHole of opponentHands) {
+      const s = evalBest([...oppHole, ...board]);
+      if (s > bestOppScore) bestOppScore = s;
+    }
+
+    if (ourScore > bestOppScore)       wins++;
+    else if (ourScore === bestOppScore) ties += 0.5; // split counts as half win
+  }
+
+  return (wins + ties) / iterations;
 }
 
+// ── Smart bot decision engine ─────────────────────────────────────────────────
 function decideBotAction(room, seat) {
   const G = room.G;
   const p = room.seats[seat];
   if (!p || !G) return { action: 'fold' };
-  const callAmt = Math.min(G.currentBet - p.bet, p.chips);
-  const potOdds = (G.pot + callAmt) > 0 ? callAmt / (G.pot + callAmt) : 0;
-  let strength;
+
+  const callAmt  = Math.min(G.currentBet - p.bet, p.chips);
+  const potAfterCall = G.pot + callAmt;
+  // Pot odds: what fraction of pot+call do we need to put in?
+  const potOdds  = potAfterCall > 0 ? callAmt / potAfterCall : 0;
+
+  // Count active opponents (not folded, not us)
+  const opponents = room.seats.filter((s, i) =>
+    s && i !== seat && !s.folded && !s.sittingOut && !s.spectator
+  ).length;
+  const numOpp = Math.max(1, opponents);
+
+  // ── Equity calculation ────────────────────────────────────────────────────
+  let equity;
   if (G.phase === 'preflop') {
-    strength = evalPreflopStrength(p.cards);
+    // Fast lookup preflop, adjusted for number of opponents
+    // A hand that beats 1 opponent 60% of the time beats N opponents less often
+    const rawPreflop = evalPreflopStrength(p.cards);
+    equity = Math.pow(rawPreflop, numOpp);
   } else {
-    const allCards = [...p.cards, ...G.community];
-    strength = handTier(evalBest(allCards));
+    // Monte Carlo for flop / turn / river
+    // Use more iterations on later streets (fewer unknown cards = faster)
+    const iters = G.phase === 'river' ? 1 : (G.phase === 'turn' ? 150 : 200);
+    equity = monteCarloEquity(p.cards, G.community, numOpp, iters);
   }
-  const aggrMod = p.botStyle === 'aggressive' ? 0.12 : p.botStyle === 'passive' ? -0.10 : 0;
-  const noise = (Math.random() - 0.5) * 0.18;
-  const adj = Math.max(0, Math.min(1, strength + aggrMod + noise));
+
+  // ── Stack-to-pot ratio (SPR) ──────────────────────────────────────────────
+  // Low SPR = committed, high SPR = more room to manoeuvre
+  const spr = G.pot > 0 ? p.chips / G.pot : 10;
+
+  // ── Style modifiers ───────────────────────────────────────────────────────
+  const aggrMod = p.botStyle === 'aggressive' ? 0.06
+                : p.botStyle === 'passive'    ? -0.06 : 0;
+  // Small noise so bots aren't perfectly deterministic
+  const noise = (Math.random() - 0.5) * 0.10;
+  const adj   = Math.max(0, Math.min(1, equity + aggrMod + noise));
+
+  // ── Raise sizing ──────────────────────────────────────────────────────────
   const raiseIncrement = G.firstRaiseAction ? G.curBB : G.lastRaiseIncrement;
   const minRaise = Math.min(callAmt + raiseIncrement, p.chips);
+
+  function makeRaise(fraction) {
+    // Bet/raise as a fraction of the pot
+    const raw = Math.round(G.pot * fraction / G.curBB) * G.curBB;
+    return Math.max(minRaise, Math.min(raw, p.chips));
+  }
+
+  // ── Decision logic ────────────────────────────────────────────────────────
   if (callAmt === 0) {
-    if (adj > 0.60 && Math.random() > 0.35) {
-      const betFraction = 0.4 + Math.random() * 0.5;
-      const rawBet = Math.round(G.pot * betFraction / G.curBB) * G.curBB;
-      const betAmt = Math.max(minRaise, Math.min(rawBet, p.chips));
-      if (betAmt > 0 && betAmt <= p.chips) return { action: 'raise', amount: betAmt };
+    // Nobody has bet - we can check for free
+    if (adj > 0.65) {
+      // Strong hand - bet for value
+      const fraction = p.botStyle === 'aggressive' ? 0.75 + Math.random() * 0.5
+                                                   : 0.45 + Math.random() * 0.4;
+      return { action: 'raise', amount: makeRaise(fraction) };
     }
+    if (adj > 0.45 && Math.random() < 0.25) {
+      // Medium hand - occasional bluff/semi-bluff bet
+      return { action: 'raise', amount: makeRaise(0.35 + Math.random() * 0.3) };
+    }
+    // Check otherwise
     return { action: 'check' };
+
   } else {
-    const foldThresh = p.botStyle === 'aggressive' ? 0.22 : p.botStyle === 'passive' ? 0.30 : 0.26;
-    const raiseThresh = p.botStyle === 'aggressive' ? 0.58 : p.botStyle === 'passive' ? 0.72 : 0.65;
-    if (adj < foldThresh || (adj < 0.42 && potOdds > 0.38)) {
+    // Facing a bet or raise
+    // Core rule: if equity > pot odds, we have correct odds to call
+    const hasOdds = adj > potOdds;
+
+    // Thresholds adjusted by style
+    const foldThresh  = p.botStyle === 'aggressive' ? 0.18
+                      : p.botStyle === 'passive'    ? 0.28 : 0.22;
+    const callThresh  = potOdds + (p.botStyle === 'passive' ? 0.04 : 0);
+    const raiseThresh = p.botStyle === 'aggressive' ? 0.58
+                      : p.botStyle === 'passive'    ? 0.72 : 0.65;
+
+    // Fold if equity too low AND pot odds aren't compelling
+    if (adj < foldThresh && !hasOdds) {
+      // Occasional hero bluff-catch: call anyway with tiny chance
+      if (Math.random() < 0.05 && p.botStyle === 'aggressive') {
+        return { action: 'call' };
+      }
       return { action: 'fold' };
-    } else if (adj > raiseThresh && Math.random() > 0.38) {
-      const sizeMult = 2.2 + Math.random() * 1.6;
+    }
+
+    // Strong hand: raise for value
+    if (adj > raiseThresh && Math.random() > 0.30) {
+      // Size raise based on equity and SPR
+      const sizeMult = spr < 3 ? 1.0   // shallow stack - just ship it
+                     : spr < 6 ? 2.0 + Math.random() * 1.0
+                     : 2.5 + Math.random() * 1.5;
       const rawRaise = Math.round(callAmt * sizeMult / G.curBB) * G.curBB;
       const raiseAmt = Math.max(minRaise, Math.min(rawRaise, p.chips));
       return { action: 'raise', amount: raiseAmt };
-    } else {
+    }
+
+    // Have odds or decent equity: call
+    if (hasOdds || adj > callThresh) {
       return { action: 'call' };
     }
+
+    // Marginal: fold (with occasional passive hero-call)
+    if (Math.random() < 0.08 && p.botStyle !== 'passive') {
+      return { action: 'call' };
+    }
+    return { action: 'fold' };
   }
 }
 
 function scheduleBotAction(room, seat) {
-  const thinkMs = 900 + Math.random() * 1400;
+  // Think time: 0.8 - 2.2 seconds (feels human)
+  const thinkMs = 800 + Math.random() * 1400;
   startActionTimer(room, seat);
   setTimeout(() => {
     if (!room.G || room.G.toAct[0] !== seat) return;
     const bot = room.seats[seat];
     if (!bot || !bot.isBot) return;
+    // If no human has a live connection, pause and stop acting
+    const humanPresent = room.seats.some(s =>
+      s && !s.isBot && !s.spectator && !s.pendingBuyBack &&
+      s.ws && s.ws.readyState === 1
+    );
+    if (!humanPresent) {
+      clearActionTimer(room);
+      if (!room.paused) {
+        svrLog(`ROOM ${room.id} auto-paused mid-hand: no humans connected`);
+        pauseGame(room, 'Server (no humans connected)');
+        broadcastAll(room, { type: 'logEvent',
+          text: '\u23f8 Game paused \u2014 no players connected. Resume when you\'re back!'
+        });
+      }
+      return;
+    }
     clearActionTimer(room);
     const { action, amount } = decideBotAction(room, seat);
     handleAction(room, seat, action, amount);
