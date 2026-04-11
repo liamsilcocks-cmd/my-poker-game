@@ -462,30 +462,7 @@ function tableSnapshot(room, forId) {
 function startActionTimer(room, seat, remainingMs) {
   clearActionTimer(room);
 
-  // ── Bot-only hand limit ──────────────────────────────────────────────
-  // Check using ws.readyState (ground truth) not the disconnected flag,
-  // because the flag may not be set yet when startNewHand fires.
-  const BOT_ONLY_HAND_LIMIT = 5;
-  const humanPresent = room.seats.some(s =>
-    s && !s.isBot && !s.spectator && !s.pendingBuyBack &&
-    s.ws && s.ws.readyState === 1
-  );
-  if (humanPresent) {
-    room.botOnlyHandCount = 0;
-  } else {
-    room.botOnlyHandCount = (room.botOnlyHandCount || 0) + 1;
-    svrLog(`ROOM ${room.id} bot-only hand ${room.botOnlyHandCount}/${BOT_ONLY_HAND_LIMIT}`);
-    if (room.botOnlyHandCount >= BOT_ONLY_HAND_LIMIT) {
-      room.botOnlyHandCount = 0;
-      svrLog(`ROOM ${room.id} auto-paused: no humans connected for ${BOT_ONLY_HAND_LIMIT} hands`);
-      pauseGame(room, 'Server (no humans connected)');
-      broadcastAll(room, { type: 'logEvent',
-        text: `⏸ Game auto-paused — no players connected for ${BOT_ONLY_HAND_LIMIT} hands. Resume when you're back!`
-      });
-      return;
-    }
-  }
-  // ────────────────────────────────────────────────
+
 
   if (room.paused) {
     room.actionTimerSeat = seat;
@@ -527,8 +504,6 @@ function pauseGame(room, byName) {
 
 function resumeGame(room, byName) {
   if (!room.paused) return;
-  room.botOnlyHandCount = 0;  // reset when a human resumes
-  room.botOnlyHandCount = 0;  // fresh start when a human resumes
   const pausedForMs = room._pausedAt ? Date.now() - room._pausedAt : 0;
   room.paused = false; room._pausedAt = null;
   broadcastAll(room, { type: 'gameResumed', byName });
@@ -608,7 +583,7 @@ wss.on('connection', (ws, req) => {
               existing.ws = ws; existing.disconnected = false; existing.autoFold = false;
               existing._disconnectedAt = null; existing._missedHands = 0;
               existing.ip = clientIp;
-              room.botOnlyHandCount = 0;  // human reconnected — reset bot-only counter
+              room.botOnlyHandCount = 0;  // human reconnected - reset bot-only counter
               send(ws, { type: 'joined', id: myId, seat: existing.seat, isHost: myId === room.hostId });
               send(ws, lobbySnapshot(room));
               if (room.G) send(ws, tableSnapshot(room, myId));
@@ -1049,7 +1024,30 @@ function checkRoundEnd(room) {
 function startNewHand(room) {
   clearActionTimer(room);
 
-
+  // ── End game if no humans connected for BOT_ONLY_HAND_LIMIT hands ──────
+  const BOT_ONLY_HAND_LIMIT = 5;
+  const humanPresent = room.seats.some(s =>
+    s && !s.isBot && !s.spectator && !s.pendingBuyBack &&
+    s.ws && s.ws.readyState === 1
+  );
+  if (humanPresent) {
+    room.botOnlyHandCount = 0;
+  } else {
+    room.botOnlyHandCount = (room.botOnlyHandCount || 0) + 1;
+    svrLog(`ROOM ${room.id} bot-only hand ${room.botOnlyHandCount}/${BOT_ONLY_HAND_LIMIT}`);
+    if (room.botOnlyHandCount >= BOT_ONLY_HAND_LIMIT) {
+      svrLog(`ROOM ${room.id} ending: ${BOT_ONLY_HAND_LIMIT} bot-only hands with no humans`);
+      room.gameActive = false;
+      room.botOnlyHandCount = 0;
+      stopBlindTimer(room);
+      room.seats.forEach((s, i) => { if (s && s.isBot) room.seats[i] = null; });
+      broadcastAll(room, { type: 'logEvent',
+        text: '🤖 Game ended — no players connected for 5 hands.'
+      });
+      broadcastAll(room, lobbySnapshot(room));
+      return;
+    }
+  }
 
   if (room.paused) { room.paused = false; broadcastAll(room, { type: 'gameResumed' }); }
   room.actionTimerSeat = -1; room.actionTimerRemaining = ACTION_TIMEOUT; room.actionTimerStarted = 0;
