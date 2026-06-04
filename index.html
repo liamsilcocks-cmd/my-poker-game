@@ -809,7 +809,7 @@ case 'winner':snd_win();hideTurnIndicator();addLog('\uD83C\uDFC6\uD83D\uDCA6 '+m
 case 'gameStarting':startKeepAliveTimer();currentGameType=msg.gameType||'cash';
   {const lp=document.getElementById('dialLabelPounds'),lc=document.getElementById('dialLabelPence');if(lp&&lc){if(currentGameType==='tournament'){lp.textContent='';lc.textContent='';}else{lp.innerHTML='pounds &pound;';lc.textContent='pence';}}}document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{show2DOnlyChrome();const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='none';}if(currentGameType==='tournament'){addLog('\uD83C\uDFC6 TOURNAMENT STARTED','log-hand');}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
 case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';coBtn.style.display=(msg.gameType==='tournament')?'none':'';
-  if(window.drumReset) window.drumReset((msg.bb||20) * 2);
+  if(window.drumReset) window.drumReset(0); // clear the raise dial until the server says it is this player's turn
   // Update blind badge
   if(msg.gameType==='tournament'){updateBlindBadge(msg.sb||10,msg.bb||20,null);}
   handNumber++;addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+(msg.gameType==='tournament'?' | Level '+(msg.blindLevel+1)+' '+fc(msg.sb||10)+'/'+fc(msg.bb||20):''),' log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));positionTokens(vs(msg.dealerSeat),vs(msg.sbSeat),vs(msg.bbSeat));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;startDealAnimation(dealSeats,()=>{setTimeout(()=>{showBet(sbSeat,msg.sb||10);},120);setTimeout(()=>{showBet(bbSeat,msg.bb||20);},280);if(lastState)applyState(lastState);});break;}
@@ -843,7 +843,7 @@ case 'blindLevelUp':{
   addLog('\uD83D\uDCC8 BLIND LEVEL UP \u2192 Level '+(level+1)+' | SB '+sbStr+' / BB '+bbStr,'log-win');
   showMsg('\uD83D\uDCC8 Blinds increase!\nLevel '+(level+1)+': '+sbStr+'/'+bbStr,4000);
   updateBlindBadge(sb,bb,msg.nextLevelMs||null);
-  if(window.drumReset)window.drumReset(bb*2);
+  // Do not prefill the raise dial on a blind change; wait for the next yourTurn message.
   break;}
 case 'tournamentEliminated':{
   const place=msg.place,total=msg.totalPlayers;
@@ -914,8 +914,12 @@ function syncActionPanelFromState(st){
   }
   if(_actionSubmitted)return;
   const callAmt=Math.max(0,Math.min((st.currentBet||0)-(me.bet||0),me.chips||0));
-  const fallbackMin=callAmt+(st.currentBB||st.currentBB===0?st.currentBB:20);
-  const offer=(_lastTurnOffer&&_lastTurnOffer.seat===mySeat)?_lastTurnOffer:{seat:mySeat,callAmt,minRaise:Math.max(fallbackMin,20),firstBet:(st.currentBet||0)===0};
+  const bbFallback=(st.currentBB||st.currentBB===0)?st.currentBB:20;
+  const firstBet=(st.currentBet||0)===0;
+  // Only invent a fallback if the dedicated yourTurn message was missed.
+  // This keeps the dial at zero on a fresh hand until the server actually asks this client to act.
+  const fallbackMin=firstBet?bbFallback:callAmt+bbFallback;
+  const offer=(_lastTurnOffer&&_lastTurnOffer.seat===mySeat)?_lastTurnOffer:{seat:mySeat,callAmt,minRaise:Math.max(fallbackMin,0),firstBet};
   const callBtn=document.getElementById('callBtn');
   if(callBtn)callBtn.textContent=offer.callAmt>0?'CALL '+fc(offer.callAmt):'CHECK';
   const raiseBtn=document.getElementById('raiseBtn');
@@ -1002,8 +1006,8 @@ document.getElementById('tablePan').addEventListener('input',function(){if(cam)c
   function updateDisplay(){const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];const val=Math.max(raw,minRaisePence);const btn=document.getElementById('raiseBtn');if(btn){const verb=btn.dataset.verb||'RAISE';btn.textContent=verb+' '+fc(val);}}
   function snapToValue(totalPence){const p=Math.max(0,totalPence);poundsIdx=Math.min(Math.floor(p/100),POUNDS.length-1);const rem=p%100;let best=0;for(let i=0;i<PENCE.length;i++){if(PENCE[i]<=rem)best=i;}penceIdx=best;renderAll();}
   let _userDraggedSinceLastMin=false;
-  window.drumReset=function(minPence){minRaisePence=Math.max(minPence||40,20);_userDraggedSinceLastMin=false;snapToValue(minRaisePence);updateDisplay();};
-  window.drumSetMin=function(minPence){minRaisePence=Math.max(minPence||40,20);const currentVal=POUNDS[poundsIdx]*100+PENCE[penceIdx];if(!_userDraggedSinceLastMin||currentVal<minRaisePence){snapToValue(minRaisePence);}_userDraggedSinceLastMin=false;updateDisplay();};
+  window.drumReset=function(minPence){minRaisePence=Math.max(Number(minPence)||0,0);_userDraggedSinceLastMin=false;snapToValue(minRaisePence);updateDisplay();};
+  window.drumSetMin=function(minPence){minRaisePence=Math.max(Number(minPence)||0,0);const currentVal=POUNDS[poundsIdx]*100+PENCE[penceIdx];if(!_userDraggedSinceLastMin||currentVal<minRaisePence){snapToValue(minRaisePence);}_userDraggedSinceLastMin=false;updateDisplay();};
   window.drumGetPence=function(){const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];return Math.max(raw,minRaisePence);};
   window.drumClearDrag=function(){_userDraggedSinceLastMin=false;};
   window.drumStep=function(drum,dir){ensureAudio();snd_chip();if(drum==='pounds'){poundsIdx=Math.max(0,Math.min(POUNDS.length-1,poundsIdx+dir));renderDial('dialPoundsInner',POUNDS,poundsIdx);}else{penceIdx=Math.max(0,Math.min(PENCE.length-1,penceIdx+dir));renderDial('dialPenceInner',PENCE,penceIdx);}updateDisplay();};
