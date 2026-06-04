@@ -1,4 +1,3 @@
-<!-- poker.html | Last edited: 2026-03-18 (tournament mode added) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,53 +10,41 @@
 <title>SYFM Poker</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:'Segoe UI',Arial,sans-serif}
-#gameUI{--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px)}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Arial,sans-serif}
 .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.92);z-index:200}
 .panel{background:linear-gradient(160deg,#0a0a0a 0%,#1a1a1a 100%);border:2px solid #c8a020;border-radius:16px;padding:36px 44px;min-width:340px;max-width:480px;width:90%;text-align:center;box-shadow:0 0 60px rgba(200,160,32,0.20)}
 .panel h1{color:#ffd700;font-size:2.2rem;margin-bottom:8px;letter-spacing:2px}
 .panel h2{color:#ffd700;font-size:1.5rem;margin-bottom:18px}
 .panel h3{color:#c8a020;font-size:1rem;margin:14px 0 8px}
 .panel p{color:#c8a060;margin-bottom:14px;line-height:1.5}
-.panel input[type=text],.panel input[type=number]{width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;background:#000000;border:1px solid #c8a020;color:#ffd700;font-size:1.1rem;outline:none;text-align:center}
-.panel input:focus{border-color:#c8a020}
+.panel input[type=text],.panel input[type=number]{width:100%;padding:12px 16px;margin:8px 0;border-radius:8px;background:#000;border:1px solid #c8a020;color:#ffd700;font-size:1.1rem;outline:none;text-align:center}
 .btn-gold{width:100%;padding:14px;margin-top:14px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:1.1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
 .btn-gold:hover{opacity:.85}
 .btn-gold:disabled{opacity:.4;cursor:not-allowed}
 .btn-sm{padding:8px 18px;border-radius:6px;border:none;font-size:.9rem;font-weight:bold;cursor:pointer;color:#fff;margin:4px}
-.btn-approve{background:#1a6a1a}
-.btn-reject{background:#6a1a1a}
+.btn-approve{background:#1a6a1a}.btn-reject{background:#6a1a1a}
 .player-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.08);border:1px solid rgba(200,160,32,0.18);border-radius:8px;padding:10px 14px;margin:6px 0;color:#ffd700;font-size:.95rem}
-.player-row .chips{color:#ffd700;font-weight:bold}
 .host-badge{font-size:.7rem;background:#c8a020;color:#000;padding:2px 7px;border-radius:4px;font-weight:bold;margin-left:8px}
 .pending-row{display:flex;justify-content:space-between;align-items:center;background:rgba(200,160,32,0.12);border:1px solid rgba(200,160,32,0.25);border-radius:8px;padding:8px 12px;margin:4px 0;color:#ffd700}
-
-/* ── Tournament game type selector ── */
 .game-type-row{display:flex;gap:10px;margin:12px 0 6px}
-.type-btn{flex:1;padding:12px 8px;border-radius:8px;border:2px solid #3a3000;background:#000000;color:#a08040;font-size:.95rem;font-weight:bold;cursor:pointer;transition:all .2s;letter-spacing:.5px}
-.type-btn:hover{border-color:#c8a020;color:#ffd700}
-.type-btn.active{border-color:#c8a020;background:rgba(200,160,32,0.18);color:#ffd700;box-shadow:0 0 12px rgba(200,160,32,0.3)}
+.type-btn{flex:1;padding:12px 8px;border-radius:8px;border:2px solid #3a3000;background:#000;color:#a08040;font-size:.95rem;font-weight:bold;cursor:pointer;transition:all .2s}
+.type-btn.active{border-color:#c8a020;background:rgba(200,160,32,0.18);color:#ffd700}
 .tournament-settings{background:rgba(200,160,32,0.06);border:1px solid rgba(200,160,32,0.35);border-radius:10px;padding:14px 16px;margin:10px 0;display:none;text-align:left}
 .tournament-settings.visible{display:block}
 .ts-row{display:flex;align-items:center;justify-content:space-between;margin:8px 0}
 .ts-label{color:#c8a060;font-size:.9rem}
-.ts-input{width:90px;padding:7px 10px;border-radius:6px;background:#000000;border:1px solid #c8a020;color:#ffd700;font-size:.95rem;text-align:center;outline:none}
-.ts-input:focus{border-color:#c8a020}
+.ts-input{width:90px;padding:7px 10px;border-radius:6px;background:#000;border:1px solid #c8a020;color:#ffd700;font-size:.95rem;text-align:center;outline:none}
 .blind-schedule{margin-top:10px;font-size:.78rem;color:#8a7030;line-height:1.7}
 .blind-schedule b{color:#c8a060}
-
-/* ── Tournament blind badge (in-game) ── */
 #blindBadge{font-size:11px;color:#ffe040;padding:3px 8px;background:rgba(100,70,0,0.45);border-radius:6px;white-space:nowrap;display:none;border:1px solid rgba(200,160,32,0.35)}
 #blindBadge .bl-label{color:#c8a060;font-size:10px}
 #blindBadge .bl-timer{color:#ffaa20;font-weight:bold}
-
-/* ── Cookie / UAT notice overlay ── */
 #cookieOverlay{z-index:500}
-#cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px;overflow-y:auto;max-height:92vh;background:linear-gradient(160deg,#000000 0%,#111111 100%)}
+#cookieOverlay .panel{max-width:560px;text-align:left;padding:32px 36px;overflow-y:auto;max-height:92vh;background:linear-gradient(160deg,#000 0%,#111 100%)}
 #cookieOverlay h2{text-align:center;margin-bottom:4px;font-size:1.35rem}
 .cookie-subtitle{color:#e09020;font-size:.82rem;letter-spacing:1px;text-transform:uppercase;text-align:center;margin-bottom:18px;display:block}
 .cookie-table{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:.85rem}
-.cookie-table th{background:rgba(200,160,32,0.22);color:#ffd700;padding:7px 10px;text-align:left;border:1px solid #c8a020;font-size:.8rem;letter-spacing:.5px}
+.cookie-table th{background:rgba(200,160,32,0.22);color:#ffd700;padding:7px 10px;text-align:left;border:1px solid #c8a020;font-size:.8rem}
 .cookie-table td{padding:7px 10px;border:1px solid #3a3000;color:#e0c860;vertical-align:top;line-height:1.45}
 .cookie-table tr:nth-child(even) td{background:rgba(200,160,32,0.05)}
 .cookie-table td:first-child{color:#ffd700;font-weight:bold;white-space:nowrap;width:36%}
@@ -65,25 +52,23 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
 .cookie-uat strong{color:#ff9090}
 .cookie-btns{display:flex;gap:10px;margin-top:20px}
 .cookie-btns .btn-gold{flex:1;margin-top:0;font-size:1rem;padding:12px}
-.btn-deny{flex:1;padding:12px;border-radius:8px;border:1px solid #aa2020;background:linear-gradient(135deg,#2a0000,#100000);color:#ff8080;font-size:1rem;font-weight:bold;cursor:pointer;letter-spacing:1px;transition:opacity .2s}
-.btn-deny:hover{opacity:.8}
+.btn-deny{flex:1;padding:12px;border-radius:8px;border:1px solid #aa2020;background:linear-gradient(135deg,#2a0000,#100000);color:#ff8080;font-size:1rem;font-weight:bold;cursor:pointer;letter-spacing:1px}
 #gameUI{display:none;position:fixed;inset:0;pointer-events:none;z-index:100}
-#gameUI > *{pointer-events:auto}
+#gameUI>*{pointer-events:auto}
 #topBar{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.80);padding:8px 14px;border-radius:8px;color:#ffd700;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
 #phase{font-size:14px;font-weight:bold;white-space:nowrap}
 #pot{font-size:17px;font-weight:bold;white-space:nowrap}
 #roomBadge{font-size:12px;color:#c8a060;padding:3px 8px;background:rgba(200,160,32,0.15);border-radius:6px;white-space:nowrap}
 #actionPanel{position:fixed;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:110;width:200px;padding:10px;background:rgba(0,0,0,0.92);border-radius:0 16px 16px 0;border-right:2px solid #c8a020;border-top:1px solid #6a5010;border-bottom:1px solid #6a5010}
-.abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent;letter-spacing:0.5px}
+.abtn{padding:12px 8px;border-radius:8px;border:none;font-size:15px;font-weight:bold;cursor:pointer;color:#fff;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
 .abtn-call{background:#1a7a1a;border-bottom:3px solid #0a4a0a}
 .abtn-raise{background:#7a5800;border-bottom:3px solid #4a3000}
 .abtn-fold{background:#7a1a1a;border-bottom:3px solid #4a0a0a}
-.swipe-allin-track{position:relative;width:100%;height:46px;border-radius:8px;background:#1e1400;border:2px solid #7a6a00;border-bottom:3px solid #4a3a00;overflow:hidden;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;margin-top:16px}
-.swipe-allin-track:active{cursor:grabbing}
-.swipe-allin-fill{position:absolute;left:0;top:0;bottom:0;width:0%;background:linear-gradient(90deg,#5a4a00,#c8a020);border-radius:6px 0 0 6px;pointer-events:none}
-.swipe-allin-thumb{position:absolute;left:4px;top:50%;transform:translateY(-50%);width:36px;height:34px;background:linear-gradient(135deg,#c8a020,#8a6a08);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#000;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.6);transition:left 0.32s cubic-bezier(0.34,1.56,0.64,1);z-index:2;pointer-events:none}
+.swipe-allin-track{position:relative;width:100%;height:46px;border-radius:8px;background:#1e1400;border:2px solid #7a6a00;overflow:hidden;cursor:grab;user-select:none;touch-action:none;margin-top:16px}
+.swipe-allin-fill{position:absolute;left:0;top:0;bottom:0;width:0%;background:linear-gradient(90deg,#5a4a00,#c8a020);pointer-events:none}
+.swipe-allin-thumb{position:absolute;left:4px;top:50%;transform:translateY(-50%);width:36px;height:34px;background:linear-gradient(135deg,#c8a020,#8a6a08);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#000;font-weight:bold;transition:left 0.32s cubic-bezier(0.34,1.56,0.64,1);z-index:2;pointer-events:none}
 .swipe-allin-thumb.dragging{transition:none}
-.swipe-allin-label{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;color:#ffe040;letter-spacing:1.5px;pointer-events:none;z-index:1;text-shadow:0 1px 4px rgba(0,0,0,0.8)}
+.swipe-allin-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;color:#ffe040;letter-spacing:1.5px;pointer-events:none;z-index:1}
 @keyframes allInShake{0%{transform:translateY(-50%) translateX(0)}15%{transform:translateY(-50%) translateX(9px)}30%{transform:translateY(-50%) translateX(-7px)}45%{transform:translateY(-50%) translateX(7px)}60%{transform:translateY(-50%) translateX(-5px)}75%{transform:translateY(-50%) translateX(4px)}90%{transform:translateY(-50%) translateX(-2px)}100%{transform:translateY(-50%) translateX(0)}}
 .swipe-allin-thumb.shake{animation:allInShake 0.52s ease}
 @keyframes allInFlash{0%{background:linear-gradient(90deg,#5a4a00,#c8a020)}50%{background:linear-gradient(90deg,#c8a020,#ffe040)}100%{background:linear-gradient(90deg,#5a4a00,#c8a020)}}
@@ -92,8 +77,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
 .dial-row{display:flex;gap:6px;justify-content:center;align-items:center;width:100%;padding:2px 0}
 .dial-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1}
 .dial-label{font-size:9px;color:#c8a060;text-align:center;letter-spacing:1px;text-transform:uppercase}
-.dial-wheel{width:72px;height:96px;overflow:hidden;position:relative;border-radius:10px;background:linear-gradient(180deg,#0a0600 0%,#1a1000 30%,#1a1000 70%,#0a0600 100%);border:2px solid #c8a020;cursor:grab;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;box-shadow:inset 0 0 18px rgba(0,0,0,0.8),0 0 8px rgba(200,160,32,0.2)}
-.dial-wheel:active{cursor:grabbing}
+.dial-wheel{width:72px;height:96px;overflow:hidden;position:relative;border-radius:10px;background:linear-gradient(180deg,#0a0600 0%,#1a1000 30%,#1a1000 70%,#0a0600 100%);border:2px solid #c8a020;cursor:grab;user-select:none;touch-action:none}
 .dial-wheel::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:32px;background:rgba(200,160,32,0.12);border-top:1px solid rgba(200,160,32,0.5);border-bottom:1px solid rgba(200,160,32,0.5);pointer-events:none;z-index:2}
 .dial-wheel::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,6,0,0.85) 0%,transparent 35%,transparent 65%,rgba(10,6,0,0.85) 100%);pointer-events:none;z-index:3}
 .dial-inner{position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;align-items:center;will-change:transform}
@@ -102,26 +86,24 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
 .dial-item.adj1{font-size:16px;color:rgba(200,160,32,0.55)}
 .dial-item.adj2{font-size:13px;color:rgba(200,160,32,0.25)}
 .dial-sep{font-size:22px;font-weight:bold;color:#c8a060;line-height:1;align-self:center;margin-top:18px}
-
-#bottomBar{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:215px;transform:none;background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none;box-shadow:0 2px 12px rgba(0,0,0,0.6)}
-#myInfo{font-size:14px;font-weight:bold;color:#ffd700;line-height:1.5;letter-spacing:0.5px}
+#bottomBar{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:215px;background:rgba(0,0,0,0.88);padding:6px 20px;border-radius:10px;border:1px solid #6a5010;color:#c8a820;text-align:center;z-index:111;white-space:nowrap;pointer-events:none}
+#myInfo{font-size:14px;font-weight:bold;color:#ffd700;line-height:1.5}
 #controlBar{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));display:flex;flex-direction:row;gap:5px;align-items:center;z-index:1000}
-.cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;line-height:1;cursor:pointer;color:#fff;background:#1a4a7a}
-.cbtn-pause.active{background:#c87020;box-shadow:0 0 8px rgba(200,120,32,0.7)}
+.cbtn-pause{padding:9px 13px;border-radius:6px;border:none;font-size:18px;cursor:pointer;color:#fff;background:#1a4a7a}
+.cbtn-pause.active{background:#c87020}
 .cbtn-cashout{padding:9px 11px;border-radius:6px;border:1px solid #c8a020;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#4a2a00;white-space:nowrap}
 .cbtn-cashout.pending{background:#6a1a00;border-color:#ff6040;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.65}}
-.cbtn-autofold{padding:9px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#3a1a5a;white-space:nowrap;-webkit-tap-highlight-color:transparent}
-.cbtn-autofold.active{background:#8a10cc;box-shadow:0 0 10px rgba(180,60,255,0.7)}
+.cbtn-autofold{padding:9px 11px;border-radius:6px;border:none;font-size:12px;font-weight:bold;cursor:pointer;color:#fff;background:#3a1a5a;white-space:nowrap}
+.cbtn-autofold.active{background:#8a10cc}
 #stackEditor{position:absolute;bottom:calc(50px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.93);border:1px solid #c8a020;border-radius:10px;padding:10px 12px;z-index:115;display:none;min-width:210px;max-height:60vh;overflow-y:auto}
-#stackEditor h4{color:#ffd700;font-size:12px;margin:0 0 8px 0;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #4a3a10;padding-bottom:5px}
+#stackEditor h4{color:#ffd700;font-size:12px;margin:0 0 8px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #4a3a10;padding-bottom:5px}
 .se-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .se-name{flex:1;color:#e0d0a0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .se-input{width:68px;background:#1a1000;border:1px solid #6a5010;border-radius:5px;color:#ffd700;font-size:13px;font-weight:bold;padding:4px 6px;text-align:right}
 .se-input:focus{outline:none;border-color:#c8a020}
-.se-btn{padding:4px 8px;border-radius:5px;border:none;background:#4a6a00;color:#fff;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
-.se-btn:active{background:#6a9a00}
-.cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);-webkit-tap-highlight-color:transparent;display:block}
+.se-btn{padding:4px 8px;border-radius:5px;border:none;background:#4a6a00;color:#fff;font-size:11px;font-weight:bold;cursor:pointer}
+.cbtn-fs{padding:9px 11px;border-radius:6px;border:none;font-size:14px;cursor:pointer;color:#c8a060;background:rgba(0,0,0,0.65);display:block}
 @supports (-webkit-touch-callout:none) and (not (display:-webkit-box)){.cbtn-fs{display:none!important}}
 #msg{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.92);padding:14px 28px;border-radius:12px;color:#fff;font-size:18px;font-weight:bold;text-align:center;display:none;border:1px solid #c8a020;max-width:80%;white-space:pre-line;pointer-events:none}
 #sideBoxes{position:fixed;top:58px;right:10px;display:flex;flex-direction:column;gap:6px;width:220px}
@@ -152,24 +134,19 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
 .jr-btns{display:flex;gap:4px}
 .jr-admit{background:#1a6a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
 .jr-reject{background:#6a1a1a;border:none;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
-#turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,0.9);display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
+#turnIndicator{position:absolute;bottom:52px;left:120px;color:#ffd700;font-size:13px;font-weight:bold;pointer-events:none;display:none;background:rgba(0,0,0,0.80);padding:6px 14px;border-radius:8px;border:1px solid #6a5010;max-width:240px;word-wrap:break-word}
 #spectatorBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.88);padding:16px 32px;border-radius:14px;color:#c8a020;font-size:16px;text-align:center;display:none;border:1px solid #6a5010;pointer-events:none;z-index:50}
 #pauseBanner{position:absolute;top:0;left:0;right:0;bottom:0;display:none;pointer-events:none;z-index:50}
-#toggleViewBtn{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:9999;height:44px;padding:0 14px;border-radius:22px;border:2px solid #c8a020;background:rgba(10,5,2,0.94);color:#ffd700;font-size:13px;font-weight:bold;letter-spacing:1px;cursor:pointer;display:none;box-shadow:0 0 0 3px rgba(200,160,32,0.25),0 4px 18px rgba(0,0,0,0.7);-webkit-tap-highlight-color:transparent;transition:background 0.2s,box-shadow 0.2s;display:none;align-items:center;gap:7px;white-space:nowrap}
-#toggleViewBtn:active{background:rgba(200,160,32,0.3);box-shadow:0 0 0 5px rgba(200,160,32,0.4)}
-#toggleViewBtn.mode2d{background:rgba(200,160,32,0.18);border-color:#ffd700;box-shadow:0 0 0 3px rgba(200,160,32,0.5),0 4px 18px rgba(0,0,0,0.7)}
 #view2d{display:block;position:fixed;inset:0;background:#1a0d05;overflow:hidden;z-index:90}
 #table2d{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(92vw,560px);height:min(58vw,360px);background:radial-gradient(ellipse at center,#0d3a18 0%,#072010 60%,#041408 100%);border-radius:50%;border:4px solid #1a5a28;box-shadow:0 0 0 6px #0a2a10,0 0 60px rgba(0,0,0,0.8),inset 0 0 40px rgba(0,0,0,0.5)}
 #table2dInner{position:relative;width:100%;height:100%}
 #table2dCenter{position:absolute;top:50%;left:50%;transform:translate(-50%,-52%);display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
-#pot2d{text-align:center}
 #pot2d .pot-label{color:#c8a060;font-size:9px;letter-spacing:2px;text-transform:uppercase}
 #pot2d .pot-val{color:#ffd700;font-size:17px;font-weight:bold;text-shadow:0 0 10px rgba(200,160,32,0.7)}
 #community2d{display:flex;gap:4px;overflow:visible}
 .c2d-card{position:relative;width:72px;height:102px;border-radius:7px;background:#fff;border:1px solid #ccc;box-shadow:0 2px 10px rgba(0,0,0,0.5);flex-shrink:0}
 .c2d-card.back{background:#1a3a8a;border-color:#2a4aaa}
-.c2d-card.red{color:#cc2020}
-.c2d-card.black{color:#111}
+.c2d-card.red{color:#cc2020}.c2d-card.black{color:#111}
 .p2d-seat{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:row;align-items:center;gap:8px;pointer-events:none}
 .p2d-info{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:74px;order:2}
 .p2d-name{font-size:10px;font-weight:bold;color:#e0d0a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px;background:rgba(0,0,0,0.78);border-radius:4px;padding:2px 5px}
@@ -179,38 +156,30 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
 .p2d-bet{font-size:9px;color:#40e860;background:rgba(0,0,0,0.65);border-radius:3px;padding:1px 4px}
 .p2d-cards{display:flex;gap:4px;order:1}
 .p2d-card{position:relative;width:70px;height:99px;border-radius:7px;background:#fff;border:1px solid #aaa;box-shadow:0 2px 8px rgba(0,0,0,0.5);flex-shrink:0}
-.p2d-seat.me .p2d-card{width:90px;height:126px;border-radius:9px;box-shadow:0 3px 14px rgba(0,0,0,0.6)}
+.p2d-seat.me .p2d-card{width:90px;height:126px;border-radius:9px}
 .p2d-card.back,.c2d-card.back{background:#1a3a8a;border-color:#2a4aaa}
 .p2d-card.red,.c2d-card.red{color:#cc2020}
 .p2d-card.black,.c2d-card.black{color:#111}
 .p2d-card.folded{background:#3a3a3a;border-color:#222;opacity:0.5}
-.p2dc-tl{position:absolute;top:3px;left:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left}
-.p2dc-br{position:absolute;bottom:3px;right:4px;font-size:11px;font-weight:bold;line-height:1.15;text-align:left;transform:rotate(180deg)}
+.p2dc-tl{position:absolute;top:3px;left:4px;font-size:11px;font-weight:bold;line-height:1.15}
+.p2dc-br{position:absolute;bottom:3px;right:4px;font-size:11px;font-weight:bold;line-height:1.15;transform:rotate(180deg)}
 .c2d-card .p2dc-tl,.c2d-card .p2dc-br{font-size:13px}
 .p2d-seat.me .p2d-card .p2dc-tl,.p2d-seat.me .p2d-card .p2dc-br{font-size:14px}
 .p2dc-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:3px;font-weight:bold;line-height:1;white-space:nowrap}
 .p2dc-center .p2dc-rank{font-size:28px;font-weight:900}
 .p2dc-center .p2dc-suit{font-size:28px}
-.c2d-card .p2dc-center .p2dc-rank{font-size:36px}
-.c2d-card .p2dc-center .p2dc-suit{font-size:36px}
-.p2d-seat.me .p2d-card .p2dc-center .p2dc-rank{font-size:36px}
-.p2d-seat.me .p2d-card .p2dc-center .p2dc-suit{font-size:36px}
-#stackInfo2d{position:fixed;bottom:calc(56px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.88);border:1px solid #6a5010;border-radius:8px;padding:5px 12px;color:#ffd700;font-size:13px;font-weight:bold;text-align:right;white-space:nowrap;display:none;z-index:112;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,0.6)}
+.c2d-card .p2dc-center .p2dc-rank,.c2d-card .p2dc-center .p2dc-suit{font-size:36px}
+.p2d-seat.me .p2d-card .p2dc-center .p2dc-rank,.p2d-seat.me .p2d-card .p2dc-center .p2dc-suit{font-size:36px}
+#stackInfo2d{position:fixed;bottom:calc(56px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));background:rgba(0,0,0,0.88);border:1px solid #6a5010;border-radius:8px;padding:5px 12px;color:#ffd700;font-size:13px;font-weight:bold;text-align:right;white-space:nowrap;display:block;z-index:112;pointer-events:none}
 .p2d-token{display:inline-block;font-size:8px;font-weight:bold;border-radius:3px;padding:1px 3px;margin-right:2px}
 .p2d-token.dealer{background:#c8a020;color:#000}
 .p2d-token.sb{background:#1a6a1a;color:#fff}
 .p2d-token.bb{background:#1a1a8a;color:#fff}
 .p2d-token.toact{background:#cc2020;color:#fff;animation:p2dPulse 0.8s ease-in-out infinite}
 @keyframes p2dPulse{0%,100%{opacity:1}50%{opacity:0.5}}
-.p2d-waiting{color:#888;font-size:9px;font-style:italic}
-/* loginBuyInInput removed — stake is set per game mode in the lobby */
-
-/* ── Player stack panel (right side, above control bar) ── */
 #playerStackPanel{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(58px + env(safe-area-inset-bottom,0px));width:220px;max-height:calc(100vh - 180px);overflow-y:auto;background:rgba(0,0,0,0.88);border:1px solid #3a2810;border-radius:10px;z-index:105;display:none}
-#playerStackPanel::-webkit-scrollbar{width:3px}
-#playerStackPanel::-webkit-scrollbar-thumb{background:#4a3010;border-radius:3px}
 .psp-header{font-size:10px;color:#6a5030;letter-spacing:1.5px;text-transform:uppercase;padding:6px 10px 4px;border-bottom:1px solid #2a1a08}
-.psp-row{padding:6px 10px 5px;border-bottom:1px solid rgba(200,160,32,0.07);position:relative}
+.psp-row{padding:6px 10px 5px;border-bottom:1px solid rgba(200,160,32,0.07)}
 .psp-row.psp-me{background:rgba(0,80,0,0.22)}
 .psp-row.psp-acting{background:rgba(180,80,0,0.22)}
 .psp-row.psp-folded{opacity:0.35}
@@ -219,84 +188,37 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
 .psp-name .psp-act-arrow{color:#ff8040;margin-right:3px;font-size:11px}
 .psp-stack{font-size:13px;font-weight:bold;color:#80cfff;line-height:1.25}
 .psp-bet{font-size:12px;color:#40e860;line-height:1.25}
-
-/* ── Tournament results overlay ── */
 .tournament-results{max-width:520px}
-.tournament-results h2{font-size:2rem;margin-bottom:4px}
-.tr-winner{font-size:1.4rem;color:#ffd700;margin:10px 0 18px;text-shadow:0 0 20px rgba(255,215,0,0.6)}
+.tr-winner{font-size:1.4rem;color:#ffd700;margin:10px 0 18px}
 .tr-table{width:100%;border-collapse:collapse;margin:8px 0}
 .tr-table th{color:#c8a060;font-size:.8rem;padding:5px 8px;border-bottom:1px solid #4a3010;text-align:left}
-.tr-table td{padding:6px 8px;border-bottom:1px solid #2a1a08;font-size:.9rem}
+.tr-table td{padding:6px 8px;border-bottom:1px solid #2a1a08;font-size:.9rem;color:#c8a060}
 .tr-table tr.place-1 td{color:#ffd700;font-weight:bold}
 .tr-table tr.place-2 td{color:#c0c0c0}
 .tr-table tr.place-3 td{color:#cd7f32}
-.tr-table td{color:#c8a060}
 .elim-banner{background:rgba(180,40,40,0.22);border:1px solid #aa2020;border-radius:10px;padding:20px;margin:10px 0;color:#ffaaaa;font-size:1.1rem}
 .elim-banner .elim-place{font-size:2rem;font-weight:bold;color:#ffd700;margin-bottom:6px}
-
-@media screen and (max-width: 480px) {
-  .panel{padding:20px 18px;min-width:0;width:94%}
-  .panel h1{font-size:1.6rem}
-  .panel input[type=text],.panel input[type=number]{font-size:1rem;padding:10px 12px}
-  .btn-gold{font-size:1rem;padding:12px}
-}
-@media screen and (max-height: 700px), screen and (max-width: 500px) {
-  #actionPanel{top:auto !important;bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;transform:none !important;left:0 !important;right:auto !important;width:160px !important;padding:6px 8px !important;gap:5px !important;max-height:calc(100vh - 120px);overflow-y:auto;border-radius:0 12px 12px 0 !important}
-  .abtn{padding:9px 6px !important;font-size:13px !important}
-  #drumWidget{gap:2px !important}
-  .dial-wheel{width:60px !important;height:80px !important}
-  .dial-item.selected{font-size:18px !important}
-  .dial-item.adj1{font-size:13px !important}
-  .dial-sep{font-size:18px !important;margin-top:14px !important}
-  .swipe-allin-track{height:38px !important}
-  .swipe-allin-thumb{width:30px !important;height:28px !important;font-size:11px !important}
-  .swipe-allin-label{font-size:10px !important;letter-spacing:1px !important}
-}
-@media screen and (max-width: 500px) {
-  #toggleViewBtn{top:auto !important;bottom:calc(58px + env(safe-area-inset-bottom,0px)) !important;right:auto !important;left:calc(4px + env(safe-area-inset-left,0px)) !important;font-size:11px !important;padding:0 10px !important;height:36px !important;border-radius:18px !important;z-index:1001 !important}
-  #topBar{top:calc(8px + env(safe-area-inset-top,0px)) !important;font-size:11px}
-  #phase{font-size:11px !important}
-  #pot{font-size:13px !important}
-  #controlBar{bottom:calc(4px + env(safe-area-inset-bottom,0px)) !important;right:calc(4px + env(safe-area-inset-right,0px)) !important;gap:3px !important}
-  .cbtn-pause,.cbtn-cashout,.cbtn-autofold,.cbtn-fs{padding:7px 8px !important;font-size:11px !important}
-  #sideBoxes{width:160px !important;top:104px !important;right:4px !important}
-  #tableSlider{display:none !important}
-  #playerStackPanel{width:180px !important;right:calc(4px + env(safe-area-inset-right,0px)) !important;bottom:calc(52px + env(safe-area-inset-bottom,0px)) !important;max-height:200px !important}
-  .psp-name{font-size:12px !important}
-  .psp-stack{font-size:12px !important}
-  .psp-bet{font-size:11px !important}
-}
+@media screen and (max-width:480px){.panel{padding:20px 18px;min-width:0;width:94%}.panel h1{font-size:1.6rem}.btn-gold{font-size:1rem;padding:12px}}
+@media screen and (max-height:700px),screen and (max-width:500px){#actionPanel{top:auto!important;bottom:calc(58px + env(safe-area-inset-bottom,0px))!important;transform:none!important;left:0!important;width:160px!important;padding:6px 8px!important;gap:5px!important;max-height:calc(100vh - 120px);overflow-y:auto;border-radius:0 12px 12px 0!important}.abtn{padding:9px 6px!important;font-size:13px!important}.dial-wheel{width:60px!important;height:80px!important}.swipe-allin-track{height:38px!important}}
+@media screen and (max-width:500px){#topBar{font-size:11px}#controlBar{bottom:calc(4px + env(safe-area-inset-bottom,0px))!important;right:calc(4px + env(safe-area-inset-right,0px))!important;gap:3px!important}.cbtn-pause,.cbtn-cashout,.cbtn-autofold,.cbtn-fs{padding:7px 8px!important;font-size:11px!important}#sideBoxes{width:160px!important;top:104px!important;right:4px!important}#playerStackPanel{width:180px!important;max-height:200px!important}}
 </style>
 </head>
 <body>
-<button id="toggleViewBtn" onclick="toggle2D()" style="display:none" title="Switch to 2D view">
-  <svg width="18" height="18" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
-    <circle cx="18" cy="18" r="16" fill="#2a1a00" stroke="#c8a020" stroke-width="3"/>
-    <circle cx="18" cy="18" r="10" fill="none" stroke="#c8a020" stroke-width="2"/>
-    <line x1="18" y1="2" x2="18" y2="8" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="18" y1="28" x2="18" y2="34" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="2" y1="18" x2="8" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="28" y1="18" x2="34" y2="18" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
-  </svg>
-  <span id="toggleViewLabel">&rarr;2D</span>
-</button>
 
 <div id="view2d">
   <div id="table2d">
     <div id="table2dInner">
-      <div id="pot2d" style="position:absolute;top:14%;left:50%;transform:translateX(-50%);text-align:center;z-index:4;pointer-events:none;background:rgba(0,0,0,0.55);border-radius:8px;padding:3px 14px 4px;border:1px solid rgba(200,160,32,0.30);white-space:nowrap;">
-        <div class="pot-label">POT</div>
-        <div class="pot-val" id="pot2dVal">&pound;0.00</div>
+      <div id="pot2d" style="position:absolute;top:14%;left:50%;transform:translateX(-50%);text-align:center;z-index:4;pointer-events:none;background:rgba(0,0,0,0.55);border-radius:8px;padding:3px 14px 4px;border:1px solid rgba(200,160,32,0.30);white-space:nowrap">
+        <div class="pot-label">POT</div><div class="pot-val" id="pot2dVal">&pound;0.00</div>
       </div>
       <div id="table2dCenter">
-        <div id="msg2d" style="display:none;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:8px 18px;color:#fff;font-size:15px;font-weight:bold;text-align:center;white-space:pre-line;max-width:260px;pointer-events:none;"></div>
+        <div id="msg2d" style="display:none;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:8px 18px;color:#fff;font-size:15px;font-weight:bold;text-align:center;white-space:pre-line;max-width:260px;pointer-events:none"></div>
         <div id="community2d"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Cookie / UAT notice -->
 <div id="cookieOverlay" class="overlay">
   <div class="panel">
     <h2>&#x1F36A; Cookie Notice</h2>
@@ -308,33 +230,22 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
         <tr><td>User Identity</td><td>Generated as a random string and saved in Local Storage.</td></tr>
         <tr><td>Session Tracking</td><td>Handled by a persistent WebSocket connection (ws).</td></tr>
         <tr><td>Game History</td><td>Written to text files on the server disk and uploaded via FTP.</td></tr>
-        <tr><td>Reconnection</td><td>The client reads the ID from Local Storage and sends it to the server to &ldquo;resume&rdquo; their seat.</td></tr>
+        <tr><td>Reconnection</td><td>The client reads the ID from Local Storage and sends it to the server to resume their seat.</td></tr>
       </tbody>
     </table>
     <div class="cookie-uat">&#9888; <strong>Development &amp; UAT Notice</strong><br>This game is in development and UAT.<br>You should <strong>never</strong> bet any real money using this game.</div>
     <div class="cookie-btns">
-      <button class="btn-gold" onclick="cookieAccept()">&#x2705; Yes, I know this game is in Dev & Test mode &amp; Continue</button>
+      <button class="btn-gold" onclick="cookieAccept()">&#x2705; Yes, I know this game is in Dev &amp; Test mode &amp; Continue</button>
       <button class="btn-deny" onclick="cookieDeny()">&#x2716; No thanks, bye &amp; Deny</button>
     </div>
   </div>
 </div>
 
-<!-- Login -->
 <div id="loginOverlay" class="overlay" style="display:none">
   <div class="panel">
     <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px">
       <circle cx="36" cy="36" r="34" fill="#1a1a1a" stroke="#c8a020" stroke-width="4"/>
-      <g opacity="0.9">
-        <path d="M36 2 A34 34 0 0 1 62.4 19" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
-        <path d="M62.4 19 A34 34 0 0 1 68.8 47" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
-        <path d="M68.8 47 A34 34 0 0 1 50 66.5" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
-        <path d="M50 66.5 A34 34 0 0 1 22 66.5" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
-        <path d="M22 66.5 A34 34 0 0 1 3.2 47" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
-        <path d="M3.2 47 A34 34 0 0 1 9.6 19" stroke="#2a1408" stroke-width="8" fill="none" stroke-linecap="butt"/>
-        <path d="M9.6 19 A34 34 0 0 1 36 2" stroke="#c8a020" stroke-width="8" fill="none" stroke-linecap="butt"/>
-      </g>
       <circle cx="36" cy="36" r="24" fill="#1c0e06" stroke="#c8a020" stroke-width="2.5"/>
-      <circle cx="36" cy="36" r="20" fill="none" stroke="rgba(200,160,32,0.3)" stroke-width="1"/>
       <text x="36" y="40" font-family="Arial" font-weight="bold" font-size="9" fill="#ffd700" text-anchor="middle">SYFM</text>
     </svg>
     <h1 style="font-size:2.4rem;letter-spacing:4px;margin-bottom:4px">SYFM</h1>
@@ -347,7 +258,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
   </div>
 </div>
 
-<!-- Buy back -->
 <div id="buyBackOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h2>&#x1F4B8; Out of Chips!</h2>
@@ -360,33 +270,24 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
   </div>
 </div>
 
-<!-- Tournament eliminated -->
 <div id="tournamentEliminatedOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h2>&#x1F3C6; Eliminated!</h2>
-    <div class="elim-banner">
-      <div class="elim-place" id="elimPlaceText">4th Place</div>
-      <div id="elimMsg">Better luck next time!</div>
-    </div>
+    <div class="elim-banner"><div class="elim-place" id="elimPlaceText">4th Place</div><div id="elimMsg">Better luck next time!</div></div>
     <p style="color:#c8a060;font-size:.9rem;margin-top:8px">You can spectate the rest of the tournament.</p>
     <button class="btn-gold" onclick="document.getElementById('tournamentEliminatedOverlay').style.display='none'">&#x1F440; Watch Tournament</button>
   </div>
 </div>
 
-<!-- Tournament over -->
 <div id="tournamentOverOverlay" class="overlay" style="display:none">
   <div class="panel tournament-results">
     <h2>&#x1F3C6; Tournament Over!</h2>
     <div class="tr-winner" id="trWinnerText"></div>
-    <table class="tr-table">
-      <thead><tr><th>Place</th><th>Player</th></tr></thead>
-      <tbody id="trPlacementBody"></tbody>
-    </table>
+    <table class="tr-table"><thead><tr><th>Place</th><th>Player</th></tr></thead><tbody id="trPlacementBody"></tbody></table>
     <button class="btn-gold" onclick="location.reload()" style="margin-top:18px">&#x1F504; New Game</button>
   </div>
 </div>
 
-<!-- Waiting -->
 <div id="waitingOverlay" class="overlay" style="display:none">
   <div class="panel">
     <h2>&#x23F3; Waiting for host&hellip;</h2>
@@ -395,16 +296,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
   </div>
 </div>
 
-<!-- Lobby -->
 <div id="lobbyOverlay" class="overlay" style="display:none">
   <div class="panel" style="max-height:90vh;overflow-y:auto">
     <h2>&#x1F346; Room <span id="lobbyRoomId"></span></h2>
     <div id="playerList"></div>
-    <div id="pendingSection" style="display:none">
-      <h3>&#x23F3; Requesting to join:</h3>
-      <div id="pendingItems"></div>
-    </div>
-    <!-- Game type selector (host only, pre-game) -->
+    <div id="pendingSection" style="display:none"><h3>&#x23F3; Requesting to join:</h3><div id="pendingItems"></div></div>
     <div id="gameTypeSection" style="display:none;margin-top:16px;border-top:1px solid #c8a020;padding-top:14px">
       <h3 style="margin-bottom:6px;color:#c8a020">&#x2660; Game Mode</h3>
       <div class="game-type-row">
@@ -412,42 +308,24 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
         <button class="type-btn" id="typeBtnTournament" onclick="selectGameType('tournament')">&#x1F3C6; Tournament</button>
       </div>
       <div class="tournament-settings" id="tournamentSettings">
-        <div class="ts-row">
-          <span class="ts-label">Starting chips (each)</span>
-          <input class="ts-input" type="number" id="tsChips" min="100" max="999999" step="100" value="8000" onchange="pushGameTypeSettings()">
-        </div>
-        <div class="ts-row">
-          <span class="ts-label">Blind level (mins)</span>
-          <input class="ts-input" type="number" id="tsBlindMins" min="1" max="60" step="1" value="10" onchange="pushGameTypeSettings()">
-        </div>
-        <div class="blind-schedule">
-          <b>Blind Schedule:</b><br>
-          L1: 10/20 &bull; L2: 20/40 &bull; L3: 30/60 &bull; L4: 50/100<br>
-          L5: 75/150 &bull; L6: 100/200 &bull; L7: 150/300 &bull; L8: 200/400<br>
-          L9: 300/600 &bull; L10: 500/1000 &bull; L11: 750/1500 &bull; L12: 1000/2000
-        </div>
+        <div class="ts-row"><span class="ts-label">Starting chips (each)</span><input class="ts-input" type="number" id="tsChips" min="100" max="999999" step="100" value="8000" onchange="pushGameTypeSettings()"></div>
+        <div class="ts-row"><span class="ts-label">Blind level (mins)</span><input class="ts-input" type="number" id="tsBlindMins" min="1" max="60" step="1" value="10" onchange="pushGameTypeSettings()"></div>
+        <div class="blind-schedule"><b>Blind Schedule:</b><br>L1:10/20 &bull; L2:20/40 &bull; L3:30/60 &bull; L4:50/100<br>L5:75/150 &bull; L6:100/200 &bull; L7:150/300 &bull; L8:200/400<br>L9:300/600 &bull; L10:500/1000 &bull; L11:750/1500 &bull; L12:1000/2000</div>
       </div>
     </div>
     <p id="lobbyStatus" style="color:#c8a060;margin-top:14px;font-size:.9rem"></p>
-    <!-- Stake input for cash game (non-host players) -->
     <div id="cashStakeSection" style="display:none;margin-top:12px;background:rgba(200,160,32,0.06);border:1px solid rgba(200,160,32,0.35);border-radius:10px;padding:12px 14px;text-align:left">
-      <div style="color:#c8a060;font-size:.85rem;margin-bottom:6px">&#x1F4B0; Your buy-in for this cash game:</div>
+      <div style="color:#c8a060;font-size:.85rem;margin-bottom:6px">&#x1F4B0; Your buy-in:</div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="color:#ffd700;font-size:1.1rem;font-weight:bold">&pound;</span>
-        <input type="number" id="cashStakeInput" min="1" step="1" value="10" style="flex:1;padding:8px 10px;border-radius:6px;background:#000000;border:1px solid #c8a020;color:#ffd700;font-size:1rem;text-align:center;outline:none" oninput="onCashStakeChange(this.value)">
+        <input type="number" id="cashStakeInput" min="1" step="1" value="10" style="flex:1;padding:8px 10px;border-radius:6px;background:#000;border:1px solid #c8a020;color:#ffd700;font-size:1rem;text-align:center;outline:none" oninput="onCashStakeChange(this.value)">
       </div>
-      <div style="color:#6a5030;font-size:.78rem;margin-top:6px">Host can adjust stacks during the game.</div>
     </div>
-    <!-- Bot controls (host only, pre-game) -->
     <div id="botSection" style="display:none;margin-top:12px;border-top:1px solid #c8a020;padding-top:12px">
-      <h3 style="color:#c8a020;margin-bottom:8px">🤖 Bot Players</h3>
+      <h3 style="color:#c8a020;margin-bottom:8px">&#x1F916; Bot Players</h3>
       <div style="display:flex;gap:8px">
-        <button class="btn-gold" onclick="addBot()" style="margin-top:0;padding:10px;flex:1;font-size:.95rem">
-          &#x2795; Add Bot
-        </button>
-        <button class="btn-gold" onclick="removeBot()" style="margin-top:0;padding:10px;flex:1;font-size:.95rem;background:linear-gradient(135deg,#4a1a1a,#2a0808)">
-          &#x2796; Remove Bot
-        </button>
+        <button class="btn-gold" onclick="addBot()" style="margin-top:0;padding:10px;flex:1;font-size:.95rem">&#x2795; Add Bot</button>
+        <button class="btn-gold" onclick="removeBot()" style="margin-top:0;padding:10px;flex:1;font-size:.95rem;background:linear-gradient(135deg,#4a1a1a,#2a0808)">&#x2796; Remove Bot</button>
       </div>
       <div id="botCount" style="color:#888;font-size:.78rem;margin-top:5px;text-align:center"></div>
     </div>
@@ -455,33 +333,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
   </div>
 </div>
 
-<!-- Game UI -->
 <div id="gameUI">
-  <!-- Right: player stack panel, sits above control bar -->
-  <div id="playerStackPanel">
-    <div class="psp-header">&#x1F4CA; Players</div>
-    <div id="playerStackList"></div>
-  </div>
+  <div id="playerStackPanel"><div class="psp-header">&#x1F4CA; Players</div><div id="playerStackList"></div></div>
   <div id="topBar">
-    <div id="phase">PRE-FLOP</div>
-    <div id="pot">POT: &pound;0.00</div>
+    <div id="phase">PRE-FLOP</div><div id="pot">POT: &pound;0.00</div>
     <div id="myNameBadge" style="font-size:12px;color:#80cfff;padding:3px 8px;background:rgba(0,80,160,0.25);border-radius:6px;white-space:nowrap"></div>
-    <div id="blindBadge"><span class="bl-label">BLINDS: </span><span id="blindBadgeVal">&pound;0.10/&pound;0.20</span> &bull; <span class="bl-timer" id="blindBadgeTimer"></span></div>
+    <div id="blindBadge"><span class="bl-label">BLINDS: </span><span id="blindBadgeVal">10/20</span> &bull; <span class="bl-timer" id="blindBadgeTimer"></span></div>
     <div id="roomBadge">ROOM &mdash;</div>
   </div>
   <div id="actionPanel">
     <button class="abtn abtn-call" id="callBtn" style="display:none">CHECK</button>
     <div id="drumWidget">
       <div class="dial-row">
-        <div class="dial-wrap">
-          <div class="dial-label" id="dialLabelPounds">pounds &pound;</div>
-          <div class="dial-wheel" id="dialPounds"><div class="dial-inner" id="dialPoundsInner"></div></div>
-        </div>
+        <div class="dial-wrap"><div class="dial-label" id="dialLabelPounds">pounds &pound;</div><div class="dial-wheel" id="dialPounds"><div class="dial-inner" id="dialPoundsInner"></div></div></div>
         <div class="dial-sep">.</div>
-        <div class="dial-wrap">
-          <div class="dial-label" id="dialLabelPence">pence</div>
-          <div class="dial-wheel" id="dialPence"><div class="dial-inner" id="dialPenceInner"></div></div>
-        </div>
+        <div class="dial-wrap"><div class="dial-label" id="dialLabelPence">pence</div><div class="dial-wheel" id="dialPence"><div class="dial-inner" id="dialPenceInner"></div></div></div>
       </div>
     </div>
     <button class="abtn abtn-raise" id="raiseBtn" style="display:none">BET &pound;0.40</button>
@@ -493,33 +359,34 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
     <button class="abtn abtn-fold" id="foldBtn" style="display:none;margin-top:16px">FOLD</button>
   </div>
   <div id="drumOverlay" style="display:none"></div>
-  <div id="bottomBar">
-    <div id="myInfo">Stack &pound;10.00</div>
+  <div id="bottomBar"><div id="myInfo">Stack &pound;10.00</div></div>
+  <div id="stackEditor">
+    <h4>&#x1F527; Host Controls</h4>
+    <div class="se-row" style="margin-bottom:10px;border-bottom:1px solid #4a3a10;padding-bottom:10px">
+      <span class="se-name" style="color:#ffd700">Buy-in &pound;</span>
+      <input class="se-input" id="buyInInput" type="number" min="1" step="1" value="10.00">
+      <button class="se-btn" id="buyInBtn" onclick="applyBuyIn()" style="background:#1a3a6a">SET</button>
+    </div>
+    <div style="color:#888;font-size:10px;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Player stacks</div>
+    <div id="stackEditorRows"></div>
   </div>
-  </div>
+  <div id="stackInfo2d"></div>
   <div id="controlBar">
     <button class="cbtn-pause" id="pauseBtn" onclick="togglePause()">&#x23F8;</button>
     <button class="cbtn-cashout" id="cashOutBtn" onclick="doCashOut()">CASH OUT</button>
     <button class="cbtn-autofold" id="autoFoldBtn" onclick="toggleAutoFold()">AUTO-FOLD</button>
     <button class="cbtn-autofold" id="stackEditorBtn" onclick="toggleStackEditor()" style="display:none;background:#2a4a1a">&#x1F527;</button>
-    <button class="cbtn-fs" id="fsBtn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
+    <button class="cbtn-fs" id="fsBtn" onclick="toggleFullscreen()">&#x26F6;</button>
   </div>
   <div id="pauseBanner"></div>
   <div id="spectatorBanner">&#x1F440; You are spectating &mdash; no cards will be dealt to you</div>
-  <div id="msg"></div>
-  <div id="waitingMsg"></div>
-  <div id="joinRequestNotif">
-    <h4>&#x23F3; Players want to join</h4>
-    <div id="joinReqList"></div>
-  </div>
+  <div id="msg"></div><div id="waitingMsg"></div>
+  <div id="joinRequestNotif"><h4>&#x23F3; Players want to join</h4><div id="joinReqList"></div></div>
   <div id="turnIndicator"></div>
   <div id="sideBoxes">
     <div id="chatBox">
       <div id="chatHeader" onclick="toggleChat()">&#x1F4AC; CHAT <span id="chatToggle">&#x25B6; expand</span></div>
-      <div id="chatInner">
-        <div id="chatLog"></div>
-        <input type="text" id="chatInput" placeholder="Type and press Enter&hellip;" maxlength="100">
-      </div>
+      <div id="chatInner"><div id="chatLog"></div><input type="text" id="chatInput" placeholder="Type and press Enter&hellip;" maxlength="100"></div>
     </div>
     <div id="activityBox">
       <div id="activityHeader" onclick="toggleActivityLog()">&#x1F4CB; LOG <span id="activityToggle">&#x25B6; expand</span></div>
@@ -544,93 +411,54 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
 'use strict';
 let audioCtx;
 function ensureAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}
-function snd_deal(){ensureAudio();const t=audioCtx.currentTime,len=Math.floor(audioCtx.sampleRate*0.12),buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/len),0.6);const src=audioCtx.createBufferSource(),bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.Q.value=0.6;bp.frequency.setValueAtTime(4200,t);bp.frequency.exponentialRampToValueAtTime(1600,t+0.12);const g=audioCtx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.28,t+0.015);g.gain.exponentialRampToValueAtTime(0.001,t+0.12);src.buffer=buf;src.connect(bp);bp.connect(g);g.connect(audioCtx.destination);src.start(t);}
-function snd_flip(){ensureAudio();const t=audioCtx.currentTime,b=audioCtx.createBuffer(1,Math.floor(audioCtx.sampleRate*0.055),audioCtx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2200;g.gain.setValueAtTime(0.32,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.055);src.buffer=b;src.connect(hp);hp.connect(g);g.connect(audioCtx.destination);src.start(t);}
-function snd_chip(){ensureAudio();const t=audioCtx.currentTime,base=1600+Math.random()*500;[[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{const osc=audioCtx.createOscillator(),g=audioCtx.createGain();osc.type='sine';osc.frequency.value=base*r*(0.97+Math.random()*0.06);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);osc.connect(g);g.connect(audioCtx.destination);osc.start(t);osc.stop(t+0.14);});}
+function snd_chip(){ensureAudio();const t=audioCtx.currentTime,base=1600+Math.random()*500;[[1.0,0.16],[1.52,0.09],[2.51,0.05],[3.97,0.025]].forEach(([r,v])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.value=base*r*(0.97+Math.random()*0.06);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.09+r*0.022);o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+0.14);});}
 function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,1319].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*0.10);g.gain.linearRampToValueAtTime(0.12,t+i*0.10+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.10+0.55);o.connect(g);g.connect(audioCtx.destination);o.start(t+i*0.10);o.stop(t+i*0.10+0.6);});}
-function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([delay,freq])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq*0.8,t+delay);o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);g.gain.setValueAtTime(0,t+delay);g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+delay);o.stop(t+delay+0.3);});}
+function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([d,f])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(f*0.8,t+d);o.frequency.linearRampToValueAtTime(f,t+d+0.12);g.gain.setValueAtTime(0,t+d);g.gain.linearRampToValueAtTime(0.28,t+d+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+d+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+d);o.stop(t+d+0.3);});}
+
 let seatActions={};
+let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,myBuyIn=1000,ws=null,lastState=null,lastLobbyMsg=null;
+let currentGameType='cash',blindTimerInterval=null;
 
-function vs(serverSeat){return serverSeat;}
-function numVisualSeats(){return 9;}
-function updateOccupiedSeats(seats){}
-let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,myBuyIn=1000,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
-let occupiedSeats=[];
-let is2D=true;
-let currentGameType='cash';
-let blindTimerInterval=null;
+function vs(s){return s;}
+function updateOccupiedSeats(){}
+function formatChips(a,gt){return(!gt||gt==='cash')?'\u00a3'+(a/100).toFixed(2):a.toLocaleString();}
+function fc(a){return formatChips(a,currentGameType);}
 
-// ── Blind badge timer ─────────────────────────────────────────────────────────
-function startBlindBadgeCountdown(remainingMs){
+function startBlindBadgeCountdown(ms){
   if(blindTimerInterval){clearInterval(blindTimerInterval);blindTimerInterval=null;}
-  if(currentGameType!=='tournament'||remainingMs==null){return;}
-  let remaining=remainingMs;
-  const timerEl=document.getElementById('blindBadgeTimer');
-  function tick(){
-    if(remaining<=0){if(timerEl)timerEl.textContent='';return;}
-    const m=Math.floor(remaining/60000),s=Math.floor((remaining%60000)/1000);
-    if(timerEl)timerEl.textContent=m+':'+(s<10?'0':'')+s;
-    remaining-=1000;
-  }
-  tick();
-  blindTimerInterval=setInterval(tick,1000);
+  if(currentGameType!=='tournament'||ms==null)return;
+  let rem=ms;const el=document.getElementById('blindBadgeTimer');
+  function tick(){if(rem<=0){if(el)el.textContent='';return;}const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);if(el)el.textContent=m+':'+(s<10?'0':'')+s;rem-=1000;}
+  tick();blindTimerInterval=setInterval(tick,1000);
 }
-function updateBlindBadge(sb,bb,remainingMs){
-  const badge=document.getElementById('blindBadge');
-  const val=document.getElementById('blindBadgeVal');
+function updateBlindBadge(sb,bb,ms){
+  const badge=document.getElementById('blindBadge'),val=document.getElementById('blindBadgeVal');
   if(!badge||!val)return;
   if(currentGameType!=='tournament'){badge.style.display='none';return;}
   badge.style.display='inline-flex';
-  val.textContent = currentGameType === 'tournament'
-    ? sb.toLocaleString() + '/' + bb.toLocaleString()
-    : '\u00a3' + (sb/100).toFixed(2) + '/\u00a3' + (bb/100).toFixed(2);
-  startBlindBadgeCountdown(remainingMs);
+  val.textContent=sb.toLocaleString()+'/'+bb.toLocaleString();
+  startBlindBadgeCountdown(ms);
 }
 
-const LW=320,LH=128;
-// ── Chip display: cash shows £X.XX, tournament shows raw integer ──────────────
-function formatChips(amount, gameType) {
-  if (!gameType || gameType === 'cash') return '\u00a3' + (amount / 100).toFixed(2);
-  return amount.toLocaleString();
-}
-// Convenience: uses the live currentGameType so callers don't need to pass it
-function fc(amount) { return formatChips(amount, currentGameType); }
-
-// ── Player stack panel (left side, updates every state tick) ──────────────────
-function updatePlayerStackPanel(st) {
-  const panel = document.getElementById('playerStackPanel');
-  const list  = document.getElementById('playerStackList');
-  if (!panel || !list || !st || !st.players) return;
-  const seated = st.players.map((p, i) => p ? { ...p, idx: i } : null).filter(Boolean);
-  if (seated.length === 0) { panel.style.display = 'none'; return; }
-  panel.style.display = 'block';
-  list.innerHTML = '';
-  const myIdx = seated.findIndex(p => p.idx === mySeat);
-  const sorted = myIdx >= 0 ? [...seated.slice(myIdx), ...seated.slice(0, myIdx)] : seated;
-  sorted.forEach(p => {
-    const isMe = p.idx === mySeat, isActing = st.toActSeat === p.idx;
-    const row = document.createElement('div');
-    row.className = 'psp-row' + (isMe?' psp-me':'') + (isActing?' psp-acting':'') + (p.folded?' psp-folded':'');
-    const nameEl = document.createElement('div');
-    nameEl.className = 'psp-name' + (isMe?' psp-me':'');
-    if (isActing) { const a = document.createElement('span'); a.className='psp-act-arrow'; a.textContent='\u25b6 '; nameEl.appendChild(a); }
-    nameEl.appendChild(document.createTextNode(p.name));
-    if (p.isBot) {
-      const botTag = document.createElement('span');
-      botTag.style.cssText = 'font-size:9px;color:#cc88ff;margin-left:4px';
-      botTag.textContent = '🤖';
-      nameEl.appendChild(botTag);
-    }
-    const stackEl = document.createElement('div');
-    stackEl.className = 'psp-stack';
-    stackEl.textContent = formatChips(p.chips, st.gameType);
-    row.appendChild(nameEl); row.appendChild(stackEl);
-    if (p.bet > 0) {
-      const betEl = document.createElement('div');
-      betEl.className = 'psp-bet';
-      betEl.textContent = 'Bet: ' + formatChips(p.bet, st.gameType);
-      row.appendChild(betEl);
-    }
+function updatePlayerStackPanel(st){
+  const panel=document.getElementById('playerStackPanel'),list=document.getElementById('playerStackList');
+  if(!panel||!list||!st||!st.players)return;
+  const seated=st.players.map((p,i)=>p?{...p,idx:i}:null).filter(Boolean);
+  if(!seated.length){panel.style.display='none';return;}
+  panel.style.display='block';list.innerHTML='';
+  const mi=seated.findIndex(p=>p.idx===mySeat);
+  const sorted=mi>=0?[...seated.slice(mi),...seated.slice(0,mi)]:seated;
+  sorted.forEach(p=>{
+    const isMe=p.idx===mySeat,isAct=st.toActSeat===p.idx;
+    const row=document.createElement('div');
+    row.className='psp-row'+(isMe?' psp-me':'')+(isAct?' psp-acting':'')+(p.folded?' psp-folded':'');
+    const nm=document.createElement('div');nm.className='psp-name'+(isMe?' psp-me':'');
+    if(isAct){const a=document.createElement('span');a.className='psp-act-arrow';a.textContent='\u25b6 ';nm.appendChild(a);}
+    nm.appendChild(document.createTextNode(p.name));
+    if(p.isBot){const b=document.createElement('span');b.style.cssText='font-size:9px;color:#cc88ff;margin-left:4px';b.textContent='\uD83E\uDD16';nm.appendChild(b);}
+    const sk=document.createElement('div');sk.className='psp-stack';sk.textContent=formatChips(p.chips,st.gameType);
+    row.appendChild(nm);row.appendChild(sk);
+    if(p.bet>0){const be=document.createElement('div');be.className='psp-bet';be.textContent='Bet: '+formatChips(p.bet,st.gameType);row.appendChild(be);}
     list.appendChild(row);
   });
 }
@@ -638,269 +466,282 @@ function updatePlayerStackPanel(st) {
 function applyState(st){
   if(!st)return;
   lastState=st;
-  if(st.players)updateOccupiedSeats(st.players);
-  for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false,p.spectator||false,p.pendingBuyBack||false);else updateLabel(i,null,0,0,'',false,false,false,false,false);}
-  const comm=st.community||[];
-  for(let ci=0;ci<5;ci++){const mesh=communityCardMeshes[ci];if(ci<comm.length){if(!mesh||!mesh.isVisible){const m=getOrCreateCommunityMesh(ci),target=COM_POS[ci].clone();m.material=cardBackMat;m.isVisible=true;animDeal(m,target,()=>{snd_deal();const cd=comm[ci];if(cd&&cd!=='back')animFlipUp(m,cardFrontMats[cd.r+cd.s]||cardBackMat,()=>snd_flip());});}}else{if(mesh)mesh.isVisible=false;}}
-  for(let i=0;i<NP;i++){const p=st.players[i],meshes=seatCardMeshes[i];if(!p||!p.cards||p.cards.length===0){for(const m of meshes){if(m)m.isVisible=false;}seatCardMeshes[i]=[null,null];continue;}p.cards.forEach((cd,cn)=>{const m=meshes[cn];if(!m||!m.isVisible)return;if(p.folded){if(cardFoldedMat&&m.material!==cardFoldedMat)m.material=cardFoldedMat;return;}if(cd&&cd!=='back'){const fmat=cardFrontMats[cd.r+cd.s];if(fmat&&m.material!==fmat)animFlipUp(m,fmat,()=>snd_flip());}else{if(m.material!==cardBackMat)m.material=cardBackMat;}});}
   const p0=st.players[mySeat];
   if(p0)document.getElementById('myInfo').innerHTML='Stack '+formatChips(p0.chips,st.gameType)+(p0.bet>0?'<br><span style="color:#80cfff">Bet '+formatChips(p0.bet,st.gameType)+'</span>':'');
   document.getElementById('pot').textContent='POT: '+formatChips(st.pot||0,st.gameType);
   document.getElementById('phase').textContent=(st.phase||'').toUpperCase().replace('PREFLOP','PRE-FLOP');
   updatePlayerStackPanel(st);
-  // Update blind badge from state
-  if(st.gameType==='tournament'&&st.currentSB&&st.currentBB){updateBlindBadge(st.currentSB,st.currentBB,st.blindLevelRemainingMs);}
-  // Tournament: hide cash out button
-  const coBtn=document.getElementById('cashOutBtn');
-  if(coBtn)coBtn.style.display=(st.gameType==='tournament')?'none':'';
-  if(is2D)render2D(st);
+  if(st.gameType==='tournament'&&st.currentSB&&st.currentBB)updateBlindBadge(st.currentSB,st.currentBB,st.blindLevelRemainingMs);
+  const cb=document.getElementById('cashOutBtn');if(cb)cb.style.display=st.gameType==='tournament'?'none':'';
+  render2D(st);
 }
 
-function toggle2D(){is2D=!is2D;const btn=document.getElementById('toggleViewBtn');const label=document.getElementById('toggleViewLabel');const canvas=document.getElementById('c');const view2d=document.getElementById('view2d');const slider=document.getElementById('tableSlider');const bottomBar=document.getElementById('bottomBar');const stackInfo2d=document.getElementById('stackInfo2d');if(is2D){canvas.style.display='none';view2d.style.display='block';if(slider)slider.style.display='none';if(bottomBar)bottomBar.style.display='none';if(stackInfo2d)stackInfo2d.style.display='block';if(label)label.textContent='\u21923D';btn.classList.add('mode2d');btn.title='Switch to 3D view';if(lastState)render2D(lastState);}else{canvas.style.display='block';view2d.style.display='none';if(slider)slider.style.display='';if(bottomBar)bottomBar.style.display='';if(stackInfo2d)stackInfo2d.style.display='none';if(label)label.textContent='\u21922D';btn.classList.remove('mode2d');btn.title='Switch to 2D view';if(lastState)applyState(lastState);}}
-function build2DCard(rank,suit,folded){const el=document.createElement('div');el.className='p2d-card';if(folded){el.classList.add('folded');return el;}if(!rank||rank==='back'){el.classList.add('back');return el;}const isRed=(suit==='\u2665'||suit==='\u2666');el.classList.add(isRed?'red':'black');const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;el.appendChild(tl);el.appendChild(br);const ctr=document.createElement('div');ctr.className='p2dc-center';const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;ctr.appendChild(rSpan);ctr.appendChild(sSpan);el.appendChild(ctr);return el;}
-function build2DCommCard(rank,suit){const el=document.createElement('div');el.className='c2d-card';if(!rank||rank==='back'){el.classList.add('back');return el;}const isRed=(suit==='\u2665'||suit==='\u2666');el.classList.add(isRed?'red':'black');const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;el.appendChild(tl);el.appendChild(br);const ctr=document.createElement('div');ctr.className='p2dc-center';const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;ctr.appendChild(rSpan);ctr.appendChild(sSpan);el.appendChild(ctr);return el;}
-function render2D(st){if(!st||!st.players)return;const inner=document.getElementById('table2dInner');inner.querySelectorAll('.p2d-seat').forEach(el=>el.remove());document.getElementById('pot2dVal').textContent=fc(st.pot||0);const p0=st.players[mySeat];const si2d=document.getElementById('stackInfo2d');if(si2d&&p0){si2d.innerHTML='Stack '+fc(p0.chips)+(p0.bet>0?'<br><span style="color:#80cfff;font-size:11px">Bet '+fc(p0.bet)+'</span>':'');}const comm=st.community||[];const commEl=document.getElementById('community2d');commEl.innerHTML='';for(let i=0;i<5;i++){if(i<comm.length&&comm[i]&&comm[i]!=='back'){commEl.appendChild(build2DCommCard(comm[i].r,comm[i].s));}else if(i<comm.length){commEl.appendChild(build2DCommCard('back',null));}else{const ph=document.createElement('div');ph.className='c2d-card';ph.style.visibility='hidden';commEl.appendChild(ph);}}const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);const n=seated.length||2;const rx=44,ry=38;seated.forEach((srvSeat)=>{const p=st.players[srvSeat];if(!p)return;const vSeat=vs(srvSeat);const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;const px=50+rx*Math.cos(angle),py=50-ry*Math.sin(angle);const isMe=(srvSeat===mySeat),isToAct=(st.toActSeat===srvSeat),isDealer=(st.dealerSeat===srvSeat),isSB=(st.sbSeat===srvSeat),isBB=(st.bbSeat===srvSeat);const div=document.createElement('div');div.className='p2d-seat'+(isMe?' me':'');div.style.left=px+'%';div.style.top=py+'%';if(p.cards&&p.cards.length){const cardsDiv=document.createElement('div');cardsDiv.className='p2d-cards';p.cards.forEach(cd=>{const rank=cd&&cd!=='back'?cd.r:null,suit=cd&&cd!=='back'?cd.s:null;cardsDiv.appendChild(build2DCard(rank,suit,p.folded));});div.appendChild(cardsDiv);}const info=document.createElement('div');info.className='p2d-info';const nameDiv=document.createElement('div');nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');nameDiv.textContent=p.name;info.appendChild(nameDiv);const tokens=document.createElement('div');if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}if(tokens.children.length)info.appendChild(tokens);if(!isMe){const stackDiv=document.createElement('div');stackDiv.className='p2d-stack';stackDiv.textContent=fc(p.chips);info.appendChild(stackDiv);}if(p.bet>0){const betDiv=document.createElement('div');betDiv.className='p2d-bet';betDiv.textContent='bet '+fc(p.bet);info.appendChild(betDiv);}div.appendChild(info);inner.appendChild(div);});}
-let _reconnectTimer=null,_reconnectAttempts=0,_intentionalClose=false,_serverShutdown=false;
-const MAX_RECONNECT_ATTEMPTS=12;
-const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,10000,10000,10000,10000,10000];
-const SHUTDOWN_FIRST_DELAY=12000;
-function connectWS(name,roomId,playerId){_intentionalClose=false;if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);ws.onopen=()=>{_reconnectAttempts=0;_serverShutdown=false;const rb=document.getElementById('reconnectBanner');if(rb)rb.style.display='none';ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId,buyIn:myBuyIn}));};ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};ws.onclose=()=>{if(_intentionalClose)return;if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){showRestartPrompt();return;}const baseDelay=_serverShutdown&&_reconnectAttempts===0?SHUTDOWN_FIRST_DELAY:RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];_reconnectAttempts++;showReconnectBanner(_reconnectAttempts,baseDelay);_reconnectTimer=setTimeout(()=>{if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);},baseDelay);};ws.onerror=()=>{if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';}};}
-function showReconnectBanner(attempt,delayMs){let rb=document.getElementById('reconnectBanner');if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';document.body.appendChild(rb);}rb.style.display='block';const secs=Math.round(delayMs/1000);const shutMsg=_serverShutdown?'\nServer restarting \u2014 please wait\u2026':'';rb.textContent='\u26A0 Reconnecting\u2026 ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+secs+'s'+shutMsg;if(rb._countdown)clearInterval(rb._countdown);let remaining=secs;rb._countdown=setInterval(()=>{remaining--;if(remaining<=0){clearInterval(rb._countdown);rb._countdown=null;return;}const sm=_serverShutdown?'\nServer restarting \u2014 please wait\u2026':'';rb.textContent='\u26A0 Reconnecting\u2026 ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+remaining+'s'+sm;},1000);}
-function showRestartPrompt(){let rb=document.getElementById('reconnectBanner');if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';document.body.appendChild(rb);}rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.96);border:2px solid #c84040;border-radius:14px;padding:24px 32px;color:#ff9090;font-size:15px;font-weight:bold;text-align:center;z-index:999;min-width:280px';rb.innerHTML='\u26A0 Lost connection to server.<br><br><span style="color:#c8a060;font-weight:normal;font-size:13px">The server may have restarted.<br>Your seat will be held if you reconnect.</span><br><br><button onclick="location.reload()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:14px;font-weight:bold;cursor:pointer">\uD83D\uDD04 Reload &amp; Reconnect</button>';}
-function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&myName&&myRoomId&&myId){if(!ws||ws.readyState===WebSocket.CLOSED||ws.readyState===WebSocket.CLOSING){if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}_reconnectAttempts=0;showReconnectBanner(1,0);connectWS(myName,myRoomId,myId);}}});
-
-// ── Tournament lobby controls ─────────────────────────────────────────────────
-let pendingGameType='cash';
-function selectGameType(type){
-  pendingGameType=type;
-  document.getElementById('typeBtnCash').classList.toggle('active',type==='cash');
-  document.getElementById('typeBtnTournament').classList.toggle('active',type==='tournament');
-  const ts=document.getElementById('tournamentSettings');
-  if(ts)ts.classList.toggle('visible',type==='tournament');
-  pushGameTypeSettings();
+function build2DCard(rank,suit,folded){
+  const el=document.createElement('div');el.className='p2d-card';
+  if(folded){el.classList.add('folded');return el;}
+  if(!rank||rank==='back'){el.classList.add('back');return el;}
+  const red=suit==='\u2665'||suit==='\u2666';el.classList.add(red?'red':'black');
+  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
+  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
+  const ctr=document.createElement('div');ctr.className='p2dc-center';
+  const rs=document.createElement('span');rs.className='p2dc-rank';rs.textContent=rank;
+  const ss=document.createElement('span');ss.className='p2dc-suit';ss.textContent=suit;
+  ctr.appendChild(rs);ctr.appendChild(ss);el.appendChild(tl);el.appendChild(br);el.appendChild(ctr);return el;
 }
-function pushGameTypeSettings(){
-  if(!isHost)return;
-  const chips=Math.max(100,parseInt(document.getElementById('tsChips').value)||8000);
-  const mins=parseInt(document.getElementById('tsBlindMins').value)||10;
-  wsSend({type:'setGameType',gameType:pendingGameType,tournamentChips:chips,blindLevelDuration:mins});
+function build2DCommCard(rank,suit){
+  const el=document.createElement('div');el.className='c2d-card';
+  if(!rank||rank==='back'){el.classList.add('back');return el;}
+  const red=suit==='\u2665'||suit==='\u2666';el.classList.add(red?'red':'black');
+  const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;
+  const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;
+  const ctr=document.createElement('div');ctr.className='p2dc-center';
+  const rs=document.createElement('span');rs.className='p2dc-rank';rs.textContent=rank;
+  const ss=document.createElement('span');ss.className='p2dc-suit';ss.textContent=suit;
+  ctr.appendChild(rs);ctr.appendChild(ss);el.appendChild(tl);el.appendChild(br);el.appendChild(ctr);return el;
 }
-
-function showTournamentResults(placement, winnerName){
-  const ov=document.getElementById('tournamentOverOverlay');
-  const winEl=document.getElementById('trWinnerText');
-  const tbody=document.getElementById('trPlacementBody');
-  if(!ov||!tbody)return;
-  if(winEl)winEl.textContent='\uD83C\uDFC6 Winner: '+winnerName+'!';
-  const sorted=[...(placement||[])].sort((a,b)=>a.place-b.place);
-  tbody.innerHTML='';
-  sorted.forEach(p=>{
-    const tr=document.createElement('tr');
-    const placeClass=p.place<=3?'place-'+p.place:'';
-    if(placeClass)tr.className=placeClass;
-    const medal=p.place===1?'\uD83E\uDD47':p.place===2?'\uD83E\uDD48':p.place===3?'\uD83E\uDD49':'';
-    tr.innerHTML='<td>'+medal+' '+p.place+'</td><td>'+p.name+'</td>';
-    tbody.appendChild(tr);
+function render2D(st){
+  if(!st||!st.players)return;
+  const inner=document.getElementById('table2dInner');inner.querySelectorAll('.p2d-seat').forEach(e=>e.remove());
+  document.getElementById('pot2dVal').textContent=fc(st.pot||0);
+  const p0=st.players[mySeat],si=document.getElementById('stackInfo2d');
+  if(si&&p0)si.innerHTML='Stack '+fc(p0.chips)+(p0.bet>0?'<br><span style="color:#80cfff;font-size:11px">Bet '+fc(p0.bet)+'</span>':'');
+  const comm=st.community||[],ce=document.getElementById('community2d');ce.innerHTML='';
+  for(let i=0;i<5;i++){
+    if(i<comm.length&&comm[i]&&comm[i]!=='back')ce.appendChild(build2DCommCard(comm[i].r,comm[i].s));
+    else if(i<comm.length)ce.appendChild(build2DCommCard('back',null));
+    else{const ph=document.createElement('div');ph.className='c2d-card';ph.style.visibility='hidden';ce.appendChild(ph);}
+  }
+  const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null),n=seated.length||2;
+  seated.forEach(srv=>{
+    const p=st.players[srv];if(!p)return;
+    const angle=-Math.PI/2-(vs(srv)/n)*Math.PI*2;
+    const px=50+44*Math.cos(angle),py=50-38*Math.sin(angle);
+    const isMe=srv===mySeat,isAct=st.toActSeat===srv,isD=st.dealerSeat===srv,isSB=st.sbSeat===srv,isBB=st.bbSeat===srv;
+    const div=document.createElement('div');div.className='p2d-seat'+(isMe?' me':'');div.style.left=px+'%';div.style.top=py+'%';
+    if(p.cards&&p.cards.length){const cd=document.createElement('div');cd.className='p2d-cards';p.cards.forEach(c=>{cd.appendChild(build2DCard(c&&c!=='back'?c.r:null,c&&c!=='back'?c.s:null,p.folded));});div.appendChild(cd);}
+    const info=document.createElement('div');info.className='p2d-info';
+    const nd=document.createElement('div');nd.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');nd.textContent=p.name;info.appendChild(nd);
+    const tok=document.createElement('div');
+    if(isAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tok.appendChild(t);}
+    if(isD){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tok.appendChild(t);}
+    if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tok.appendChild(t);}
+    if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tok.appendChild(t);}
+    if(tok.children.length)info.appendChild(tok);
+    if(!isMe){const sd=document.createElement('div');sd.className='p2d-stack';sd.textContent=fc(p.chips);info.appendChild(sd);}
+    if(p.bet>0){const bd=document.createElement('div');bd.className='p2d-bet';bd.textContent='bet '+fc(p.bet);info.appendChild(bd);}
+    div.appendChild(info);inner.appendChild(div);
   });
-  ov.style.display='flex';
 }
+
+let _reconnectTimer=null,_reconnectAttempts=0,_intentionalClose=false,_serverShutdown=false;
+const MAX_RECONNECT_ATTEMPTS=12,RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,10000,10000,10000,10000,10000],SHUTDOWN_FIRST_DELAY=12000;
+function connectWS(name,roomId,playerId){
+  _intentionalClose=false;if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}
+  const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);
+  ws.onopen=()=>{_reconnectAttempts=0;_serverShutdown=false;const rb=document.getElementById('reconnectBanner');if(rb)rb.style.display='none';ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId,buyIn:myBuyIn}));};
+  ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};
+  ws.onclose=()=>{if(_intentionalClose)return;if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){showRestartPrompt();return;}const d=_serverShutdown&&_reconnectAttempts===0?SHUTDOWN_FIRST_DELAY:RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];_reconnectAttempts++;showReconnectBanner(_reconnectAttempts,d);_reconnectTimer=setTimeout(()=>{if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);},d);};
+  ws.onerror=()=>{if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';}};
+}
+function showReconnectBanner(a,d){let rb=document.getElementById('reconnectBanner');if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';document.body.appendChild(rb);}rb.style.display='block';const s=Math.round(d/1000);rb.textContent='\u26A0 Reconnecting\u2026 ('+a+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+s+'s';if(rb._cd)clearInterval(rb._cd);let rem=s;rb._cd=setInterval(()=>{rem--;if(rem<=0){clearInterval(rb._cd);rb._cd=null;return;}rb.textContent='\u26A0 Reconnecting\u2026 ('+a+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+rem+'s';},1000);}
+function showRestartPrompt(){let rb=document.getElementById('reconnectBanner');if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';document.body.appendChild(rb);}rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.96);border:2px solid #c84040;border-radius:14px;padding:24px 32px;color:#ff9090;font-size:15px;font-weight:bold;text-align:center;z-index:999;min-width:280px';rb.innerHTML='\u26A0 Lost connection to server.<br><br><button onclick="location.reload()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:14px;font-weight:bold;cursor:pointer">\uD83D\uDD04 Reload &amp; Reconnect</button>';}
+function wsSend(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&myName&&myRoomId&&myId&&(!ws||ws.readyState===WebSocket.CLOSED||ws.readyState===WebSocket.CLOSING)){if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}_reconnectAttempts=0;showReconnectBanner(1,0);connectWS(myName,myRoomId,myId);}});
+
+let pendingGameType='cash';
+function selectGameType(type){pendingGameType=type;document.getElementById('typeBtnCash').classList.toggle('active',type==='cash');document.getElementById('typeBtnTournament').classList.toggle('active',type==='tournament');const ts=document.getElementById('tournamentSettings');if(ts)ts.classList.toggle('visible',type==='tournament');pushGameTypeSettings();}
+function pushGameTypeSettings(){if(!isHost)return;const chips=Math.max(100,parseInt(document.getElementById('tsChips').value)||8000),mins=parseInt(document.getElementById('tsBlindMins').value)||10;wsSend({type:'setGameType',gameType:pendingGameType,tournamentChips:chips,blindLevelDuration:mins});}
+function showTournamentResults(placement,winner){const ov=document.getElementById('tournamentOverOverlay'),tb=document.getElementById('trPlacementBody');if(!ov||!tb)return;const we=document.getElementById('trWinnerText');if(we)we.textContent='\uD83C\uDFC6 Winner: '+winner+'!';const s=[...(placement||[])].sort((a,b)=>a.place-b.place);tb.innerHTML='';s.forEach(p=>{const tr=document.createElement('tr');if(p.place<=3)tr.className='place-'+p.place;const m=p.place===1?'\uD83E\uDD47':p.place===2?'\uD83E\uDD48':p.place===3?'\uD83E\uDD49':'';tr.innerHTML='<td>'+m+' '+p.place+'</td><td>'+p.name+'</td>';tb.appendChild(tr);});ov.style.display='flex';}
 
 function handleServerMsg(msg){switch(msg.type){
-case 'serverShutdown':{_serverShutdown=true;showReconnectBanner(0,SHUTDOWN_FIRST_DELAY);addLog('\u26A0 Server restarting \u2014 will reconnect automatically\u2026','log-fold');break;}
-case 'logEvent':{addLog(msg.text,'log-system');break;}
+case 'serverShutdown':_serverShutdown=true;showReconnectBanner(0,SHUTDOWN_FIRST_DELAY);addLog('\u26A0 Server restarting','log-fold');break;
+case 'logEvent':addLog(msg.text,'log-system');break;
 case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';break;
 case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
-case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
+case 'lobby':renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
-case 'winner':snd_win();hideTurnIndicator();addLog('\uD83C\uDFC6\uD83D\uDCA6 '+msg.name+' wins '+fc(msg.amount)+' \u2014 '+(msg.label||''),'log-win');showMsg('\uD83C\uDFC6 '+msg.name+' wins '+fc(msg.amount)+'\n'+(msg.label||'')+'!',0);setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
+case 'winner':snd_win();hideTurnIndicator();addLog('\uD83C\uDFC6 '+msg.name+' wins '+fc(msg.amount)+' \u2014 '+(msg.label||''),'log-win');showMsg('\uD83C\uDFC6 '+msg.name+' wins '+fc(msg.amount)+'\n'+(msg.label||'')+'!',0);setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
 case 'gameStarting':startKeepAliveTimer();currentGameType=msg.gameType||'cash';
-  {const lp=document.getElementById('dialLabelPounds'),lc=document.getElementById('dialLabelPence');if(lp&&lc){if(currentGameType==='tournament'){lp.textContent='';lc.textContent='';}else{lp.innerHTML='pounds &pound;';lc.textContent='pence';}}}document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');{const tvb=document.getElementById('toggleViewBtn');tvb.style.display='flex';const tvl=document.getElementById('toggleViewLabel');if(tvl)tvl.textContent='\u21922D';}if(currentGameType==='tournament'){addLog('\uD83C\uDFC6 TOURNAMENT STARTED','log-hand');}setTimeout(()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn&&fsBtn.style.display!=='none'&&!document.fullscreenElement){const hint=document.createElement('div');hint.id='fsHint';hint.style.cssText='position:fixed;bottom:60px;right:10px;background:rgba(0,0,0,0.92);border:1px solid #c8a020;border-radius:10px;padding:10px 14px;color:#ffd700;font-size:13px;font-weight:bold;z-index:300;pointer-events:none;text-align:right;line-height:1.5;animation:fsHintFade 4.5s ease forwards';hint.innerHTML='Tap <strong style="color:#c8a060">&#x26F6;</strong> bottom-right<br><span style="font-size:11px;color:#c8a060;font-weight:normal">for fullscreen</span>';document.body.appendChild(hint);if(!document.getElementById('fsHintStyle')){const st=document.createElement('style');st.id='fsHintStyle';st.textContent='@keyframes fsHintFade{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1}100%{opacity:0}}';document.head.appendChild(st);}setTimeout(()=>{const h=document.getElementById('fsHint');if(h)h.remove();},4600);}},800);break;
-case 'newHand':{seatActions={};showMsg('');setActions(false);hideTurnIndicator();document.getElementById('waitingMsg').style.display='none';const specBanner=document.getElementById('spectatorBanner');specBanner.textContent='\uD83D\uDC40 You are spectating \u2014 no cards will be dealt to you';specBanner.style.display='none';const coBtn=document.getElementById('cashOutBtn');coBtn.classList.remove('pending');coBtn.textContent='CASH OUT';coBtn.style.display=(msg.gameType==='tournament')?'none':'';
-  if(window.drumReset) window.drumReset((msg.bb||20) * 2);
-  // Update blind badge
-  if(msg.gameType==='tournament'){updateBlindBadge(msg.sb||10,msg.bb||20,null);}
-  handNumber++;addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+(msg.gameType==='tournament'?' | Level '+(msg.blindLevel+1)+' '+fc(msg.sb||10)+'/'+fc(msg.bb||20):''),' log-hand');addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));const sbSeat=msg.sbSeat,bbSeat=msg.bbSeat,dealerSeat=msg.dealerSeat;const rawSeats=msg.activeSeats||[];const dealStartSeat=(dealerSeat===sbSeat)?bbSeat:sbSeat;const dsIdx=rawSeats.indexOf(dealStartSeat);const dealSeats=dsIdx>=0?[...rawSeats.slice(dsIdx),...rawSeats.slice(0,dsIdx)]:rawSeats;break;}
-case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(msg.gameType)currentGameType=msg.gameType;
+  {const lp=document.getElementById('dialLabelPounds'),lc=document.getElementById('dialLabelPence');if(lp&&lc){if(currentGameType==='tournament'){lp.textContent='';lc.textContent='';}else{lp.innerHTML='pounds &pound;';lc.textContent='pence';}}}
+  document.getElementById('lobbyOverlay').style.display='none';document.getElementById('gameUI').style.display='block';
+  document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');
+  if(currentGameType==='tournament')addLog('\uD83C\uDFC6 TOURNAMENT STARTED','log-hand');break;
+case 'newHand':
+  seatActions={};showMsg('');setActions(false);hideTurnIndicator();
+  document.getElementById('waitingMsg').style.display='none';document.getElementById('spectatorBanner').style.display='none';
+  {const cb=document.getElementById('cashOutBtn');cb.classList.remove('pending');cb.textContent='CASH OUT';cb.style.display=msg.gameType==='tournament'?'none':'';}
+  if(window.drumReset)window.drumReset((msg.bb||20)*2);
+  if(msg.gameType==='tournament')updateBlindBadge(msg.sb||10,msg.bb||20,null);
+  handNumber++;addLog('\u2501\u2501 Hand #'+handNumber+' | Dealer: Seat '+(msg.dealerSeat+1)+(msg.gameType==='tournament'?' | Level '+(msg.blindLevel+1)+' '+fc(msg.sb||10)+'/'+fc(msg.bb||20):''),' log-hand');
+  addLog('SB: Seat '+(msg.sbSeat+1)+' \u00b7 BB: Seat '+(msg.bbSeat+1));
+  if(lastState)applyState(lastState);break;
+case 'state':lastState=msg;if(msg.gameType)currentGameType=msg.gameType;
   if(msg.players)msg.players.forEach(p=>{if(p&&p.id&&p.chips>0)noteStartChips(p.id,p.chips);});
-  if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='flex';}if(!dealing)applyState(msg);break;
-case 'playerAction':{const pname=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL '+fc(msg.amount||0):'RAISE '+fc(msg.amount||0);if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;const logClass=msg.action==='fold'?'log-action':'log-action';addLog('\u27a4 '+pname+': '+ac, logClass);if(msg.amount>0)showBet(msg.seat,msg.amount);hideTurnIndicator();if(lastState)applyState(lastState);break;}
-case 'yourTurn':{const ca=msg.callAmt||0;if(msg.seat===mySeat){const callLabel=ca>0?'CALL '+fc(ca):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2B50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
-case 'communityDealt':addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');sweepBetsToPot(()=>{// 3D deal animation removed — apply state directly
-setTimeout(()=>{ if(lastState)applyState(lastState); },120);
-break;
-case 'showdown':setPhase('Showdown');hideTurnIndicator();/* sweepBetsToPot removed */addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\uD83C\uDCCF Showdown!',2000);break;
+  if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');}
+  applyState(msg);break;
+case 'playerAction':
+  {const pn=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL '+fc(msg.amount||0):'RAISE '+fc(msg.amount||0);if(msg.label&&msg.label.trim())ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;addLog('\u27a4 '+pn+': '+ac,'log-action');hideTurnIndicator();if(lastState)applyState(lastState);}break;
+case 'yourTurn':
+  {const ca=msg.callAmt||0;if(msg.seat===mySeat){document.getElementById('callBtn').textContent=ca>0?'CALL '+fc(ca):'CHECK';const rb=document.getElementById('raiseBtn');if(rb)rb.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2B50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const ap=lastState&&lastState.players[msg.seat];startCountdown(false,ap?ap.name:'Seat '+(msg.seat+1));}}break;
+case 'communityDealt':
+  addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');
+  setTimeout(()=>{if(lastState)applyState(lastState);},120);break;
+case 'showdown':setPhase('Showdown');hideTurnIndicator();addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\uD83C\uDCCF Showdown!',2000);break;
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
 case 'playerLeft':addLog(msg.name+' left the table');addChat('\u2b05 '+msg.name+' left');seatActions[msg.seat]='';
   if(pendingInGame[msg.id]){delete pendingInGame[msg.id];refreshInGameJoinNotif();}
-  if(msg.chips===0&&msg.id&&msg.name&&_startChips[msg.id]){recordElimination(msg.id,msg.name,_startChips[msg.id],0);document.getElementById('eliminatedBox').style.display='block';}else if(msg.chips!==undefined&&msg.id&&_startChips[msg.id]){const net=msg.chips-_startChips[msg.id];addLedgerEvent('\uD83D\uDCB0 '+msg.name+' cashed out '+fc(msg.chips)+' (net '+(net>=0?'+':'-')+fc(Math.abs(net))+')');}
+  if(msg.chips===0&&msg.id&&_startChips[msg.id]){recordElimination(msg.id,msg.name,_startChips[msg.id],0);document.getElementById('eliminatedBox').style.display='block';}
+  else if(msg.chips!==undefined&&msg.id&&_startChips[msg.id]){const net=msg.chips-_startChips[msg.id];addLedgerEvent('\uD83D\uDCB0 '+msg.name+' cashed out '+fc(msg.chips)+' (net '+(net>=0?'+':'-')+fc(Math.abs(net))+')');}
   if(msg.id===myId){_intentionalClose=true;setTimeout(()=>location.reload(),600);return;}
-  if(lastState)applyState(lastState);
-  break;
-case 'sittingOut':{document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';const wmEl=document.getElementById('waitingMsg');wmEl.textContent=msg.reason||'Sitting out\u2026';wmEl.style.display='block';break;}
+  if(lastState)applyState(lastState);break;
+case 'sittingOut':document.getElementById('gameUI').style.display='block';document.getElementById('lobbyOverlay').style.display='none';{const w=document.getElementById('waitingMsg');w.textContent=msg.reason||'Sitting out\u2026';w.style.display='block';}break;
 case 'gamePaused':handlePaused(true,msg.byName);break;
 case 'gameResumed':handlePaused(false,msg.byName);break;
-case 'cashOutPending':{const btn=document.getElementById('cashOutBtn');btn.classList.add('pending');btn.textContent='CASH OUT \u23f3';addLog('\uD83D\uDCB0 CASH OUT: '+(myName||'You')+' will cash out after this hand','log-win');showMsg('\u23f3 Cash out queued \u2014 you will leave after this hand.',3500);break;}
-case 'voluntaryAutoFoldAck':addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON: You will fold every hand until you turn this off':'OFF: You are back in the game'));break;
-case 'buyBackOffer':{document.getElementById('buyBackOverlay').style.display='flex';addLog('\uD83D\uDCB8 You are out of chips! Choose to buy back in or spectate.','log-hand');let _bbSecs=15;const _bbEl=document.getElementById('buyBackTimer');_bbEl.textContent=_bbSecs;if(window._buyBackInterval)clearInterval(window._buyBackInterval);window._buyBackInterval=setInterval(()=>{_bbSecs--;_bbEl.textContent=_bbSecs;if(_bbSecs<=0){clearInterval(window._buyBackInterval);window._buyBackInterval=null;respondBuyBack(false);}},1000);break;}
-case 'buyBackAccepted':{document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='none';showMsg('\u2705 Bought back in!\nYou\u2019ll be dealt in from the next hand.',4500);addLog('\u2705 BUY-BACK accepted','log-win');break;}
-case 'spectating':{document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='block';addLog('\uD83D\uDC40 You are now spectating','log-hand');break;}
-// ── Tournament messages ──────────────────────────────────────────────────────
-case 'blindLevelUp':{
-  const sb=msg.sb,bb=msg.bb,level=msg.level;
-  const sbStr=fc(sb),bbStr=fc(bb);
-  snd_joinAlert();
-  addLog('\uD83D\uDCC8 BLIND LEVEL UP \u2192 Level '+(level+1)+' | SB '+sbStr+' / BB '+bbStr,'log-win');
-  showMsg('\uD83D\uDCC8 Blinds increase!\nLevel '+(level+1)+': '+sbStr+'/'+bbStr,4000);
-  updateBlindBadge(sb,bb,msg.nextLevelMs||null);
-  if(window.drumReset)window.drumReset(bb*2);
-  break;}
-case 'tournamentEliminated':{
-  const place=msg.place,total=msg.totalPlayers;
-  const suffix=place===1?'st':place===2?'nd':place===3?'rd':'th';
-  document.getElementById('elimPlaceText').textContent=place+suffix+' Place';
-  document.getElementById('elimMsg').textContent='You finished in place '+place+(total?' of '+total:'')+'. Well played!';
-  document.getElementById('tournamentEliminatedOverlay').style.display='flex';
-  addLog('\uD83C\uDFC6 You finished '+place+suffix+'!','log-win');
-  break;}
-case 'tournamentEliminatedBroadcast':{
-  const pl=msg.placement||[];
-  if(pl.length){const latest=pl[pl.length-1];addLog('\uD83D\uDED1 '+latest.name+' eliminated \u2014 finished '+latest.place+'th','log-fold');}
-  break;}
-case 'tournamentOver':{
-  snd_win();snd_win();
-  showTournamentResults(msg.placement, msg.winner);
-  addLog('\uD83C\uDFC6 TOURNAMENT OVER! Winner: '+msg.winner,'log-win');
-  break;}
+case 'cashOutPending':{const b=document.getElementById('cashOutBtn');b.classList.add('pending');b.textContent='CASH OUT \u23f3';addLog('\uD83D\uDCB0 CASH OUT: '+(myName||'You')+' will cash out after this hand','log-win');showMsg('\u23f3 Cash out queued',3500);}break;
+case 'voluntaryAutoFoldAck':addLog('\u23f8 AUTO-FOLD '+(myAutoFold?'ON':'OFF'));break;
+case 'buyBackOffer':document.getElementById('buyBackOverlay').style.display='flex';addLog('\uD83D\uDCB8 Out of chips!','log-hand');{let s=15;const el=document.getElementById('buyBackTimer');el.textContent=s;if(window._buyBackInterval)clearInterval(window._buyBackInterval);window._buyBackInterval=setInterval(()=>{s--;el.textContent=s;if(s<=0){clearInterval(window._buyBackInterval);window._buyBackInterval=null;respondBuyBack(false);}},1000);}break;
+case 'buyBackAccepted':document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='none';showMsg('\u2705 Bought back in!\nYou'll be dealt in from the next hand.',4500);addLog('\u2705 BUY-BACK accepted','log-win');break;
+case 'spectating':document.getElementById('buyBackOverlay').style.display='none';document.getElementById('spectatorBanner').style.display='block';addLog('\uD83D\uDC40 You are now spectating','log-hand');break;
+case 'blindLevelUp':{const sb=msg.sb,bb=msg.bb,lv=msg.level;snd_joinAlert();addLog('\uD83D\uDCC8 BLIND LEVEL UP \u2192 Level '+(lv+1)+' | '+fc(sb)+'/'+fc(bb),'log-win');showMsg('\uD83D\uDCC8 Blinds increase!\nLevel '+(lv+1)+': '+fc(sb)+'/'+fc(bb),4000);updateBlindBadge(sb,bb,msg.nextLevelMs||null);if(window.drumReset)window.drumReset(bb*2);}break;
+case 'tournamentEliminated':{const pl=msg.place,tot=msg.totalPlayers,sx=pl===1?'st':pl===2?'nd':pl===3?'rd':'th';document.getElementById('elimPlaceText').textContent=pl+sx+' Place';document.getElementById('elimMsg').textContent='You finished in place '+pl+(tot?' of '+tot:'')+'. Well played!';document.getElementById('tournamentEliminatedOverlay').style.display='flex';addLog('\uD83C\uDFC6 You finished '+pl+sx+'!','log-win');}break;
+case 'tournamentEliminatedBroadcast':{const pl=msg.placement||[];if(pl.length){const la=pl[pl.length-1];addLog('\uD83D\uDED1 '+la.name+' eliminated \u2014 finished '+la.place+'th','log-fold');}}break;
+case 'tournamentOver':snd_win();snd_win();showTournamentResults(msg.placement,msg.winner);addLog('\uD83C\uDFC6 TOURNAMENT OVER! Winner: '+msg.winner,'log-win');break;
 case 'chat':addChat(msg.name+': '+msg.text);break;
-case 'error':addChat('\u26a0 '+msg.msg);break;}}
+case 'error':addChat('\u26a0 '+msg.msg);break;
+}}
 
-function renderLobby(msg){lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;if(msg.gameActive)return;document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';const seated=msg.seats.filter(Boolean);for(const s of seated){const div=document.createElement('div');div.className='player-row';div.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(div);}const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const row=document.createElement('div');row.className='pending-row';row.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(\''+p.id+'\',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(\''+p.id+'\',false)">\u2717 Reject</button></span>';pi.appendChild(row);}}else{ps.style.display='none';}
-  // Show game type section for host
-  const gts=document.getElementById('gameTypeSection');
-  if(gts){gts.style.display=isHost?'block':'none';}
-  // Sync lobby state with server settings
-  if(msg.gameType){pendingGameType=msg.gameType;const btnC=document.getElementById('typeBtnCash'),btnT=document.getElementById('typeBtnTournament');if(btnC)btnC.classList.toggle('active',msg.gameType==='cash');if(btnT)btnT.classList.toggle('active',msg.gameType==='tournament');const ts=document.getElementById('tournamentSettings');if(ts)ts.classList.toggle('visible',msg.gameType==='tournament');if(msg.tournamentChips){const ci=document.getElementById('tsChips');if(ci)ci.value=msg.tournamentChips;}if(msg.blindLevelDuration){const bi=document.getElementById('tsBlindMins');if(bi)bi.value=msg.blindLevelDuration;}}
-  // Show bot section for host pre-game
-  const botSec = document.getElementById('botSection');
-  if (botSec) botSec.style.display = isHost ? 'block' : 'none';
-  const botCountEl = document.getElementById('botCount');
-  if (botCountEl) {
-    const numBots = seated.filter(s => s.isBot).length;
-    botCountEl.textContent = numBots > 0 ? numBots + ' bot' + (numBots > 1 ? 's' : '') + ' at the table' : 'No bots yet — up to ' + (9 - seated.length) + ' can join';
-  }
-  // Cash stake input for non-host players in cash game
-  const css=document.getElementById('cashStakeSection');
-  if(css){const showStake=!isHost&&msg.gameType==='cash';css.style.display=showStake?'block':'none';}
-  const statusEl=document.getElementById('lobbyStatus');const gameMode=msg.gameType==='tournament'?'\uD83C\uDFC6 Tournament (\u007b\u007b chips\u007d\u007d starting chips)'.replace('\u007b\u007b chips\u007d\u007d',(msg.tournamentChips||8000).toLocaleString()):'\uD83D\uDCB0 Cash Game (buy-in \u00a3'+((msg.buyIn||1000)/100).toFixed(2)+')';if(isHost)statusEl.innerHTML=seated.length<2?'Waiting for more players to join\u2026':'Ready to start! Mode: '+gameMode;else statusEl.innerHTML='Waiting for host to start\u2026 <span style="color:#ffd700">'+gameMode+'</span>';const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else{sb.style.display='none';}}
+function renderLobby(msg){
+  lastLobbyMsg=msg;myRoomId=msg.roomId;document.getElementById('lobbyRoomId').textContent=msg.roomId;
+  if(msg.gameActive)return;
+  document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='flex';
+  const pl=document.getElementById('playerList');pl.innerHTML='<h3 style="color:#c8a020;margin-bottom:8px">Players at table:</h3>';
+  const seated=msg.seats.filter(Boolean);
+  for(const s of seated){const d=document.createElement('div');d.className='player-row';d.innerHTML='<span>'+s.name+(s.id===msg.hostId?'<span class="host-badge">HOST</span>':'')+'</span><span class="chips">\u00a3'+(s.chips/100).toFixed(2)+'</span>';pl.appendChild(d);}
+  const ps=document.getElementById('pendingSection'),pi=document.getElementById('pendingItems'),pending=msg.pending||[];
+  if(isHost&&pending.length>0){ps.style.display='block';pi.innerHTML='';for(const p of pending){const r=document.createElement('div');r.className='pending-row';r.innerHTML='<span>'+p.name+'</span><span><button class="btn-sm btn-approve" onclick="approvePlayer(''+p.id+'',true)">\u2713 Admit</button><button class="btn-sm btn-reject" onclick="approvePlayer(''+p.id+'',false)">\u2717 Reject</button></span>';pi.appendChild(r);}}else{ps.style.display='none';}
+  const gts=document.getElementById('gameTypeSection');if(gts)gts.style.display=isHost?'block':'none';
+  if(msg.gameType){pendingGameType=msg.gameType;document.getElementById('typeBtnCash').classList.toggle('active',msg.gameType==='cash');document.getElementById('typeBtnTournament').classList.toggle('active',msg.gameType==='tournament');const ts=document.getElementById('tournamentSettings');if(ts)ts.classList.toggle('visible',msg.gameType==='tournament');if(msg.tournamentChips){const ci=document.getElementById('tsChips');if(ci)ci.value=msg.tournamentChips;}if(msg.blindLevelDuration){const bi=document.getElementById('tsBlindMins');if(bi)bi.value=msg.blindLevelDuration;}}
+  const bs=document.getElementById('botSection');if(bs)bs.style.display=isHost?'block':'none';
+  const bc=document.getElementById('botCount');if(bc){const nb=seated.filter(s=>s.isBot).length;bc.textContent=nb>0?nb+' bot'+(nb>1?'s':'')+' at the table':'No bots yet';}
+  const css=document.getElementById('cashStakeSection');if(css)css.style.display=(!isHost&&msg.gameType==='cash')?'block':'none';
+  const gm=msg.gameType==='tournament'?'\uD83C\uDFC6 Tournament ('+(msg.tournamentChips||8000).toLocaleString()+' chips)':'\uD83D\uDCB0 Cash Game (buy-in \u00a3'+((msg.buyIn||1000)/100).toFixed(2)+')';
+  const sl=document.getElementById('lobbyStatus');if(isHost)sl.innerHTML=seated.length<2?'Waiting for more players\u2026':'Ready to start! Mode: '+gm;else sl.innerHTML='Waiting for host\u2026 <span style="color:#ffd700">'+gm+'</span>';
+  const sb=document.getElementById('startBtn');if(isHost){sb.style.display='block';sb.disabled=seated.length<2;}else sb.style.display='none';
+}
 
 function approvePlayer(id,accept){wsSend({type:'approve',id,accept});}
-function addBot() { wsSend({ type: 'addBot' }); }
-function removeBot() { wsSend({ type: 'removeBot' }); }
-function onCashStakeChange(val){myBuyIn=Math.round((parseFloat(val)||10)*100);}
-function updateLedgerStacks(){if(!lastState||!lastState.players)return;const seated=lastState.players.filter(Boolean);if(!seated.length)return;let txt='\uD83D\uDCCA After hand #'+handNumber+': '+seated.map(p=>p.name+' '+fc(p.chips)).join(' | ');addLedgerEvent(txt);}
+function addBot(){wsSend({type:'addBot'});}
+function removeBot(){wsSend({type:'removeBot'});}
+function onCashStakeChange(v){myBuyIn=Math.round((parseFloat(v)||10)*100);}
+function updateLedgerStacks(){if(!lastState||!lastState.players)return;const s=lastState.players.filter(Boolean);if(!s.length)return;addLedgerEvent('\uD83D\uDCCA After hand #'+handNumber+': '+s.map(p=>p.name+' '+fc(p.chips)).join(' | '));}
 function exitGame(){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}document.getElementById('buyBackOverlay').style.display='none';_intentionalClose=true;wsSend({type:'exitGame'});}
-function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}const stakeInput=document.getElementById('buyBackStakeInput');const buyIn=accept?Math.round((parseFloat((stakeInput?stakeInput.value:'').replace(/[^0-9.]/g,''))||10)*100):null;wsSend({type:'buyBack',accept,buyIn});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
+function respondBuyBack(accept){if(window._buyBackInterval){clearInterval(window._buyBackInterval);window._buyBackInterval=null;}const si=document.getElementById('buyBackStakeInput');const buyIn=accept?Math.round((parseFloat((si?si.value:'').replace(/[^0-9.]/g,''))||10)*100):null;wsSend({type:'buyBack',accept,buyIn});document.getElementById('buyBackOverlay').style.display='none';if(!accept)document.getElementById('spectatorBanner').style.display='block';}
 let pendingInGame={};
 function addInGameJoinRequest(id,name){pendingInGame[id]={id,name};refreshInGameJoinNotif();}
-function refreshInGameJoinNotif(){const notif=document.getElementById('joinRequestNotif'),list=document.getElementById('joinReqList'),entries=Object.values(pendingInGame);if(!entries.length||!isHost){notif.style.display='none';return;}notif.style.display='block';list.innerHTML='';for(const p of entries){const row=document.createElement('div');row.className='jr-row';row.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(\''+p.id+'\',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(\''+p.id+'\',false)">Reject</button></span>';list.appendChild(row);}}
+function refreshInGameJoinNotif(){const n=document.getElementById('joinRequestNotif'),l=document.getElementById('joinReqList'),e=Object.values(pendingInGame);if(!e.length||!isHost){n.style.display='none';return;}n.style.display='block';l.innerHTML='';for(const p of e){const r=document.createElement('div');r.className='jr-row';r.innerHTML='<span class="jr-name">'+p.name+'</span><span class="jr-btns"><button class="jr-admit" onclick="inGameApprove(''+p.id+'',true)">Admit</button><button class="jr-reject" onclick="inGameApprove(''+p.id+'',false)">Reject</button></span>';l.appendChild(r);}}
 function inGameApprove(id,accept){wsSend({type:'approve',id,accept});delete pendingInGame[id];refreshInGameJoinNotif();}
-function showTurnIndicator(txt){document.getElementById('turnIndicator').textContent=txt;document.getElementById('turnIndicator').style.display='block';}
+function showTurnIndicator(t){document.getElementById('turnIndicator').textContent=t;document.getElementById('turnIndicator').style.display='block';}
 function hideTurnIndicator(){document.getElementById('turnIndicator').style.display='none';stopCountdown();}
-const TURN_SECS=15;
-let _countdownInterval=null;
-function startCountdown(isMe,playerName){clearInterval(_countdownInterval);let secs=TURN_SECS;const foldBtn=document.getElementById('foldBtn');function tick(){if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}if(secs<=0){clearInterval(_countdownInterval);return;}secs--;}tick();_countdownInterval=setInterval(tick,1000);}
-function stopCountdown(){clearInterval(_countdownInterval);const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
-function setActions(v){const panel=document.getElementById('actionPanel');if(panel)panel.style.display=v?'flex':'none';['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
-}function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
-function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}}
-function addChat(txt){const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);if(chatCollapsed){const box=document.getElementById('chatBox');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),2200);}}
+const TURN_SECS=15;let _countdownInterval=null;
+function startCountdown(isMe,name){clearInterval(_countdownInterval);let s=TURN_SECS;const fb=document.getElementById('foldBtn');function tick(){if(isMe){if(fb){fb.textContent='FOLD '+s+'s';fb.style.background=s>5?'#7a1a1a':s>3?'#9a1a00':'#cc0000';fb.style.boxShadow=s<=5?'0 0 '+(8+(5-Math.max(s,0))*4)+'px rgba(220,40,40,0.85)':'none';}}else showTurnIndicator('\u23f3 '+name+' is thinking\u2026 ('+s+'s)');if(s<=0){clearInterval(_countdownInterval);return;}s--;}tick();_countdownInterval=setInterval(tick,1000);}
+function stopCountdown(){clearInterval(_countdownInterval);const fb=document.getElementById('foldBtn');if(fb){fb.textContent='FOLD';fb.style.background='';fb.style.boxShadow='';}}
+function setActions(v){const p=document.getElementById('actionPanel');if(p)p.style.display=v?'flex':'none';['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const fb=document.getElementById('foldBtn');if(fb){fb.textContent='FOLD';fb.style.background='';fb.style.boxShadow='';}}}
+function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
+function showMsg(m,ms=2400){const e=document.getElementById('msg');e.textContent=m;e.style.display=m?'block':'none';if(ms>0)setTimeout(()=>e.style.display='none',ms);const e2=document.getElementById('msg2d');if(e2){e2.textContent=m;e2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>e2.style.display='none',ms);}}
+function addChat(t){const log=document.getElementById('chatLog'),d=document.createElement('div');d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);if(chatCollapsed){const b=document.getElementById('chatBox');b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');setTimeout(()=>b.classList.remove('flash'),2200);}}
 let handNumber=0;
-function sendKeepAlive(){if(!myRoomId||!myId)return;fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber).then(r=>r.text()).then(txt=>{addLog('\uD83D\uDCE1 Keep-alive \u2014 server: '+txt,'log-action');}).catch(()=>{addLog('\u26A0 Keep-alive failed','log-action');});}
-function startKeepAliveTimer(){if(window._keepAliveTimer)return;window._keepAliveTimer=setInterval(sendKeepAlive, 4*60*1000);setTimeout(sendKeepAlive, 30000);}
-function addLog(txt,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const div=document.createElement('div');div.className=cls;div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
+function sendKeepAlive(){if(!myRoomId||!myId)return;fetch('/keepalive?room='+(myRoomId||'?')+'&hand='+handNumber).then(r=>r.text()).then(t=>{addLog('\uD83D\uDCE1 Keep-alive: '+t,'log-action');}).catch(()=>addLog('\u26A0 Keep-alive failed','log-action'));}
+function startKeepAliveTimer(){if(window._keepAliveTimer)return;window._keepAliveTimer=setInterval(sendKeepAlive,4*60*1000);setTimeout(sendKeepAlive,30000);}
+function addLog(t,cls='log-action'){const log=document.getElementById('activityLog');if(!log)return;const d=document.createElement('div');d.className=cls;d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight;while(log.children.length>200)log.removeChild(log.firstChild);}
 const _ledger=[];
-function addLedgerEvent(txt){_ledger.push({t:new Date().toLocaleTimeString(),msg:txt});refreshLedger();}
+function addLedgerEvent(t){_ledger.push({t:new Date().toLocaleTimeString(),msg:t});refreshLedger();}
 function refreshLedger(){const el=document.getElementById('ledgerLog');if(!el)return;el.innerHTML='';_ledger.slice().reverse().forEach(e=>{const d=document.createElement('div');d.style.cssText='padding:3px 0;border-bottom:1px solid rgba(200,160,32,0.1);font-size:10px;color:#e0c060;';d.innerHTML='<span style="color:#888;font-size:9px">'+e.t+'</span> '+e.msg;el.appendChild(d);});}
 const _eliminated={};
-function recordElimination(id,name,startChips,finalChips){if(_eliminated[id])return;const net=finalChips-startChips;const netStr=(net>=0?'+':'-')+fc(Math.abs(net));_eliminated[id]={name,startChips,finalChips,net};const msg='\uD83D\uDCCA '+name+' eliminated \u2014 net: '+netStr;addLog(msg,'log-fold');addLedgerEvent('\uD83D\uDCCF '+msg);refreshEliminatedBadge();}
-function refreshEliminatedBadge(){const el=document.getElementById('eliminatedList');if(!el)return;el.innerHTML='';Object.values(_eliminated).forEach(p=>{const net=p.net;const d=document.createElement('div');d.style.cssText='padding:4px 6px;background:rgba(200,160,32,0.07);border-radius:5px;margin:3px 0;font-size:10px;color:#c8a060;';d.innerHTML='<b style="color:#ffd700">'+p.name+'</b> &nbsp;net: <span style="color:'+(net>=0?'#40e870':'#e05050')+'">'+(net>=0?'+':'-')+fc(Math.abs(net))+'</span>';el.appendChild(d);});const hdr=document.getElementById('eliminatedHdr');if(hdr)hdr.textContent='OUT ('+ Object.keys(_eliminated).length+')';}
+function recordElimination(id,name,sc,fc2){if(_eliminated[id])return;const net=fc2-sc;_eliminated[id]={name,net};const m='\uD83D\uDCCA '+name+' eliminated \u2014 net: '+(net>=0?'+':'-')+fc(Math.abs(net));addLog(m,'log-fold');addLedgerEvent('\uD83D\uDCCF '+m);refreshEliminatedBadge();}
+function refreshEliminatedBadge(){const el=document.getElementById('eliminatedList');if(!el)return;el.innerHTML='';Object.values(_eliminated).forEach(p=>{const d=document.createElement('div');d.style.cssText='padding:4px 6px;background:rgba(200,160,32,0.07);border-radius:5px;margin:3px 0;font-size:10px;color:#c8a060;';d.innerHTML='<b style="color:#ffd700">'+p.name+'</b> &nbsp;net: <span style="color:'+(p.net>=0?'#40e870':'#e05050')+'">'+(p.net>=0?'+':'-')+fc(Math.abs(p.net))+'</span>';el.appendChild(d);});const h=document.getElementById('eliminatedHdr');if(h)h.textContent='OUT ('+Object.keys(_eliminated).length+')';}
 const _startChips={};
 function noteStartChips(id,chips){if(!_startChips[id])_startChips[id]=chips;}
 let gamePaused=false;
 function togglePause(){wsSend({type:gamePaused?'resume':'pause'});}
-function applyBuyIn(){const inp=document.getElementById("buyInInput");const btn=document.getElementById("buyInBtn");if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0.20){inp.style.borderColor="#cc0000";return;}const pence=Math.round(val*100);wsSend({type:"setBuyIn",buyIn:pence});addLog("\uD83D\uDD27 HOST: Buy-in set to "+fc(pence),"log-hand");addLedgerEvent("\uD83D\uDD27 Buy-in changed to "+fc(pence));if(btn){btn.textContent="\u2713";btn.style.background="#1a6a1a";setTimeout(()=>{btn.textContent="SET";btn.style.background="#1a3a6a";},1500);}inp.style.borderColor="#c8a020";setTimeout(()=>{if(inp)inp.style.borderColor="";},1500);}
-function toggleStackEditor(){const panel=document.getElementById('stackEditor');if(panel.style.display==='block'){panel.style.display='none';return;}const seated=[];if(lastState&&lastState.players){lastState.players.forEach(p=>{if(p&&p.id&&p.name)seated.push({id:p.id,name:p.name,chips:p.chips});});}if(seated.length===0&&lastLobbyMsg&&lastLobbyMsg.seats){lastLobbyMsg.seats.forEach(s=>{if(s&&s.id&&s.name)seated.push({id:s.id,name:s.name,chips:s.chips});});}const rows=document.getElementById('stackEditorRows');rows.innerHTML='';const isTourney=currentGameType==='tournament';if(seated.length===0){rows.innerHTML='<div style="color:#888;font-size:12px">No players found</div>';}else{seated.forEach((p,i)=>{const row=document.createElement('div');row.className='se-row';const dispVal=isTourney?p.chips:(p.chips/100).toFixed(2);const stepVal=isTourney?'1':'0.01';const minVal=isTourney?'0':'0';row.innerHTML='<span class="se-name">'+p.name+'</span>'+(isTourney?'':'<span style="color:#888;font-size:10px">&pound;</span>')+'<input class="se-input" id="se-inp-'+i+'" type="number" min="'+minVal+'" step="'+stepVal+'" value="'+dispVal+'"><button class="se-btn" id="se-btn-'+i+'" onclick="doSetStack('+i+',\''+p.id+'\')">SET</button>';rows.appendChild(row);});}panel.style.display='block';}
-function doSetStack(idx,playerId){const inp=document.getElementById("se-inp-"+idx);const btn=document.getElementById("se-btn-"+idx);if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0){inp.style.borderColor="#cc0000";return;}const isTourney=currentGameType==='tournament';const chips=isTourney?Math.round(val):Math.round(val*100);const allP=[];if(lastState&&lastState.players)lastState.players.forEach(p=>{if(p&&p.name)allP.push(p);});if(!allP.length&&lastLobbyMsg&&lastLobbyMsg.seats)lastLobbyMsg.seats.forEach(s=>{if(s&&s.name)allP.push(s);});const pn=allP[idx]?allP[idx].name:"Player";wsSend({type:"setStack",playerId:playerId,chips:chips});addLog("\uD83D\uDD27 HOST: "+pn+" stack set to "+fc(chips),"log-hand");btn.textContent="\u2713";btn.style.background="#1a6a1a";inp.style.borderColor="#c8a020";setTimeout(()=>{btn.textContent="SET";btn.style.background="";inp.style.borderColor="";},2000);}
-function handlePaused(isPaused,byName){gamePaused=isPaused;const btn=document.getElementById('pauseBtn');const banner=document.getElementById('pauseBanner');if(isPaused){btn.classList.add('active');btn.textContent='\u25b6';banner.style.display='block';addLog('\u23f8 Game PAUSED by '+(byName||'a player'),'log-hand');}else{btn.classList.remove('active');btn.textContent='\u23f8';banner.style.display='none';addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');}}
+function applyBuyIn(){const inp=document.getElementById('buyInInput');if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0.20){inp.style.borderColor='#cc0000';return;}const p=Math.round(val*100);wsSend({type:'setBuyIn',buyIn:p});addLog('\uD83D\uDD27 HOST: Buy-in set to '+fc(p),'log-hand');addLedgerEvent('\uD83D\uDD27 Buy-in changed to '+fc(p));const btn=document.getElementById('buyInBtn');if(btn){btn.textContent='\u2713';btn.style.background='#1a6a1a';setTimeout(()=>{btn.textContent='SET';btn.style.background='#1a3a6a';},1500);}inp.style.borderColor='#c8a020';setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);}
+function toggleStackEditor(){const panel=document.getElementById('stackEditor');if(panel.style.display==='block'){panel.style.display='none';return;}const seated=[];if(lastState&&lastState.players)lastState.players.forEach(p=>{if(p&&p.id&&p.name)seated.push({id:p.id,name:p.name,chips:p.chips});});if(!seated.length&&lastLobbyMsg&&lastLobbyMsg.seats)lastLobbyMsg.seats.forEach(s=>{if(s&&s.id&&s.name)seated.push({id:s.id,name:s.name,chips:s.chips});});const rows=document.getElementById('stackEditorRows');rows.innerHTML='';const isTour=currentGameType==='tournament';if(!seated.length){rows.innerHTML='<div style="color:#888;font-size:12px">No players found</div>';}else{seated.forEach((p,i)=>{const row=document.createElement('div');row.className='se-row';const v=isTour?p.chips:(p.chips/100).toFixed(2);row.innerHTML='<span class="se-name">'+p.name+'</span>'+(isTour?'':'<span style="color:#888;font-size:10px">&pound;</span>')+'<input class="se-input" id="se-inp-'+i+'" type="number" min="0" step="'+(isTour?'1':'0.01')+'" value="'+v+'"><button class="se-btn" id="se-btn-'+i+'" onclick="doSetStack('+i+',''+p.id+'')">SET</button>';rows.appendChild(row);});}panel.style.display='block';}
+function doSetStack(idx,pid){const inp=document.getElementById('se-inp-'+idx),btn=document.getElementById('se-btn-'+idx);if(!inp)return;const val=parseFloat(inp.value);if(isNaN(val)||val<0){inp.style.borderColor='#cc0000';return;}const isTour=currentGameType==='tournament',chips=isTour?Math.round(val):Math.round(val*100);const allP=[];if(lastState&&lastState.players)lastState.players.forEach(p=>{if(p&&p.name)allP.push(p);});if(!allP.length&&lastLobbyMsg&&lastLobbyMsg.seats)lastLobbyMsg.seats.forEach(s=>{if(s&&s.name)allP.push(s);});const pn=allP[idx]?allP[idx].name:'Player';wsSend({type:'setStack',playerId:pid,chips});addLog('\uD83D\uDD27 HOST: '+pn+' stack set to '+fc(chips),'log-hand');btn.textContent='\u2713';btn.style.background='#1a6a1a';inp.style.borderColor='#c8a020';setTimeout(()=>{btn.textContent='SET';btn.style.background='';inp.style.borderColor='';},2000);}
+function handlePaused(isPaused,by){gamePaused=isPaused;const btn=document.getElementById('pauseBtn'),ban=document.getElementById('pauseBanner');if(isPaused){btn.classList.add('active');btn.textContent='\u25b6';ban.style.display='block';addLog('\u23f8 Game PAUSED by '+(by||'a player'),'log-hand');}else{btn.classList.remove('active');btn.textContent='\u23f8';ban.style.display='none';addLog('\u25b6 Game RESUMED'+(by?' by '+by:''),'log-hand');}}
 let myAutoFold=false;
-function toggleAutoFold(){myAutoFold=!myAutoFold;wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});const btn=document.getElementById('autoFoldBtn');if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}}
-function showBet(serverSeat,amount){/* 3D removed */}
+function toggleAutoFold(){myAutoFold=!myAutoFold;wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});const btn=document.getElementById('autoFoldBtn');if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON',3200);}else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF',2400);}}
+function showBet(){}
 let activityCollapsed=true;
-function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';}
+function toggleActivityLog(){activityCollapsed=!activityCollapsed;const l=document.getElementById('activityLog'),t=document.getElementById('activityToggle');l.style.display=activityCollapsed?'none':'flex';t.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';}
 let chatCollapsed=true;
-function toggleChat(){chatCollapsed=!chatCollapsed;const inner=document.getElementById('chatInner'),toggle=document.getElementById('chatToggle');inner.style.display=chatCollapsed?'none':'block';toggle.textContent=chatCollapsed?'\u25b6 expand':'\u25bc collapse';}
+function toggleChat(){chatCollapsed=!chatCollapsed;const i=document.getElementById('chatInner'),t=document.getElementById('chatToggle');i.style.display=chatCollapsed?'none':'block';t.textContent=chatCollapsed?'\u25b6 expand':'\u25bc collapse';}
 let eliminatedCollapsed=true;
-function toggleEliminated(){eliminatedCollapsed=!eliminatedCollapsed;const el=document.getElementById('eliminatedList'),toggle=document.getElementById('eliminatedToggle');el.style.display=eliminatedCollapsed?'none':'block';toggle.textContent=eliminatedCollapsed?'\u25b6 expand':'\u25bc collapse';}
+function toggleEliminated(){eliminatedCollapsed=!eliminatedCollapsed;const e=document.getElementById('eliminatedList'),t=document.getElementById('eliminatedToggle');e.style.display=eliminatedCollapsed?'none':'block';t.textContent=eliminatedCollapsed?'\u25b6 expand':'\u25bc collapse';}
 let ledgerCollapsed=true;
-function toggleLedger(){ledgerCollapsed=!ledgerCollapsed;const el=document.getElementById('ledgerLog'),toggle=document.getElementById('ledgerToggle');el.style.display=ledgerCollapsed?'none':'block';toggle.textContent=ledgerCollapsed?'\u25b6 expand':'\u25bc collapse';}
-function toggleFullscreen(){if(!document.fullscreenElement&&!document.webkitFullscreenElement){const el=document.documentElement;if(el.requestFullscreen){el.requestFullscreen().catch(()=>{});}else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();}}else{if(document.exitFullscreen){document.exitFullscreen();}else if(document.webkitExitFullscreen){document.webkitExitFullscreen();}}}
-window.addEventListener('load',()=>{const fsBtn=document.getElementById('fsBtn');if(fsBtn){const fsAvailable=!!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);if(!fsAvailable)fsBtn.style.display='none';}});
-function doCashOut(){if(currentGameType==='tournament'){addChat('\u26a0 Cash out not available in tournament mode.');return;}if(!confirm('Cash out and leave the table with your remaining chips?'))return;_intentionalClose=true;wsSend({type:'cashOut'});}
-document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
-document.addEventListener('webkitfullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
+function toggleLedger(){ledgerCollapsed=!ledgerCollapsed;const e=document.getElementById('ledgerLog'),t=document.getElementById('ledgerToggle');e.style.display=ledgerCollapsed?'none':'block';t.textContent=ledgerCollapsed?'\u25b6 expand':'\u25bc collapse';}
+function toggleFullscreen(){if(!document.fullscreenElement&&!document.webkitFullscreenElement){const el=document.documentElement;if(el.requestFullscreen)el.requestFullscreen().catch(()=>{});else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();else if(document.webkitExitFullscreen)document.webkitExitFullscreen();}}
+window.addEventListener('load',()=>{const b=document.getElementById('fsBtn');if(b&&!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen))b.style.display='none';});
+function doCashOut(){if(currentGameType==='tournament'){addChat('\u26a0 Cash out not available in tournament mode.');return;}if(!confirm('Cash out and leave the table?'))return;_intentionalClose=true;wsSend({type:'cashOut'});}
+document.addEventListener('fullscreenchange',()=>{const b=document.getElementById('fsBtn');if(b)b.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
+document.addEventListener('webkitfullscreenchange',()=>{const b=document.getElementById('fsBtn');if(b)b.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 
 document.getElementById('callBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
 document.getElementById('raiseBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
 document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 
-// ── Swipe-to-confirm All In ───────────────────────────────────────────────────
 (function(){
   const track=document.getElementById('allInBtn'),thumb=document.getElementById('allInThumb'),fill=document.getElementById('allInFill');
   if(!track||!thumb||!fill)return;
-  const THUMB_W=36,CONFIRM_AT=0.88,SNAP_MS=320;
-  let active=false,startX=0,travelX=0;
+  const THUMB_W=36,CONFIRM_AT=0.88,SNAP_MS=320;let active=false,startX=0,travelX=0;
   function maxTravel(){return track.offsetWidth-THUMB_W-8;}
-  function setPos(px){const mx=maxTravel();const clamped=Math.max(0,Math.min(px,mx));thumb.style.left=(4+clamped)+'px';fill.style.width=(clamped/mx*100)+'%';}
+  function setPos(px){const mx=maxTravel(),cl=Math.max(0,Math.min(px,mx));thumb.style.left=(4+cl)+'px';fill.style.width=(cl/mx*100)+'%';}
   function snapBack(){thumb.classList.remove('dragging');thumb.style.left='4px';fill.style.transition='width '+SNAP_MS+'ms cubic-bezier(0.34,1.56,0.64,1)';fill.style.width='0%';setTimeout(()=>{fill.style.transition='none';},SNAP_MS+50);}
-  function confirmAllIn(){thumb.classList.remove('dragging');const mx=maxTravel();thumb.style.left=(4+mx)+'px';fill.style.width='100%';fill.classList.add('flash');ensureAudio();snd_win();setTimeout(()=>{fill.classList.remove('flash');snapBack();const me=lastState&&lastState.players&&lastState.players[mySeat];const allInAmount=me?me.chips:drumGetPence();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:allInAmount});},220);}
+  function confirmAllIn(){thumb.classList.remove('dragging');const mx=maxTravel();thumb.style.left=(4+mx)+'px';fill.style.width='100%';fill.classList.add('flash');ensureAudio();snd_win();setTimeout(()=>{fill.classList.remove('flash');snapBack();const me=lastState&&lastState.players&&lastState.players[mySeat];const amt=me?me.chips:drumGetPence();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:amt});},220);}
   function shakeHint(){thumb.classList.remove('shake');void thumb.offsetWidth;thumb.classList.add('shake');setTimeout(()=>thumb.classList.remove('shake'),560);}
   track.addEventListener('pointerdown',e=>{e.preventDefault();track.setPointerCapture(e.pointerId);active=true;startX=e.clientX;travelX=0;thumb.classList.add('dragging');fill.style.transition='none';},{passive:false});
   track.addEventListener('pointermove',e=>{if(!active)return;e.preventDefault();travelX=Math.max(0,e.clientX-startX);setPos(travelX);},{passive:false});
-  track.addEventListener('pointerup',()=>{if(!active)return;active=false;const mx=maxTravel();if(travelX>=mx*CONFIRM_AT){confirmAllIn();}else if(travelX<6){snapBack();shakeHint();}else{snapBack();}});
+  track.addEventListener('pointerup',()=>{if(!active)return;active=false;const mx=maxTravel();if(travelX>=mx*CONFIRM_AT)confirmAllIn();else if(travelX<6){snapBack();shakeHint();}else snapBack();});
   track.addEventListener('pointercancel',()=>{if(!active)return;active=false;snapBack();});
 })();
 
-document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
-document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=1000;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
+document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}}); 
+document.getElementById('startBtn').onclick=()=>wsSend({type:'startGame'});
+document.getElementById('joinBtn').onclick=()=>{
+  const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();
+  if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}
+  if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}
+  document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';
+  myRoomId=room;myName=name;myBuyIn=1000;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);
+  if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}
+  connectWS(name,room,myId);
+};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
-document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
-// ── Scroll wheel dials ─────────────────────────────────────────────────────────
 (function(){
-  const POUNDS=Array.from({length:100},(_,i)=>i);
-  const PENCE=[0,20,40,60,80];
-  let poundsIdx=0,penceIdx=0,minRaisePence=40;
-  function renderDial(innerId,list,idx){const inner=document.getElementById(innerId);if(!inner)return;inner.innerHTML='';for(let offset=-3;offset<=3;offset++){const i=idx+offset;const div=document.createElement('div');div.className='dial-item'+(offset===0?' selected':Math.abs(offset)===1?' adj1':' adj2');div.textContent=(i>=0&&i<list.length)?String(list[i]).padStart(2,'0'):'';inner.appendChild(div);}inner.style.top='-64px';}
-  function renderAll(){renderDial('dialPoundsInner',POUNDS,poundsIdx);renderDial('dialPenceInner',PENCE,penceIdx);}
-  function updateDisplay(){const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];const val=Math.max(raw,minRaisePence);const btn=document.getElementById('raiseBtn');if(btn){const verb=btn.dataset.verb||'RAISE';btn.textContent=verb+' '+fc(val);}}
-  function snapToValue(totalPence){const p=Math.max(0,totalPence);poundsIdx=Math.min(Math.floor(p/100),POUNDS.length-1);const rem=p%100;let best=0;for(let i=0;i<PENCE.length;i++){if(PENCE[i]<=rem)best=i;}penceIdx=best;renderAll();}
-  let _userDraggedSinceLastMin=false;
-  window.drumReset=function(minPence){minRaisePence=Math.max(minPence||40,20);_userDraggedSinceLastMin=false;snapToValue(minRaisePence);updateDisplay();};
-  window.drumSetMin=function(minPence){minRaisePence=Math.max(minPence||40,20);const currentVal=POUNDS[poundsIdx]*100+PENCE[penceIdx];if(!_userDraggedSinceLastMin||currentVal<minRaisePence){snapToValue(minRaisePence);}_userDraggedSinceLastMin=false;updateDisplay();};
-  window.drumGetPence=function(){const raw=POUNDS[poundsIdx]*100+PENCE[penceIdx];return Math.max(raw,minRaisePence);};
-  window.drumClearDrag=function(){_userDraggedSinceLastMin=false;};
-  window.drumStep=function(drum,dir){ensureAudio();snd_chip();if(drum==='pounds'){poundsIdx=Math.max(0,Math.min(POUNDS.length-1,poundsIdx+dir));renderDial('dialPoundsInner',POUNDS,poundsIdx);}else{penceIdx=Math.max(0,Math.min(PENCE.length-1,penceIdx+dir));renderDial('dialPenceInner',PENCE,penceIdx);}updateDisplay();};
-  function attachWheel(wheelId,drum){const el=document.getElementById(wheelId);if(!el)return;const PX_PER_STEP=26;let active=false,startY=0,startIdx=0;function getIdx(){return drum==='pounds'?poundsIdx:penceIdx;}function getList(){return drum==='pounds'?POUNDS:PENCE;}function setIdx(i){if(drum==='pounds')poundsIdx=i;else penceIdx=i;}function onStart(y){active=true;startY=y;startIdx=getIdx();_userDraggedSinceLastMin=true;}function onMove(y){if(!active)return;const dy=startY-y;const steps=Math.round(dy/PX_PER_STEP);const list=getList();const ni=Math.max(0,Math.min(list.length-1,startIdx+steps));if(ni!==getIdx()){snd_chip();setIdx(ni);if(drum==='pounds')renderDial('dialPoundsInner',POUNDS,poundsIdx);else renderDial('dialPenceInner',PENCE,penceIdx);updateDisplay();}}function onEnd(){active=false;}el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);onStart(e.clientY);},{passive:false});el.addEventListener('pointermove',e=>{if(active){e.preventDefault();onMove(e.clientY);}},{passive:false});el.addEventListener('pointerup',()=>{onEnd();});el.addEventListener('pointercancel',()=>{onEnd();});}
+  const POUNDS=Array.from({length:100},(_,i)=>i),PENCE=[0,20,40,60,80];
+  let pI=0,cI=0,minR=40;
+  function renderDial(id,list,idx){const inner=document.getElementById(id);if(!inner)return;inner.innerHTML='';for(let o=-3;o<=3;o++){const i=idx+o,d=document.createElement('div');d.className='dial-item'+(o===0?' selected':Math.abs(o)===1?' adj1':' adj2');d.textContent=(i>=0&&i<list.length)?String(list[i]).padStart(2,'0'):'';inner.appendChild(d);}inner.style.top='-64px';}
+  function renderAll(){renderDial('dialPoundsInner',POUNDS,pI);renderDial('dialPenceInner',PENCE,cI);}
+  function updateDisplay(){const raw=POUNDS[pI]*100+PENCE[cI],val=Math.max(raw,minR);const btn=document.getElementById('raiseBtn');if(btn){const v=btn.dataset.verb||'RAISE';btn.textContent=v+' '+fc(val);}}
+  function snapToValue(tp){const p=Math.max(0,tp);pI=Math.min(Math.floor(p/100),POUNDS.length-1);const rem=p%100;let best=0;for(let i=0;i<PENCE.length;i++){if(PENCE[i]<=rem)best=i;}cI=best;renderAll();}
+  let _uds=false;
+  window.drumReset=function(mp){minR=Math.max(mp||40,20);_uds=false;snapToValue(minR);updateDisplay();};
+  window.drumSetMin=function(mp){minR=Math.max(mp||40,20);const cv=POUNDS[pI]*100+PENCE[cI];if(!_uds||cv<minR)snapToValue(minR);_uds=false;updateDisplay();};
+  window.drumGetPence=function(){return Math.max(POUNDS[pI]*100+PENCE[cI],minR);};
+  window.drumClearDrag=function(){_uds=false;};
+  function attachWheel(wid,drum){const el=document.getElementById(wid);if(!el)return;const PPS=26;let active=false,startY=0,startIdx=0;
+    function gI(){return drum==='pounds'?pI:cI;}function gL(){return drum==='pounds'?POUNDS:PENCE;}function sI(i){if(drum==='pounds')pI=i;else cI=i;}
+    function onStart(y){active=true;startY=y;startIdx=gI();_uds=true;}
+    function onMove(y){if(!active)return;const dy=startY-y,steps=Math.round(dy/PPS),list=gL(),ni=Math.max(0,Math.min(list.length-1,startIdx+steps));if(ni!==gI()){ensureAudio();snd_chip();sI(ni);if(drum==='pounds')renderDial('dialPoundsInner',POUNDS,pI);else renderDial('dialPenceInner',PENCE,cI);updateDisplay();}}
+    function onEnd(){active=false;}
+    el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);onStart(e.clientY);},{passive:false});
+    el.addEventListener('pointermove',e=>{if(active){e.preventDefault();onMove(e.clientY);}},{passive:false});
+    el.addEventListener('pointerup',()=>onEnd());el.addEventListener('pointercancel',()=>onEnd());}
   window.addEventListener('load',()=>{renderAll();updateDisplay();attachWheel('dialPounds','pounds');attachWheel('dialPence','pence');});
 })();
 
-// ── Cookie notice gate ─────────────────────────────────────────────────────────
 function cookieAccept(){document.getElementById('cookieOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';}
 function cookieDeny(){window.location.replace('https://www.disney.com');}
-
 </script>
 </body>
 </html>
