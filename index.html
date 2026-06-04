@@ -271,6 +271,27 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
   .psp-stack{font-size:12px !important}
   .psp-bet{font-size:11px !important}
 }
+
+/* 2D-only reliability/compact action controls */
+#actionPanel{z-index:5000 !important;width:180px !important;max-height:calc(100vh - 120px);overflow-y:auto}
+#actionPanel .abtn{font-size:14px !important;padding:10px 6px !important}
+#drumWidget .dial-wheel{width:64px !important;height:84px !important}
+#drumWidget .dial-item{height:28px !important;line-height:28px !important}
+#drumWidget .dial-item.selected{font-size:19px !important}
+#drumWidget .dial-item.adj1{font-size:14px !important}
+@media screen and (max-width:500px), screen and (max-height:700px){
+  #actionPanel{width:145px !important;padding:5px 6px !important;gap:4px !important;bottom:calc(50px + env(safe-area-inset-bottom,0px)) !important}
+  #actionPanel .abtn{font-size:12px !important;padding:7px 4px !important}
+  #drumWidget .dial-row{gap:3px !important}
+  #drumWidget .dial-wheel{width:52px !important;height:70px !important}
+  #drumWidget .dial-item{height:24px !important;line-height:24px !important}
+  #drumWidget .dial-item.selected{font-size:16px !important}
+  #drumWidget .dial-item.adj1{font-size:12px !important}
+  .dial-sep{font-size:16px !important;margin-top:12px !important}
+  .swipe-allin-track{height:34px !important;margin-top:10px !important}
+  #foldBtn{margin-top:8px !important}
+}
+
 </style>
 </head>
 <body>
@@ -578,6 +599,7 @@ let occupiedSeats=[];
 let is2D=true;
 let currentGameType='cash';
 let blindTimerInterval=null;
+let _lastTurnOffer=null,_actionSubmitted=false;
 
 // ── Blind badge timer ─────────────────────────────────────────────────────────
 function startBlindBadgeCountdown(remainingMs){
@@ -719,6 +741,7 @@ function applyState(st){
   const coBtn=document.getElementById('cashOutBtn');
   if(coBtn)coBtn.style.display=(st.gameType==='tournament')?'none':'';
   if(is2D)render2D(st);
+  syncActionPanelFromState(st);
 }
 
 function toggle2D(){is2D=true;show2DOnlyChrome();if(lastState)render2D(lastState);}
@@ -779,7 +802,7 @@ case 'serverShutdown':{_serverShutdown=true;showReconnectBanner(0,SHUTDOWN_FIRST
 case 'logEvent':{addLog(msg.text,'log-system');break;}
 case 'joined':myId=msg.id;if(msg.secret){mySecret=msg.secret;localStorage.setItem('pokerPlayerSecret',mySecret);}mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';break;
 case 'waiting':if(msg.secret){mySecret=msg.secret;localStorage.setItem('pokerPlayerSecret',mySecret);}document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
-case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
+case 'rejected':if((msg.reason||'').toLowerCase().includes('invalid')){localStorage.removeItem('pokerPlayerId');localStorage.removeItem('pokerPlayerSecret');myId=null;mySecret=null;}document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
 case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
 case 'winner':snd_win();hideTurnIndicator();addLog('\uD83C\uDFC6\uD83D\uDCA6 '+msg.name+' wins '+fc(msg.amount)+' \u2014 '+(msg.label||''),'log-win');showMsg('\uD83C\uDFC6 '+msg.name+' wins '+fc(msg.amount)+'\n'+(msg.label||'')+'!',0);chipsFlyToWinner(msg.seat,()=>{});setTimeout(()=>showMsg(''),5500);updateLedgerStacks();break;
@@ -794,7 +817,7 @@ case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(ms
   if(msg.players)msg.players.forEach(p=>{if(p&&p.id&&p.chips>0)noteStartChips(p.id,p.chips);});
   if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');show2DOnlyChrome();const tvb=document.getElementById('toggleViewBtn');if(tvb)tvb.style.display='none';}if(!dealing)applyState(msg);break;
 case 'playerAction':{const pname=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL '+fc(msg.amount||0):'RAISE '+fc(msg.amount||0);if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;const logClass=msg.action==='fold'?'log-action':'log-action';addLog('\u27a4 '+pname+': '+ac, logClass);if(msg.amount>0)showBet(msg.seat,msg.amount);hideTurnIndicator();if(lastState)applyState(lastState);break;}
-case 'yourTurn':{const ca=msg.callAmt||0;if(msg.seat===mySeat){const callLabel=ca>0?'CALL '+fc(ca):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2B50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
+case 'yourTurn':{const ca=msg.callAmt||0;_lastTurnOffer={seat:msg.seat,callAmt:ca,minRaise:msg.minRaise||40,firstBet:!!msg.firstBet};if(msg.seat===mySeat){_actionSubmitted=false;const callLabel=ca>0?'CALL '+fc(ca):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2B50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{_actionSubmitted=false;setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
 case 'communityDealt':addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');sweepBetsToPot(()=>{if(lastState)applyState(lastState);});break;
 case 'showdown':setPhase('Showdown');hideTurnIndicator();sweepBetsToPot(null);addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\uD83C\uDCCF Showdown!',2000);break;
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
@@ -878,6 +901,31 @@ const TURN_SECS=15;
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){clearInterval(_countdownInterval);let secs=TURN_SECS;const foldBtn=document.getElementById('foldBtn');function tick(){if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}if(secs<=0){clearInterval(_countdownInterval);return;}secs--;}tick();_countdownInterval=setInterval(tick,1000);}
 function stopCountdown(){clearInterval(_countdownInterval);const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
+
+function syncActionPanelFromState(st){
+  if(!st||!st.players)return;
+  const me=st.players[mySeat];
+  const isMyTurn = st.toActSeat===mySeat && me && !me.folded && !me.spectator && !me.pendingBuyBack && !me.voluntaryAutoFold && !me.disconnected;
+  if(!isMyTurn){
+    _actionSubmitted=false;
+    _lastTurnOffer=null;
+    setActions(false);
+    return;
+  }
+  if(_actionSubmitted)return;
+  const callAmt=Math.max(0,Math.min((st.currentBet||0)-(me.bet||0),me.chips||0));
+  const fallbackMin=callAmt+(st.currentBB||st.currentBB===0?st.currentBB:20);
+  const offer=(_lastTurnOffer&&_lastTurnOffer.seat===mySeat)?_lastTurnOffer:{seat:mySeat,callAmt,minRaise:Math.max(fallbackMin,20),firstBet:(st.currentBet||0)===0};
+  const callBtn=document.getElementById('callBtn');
+  if(callBtn)callBtn.textContent=offer.callAmt>0?'CALL '+fc(offer.callAmt):'CHECK';
+  const raiseBtn=document.getElementById('raiseBtn');
+  if(raiseBtn)raiseBtn.dataset.verb=offer.firstBet?'BET':'RAISE';
+  if(window.drumSetMin)drumSetMin(offer.minRaise||20);
+  setActions(true);
+  const wm=document.getElementById('waitingMsg');
+  if(wm)wm.style.display='none';
+}
+
 function setActions(v){const panel=document.getElementById('actionPanel');if(panel)panel.style.display=v?'flex':'none';['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
 }function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}}
@@ -917,9 +965,9 @@ function doCashOut(){if(currentGameType==='tournament'){addChat('\u26a0 Cash out
 document.addEventListener('fullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 document.addEventListener('webkitfullscreenchange',()=>{const btn=document.getElementById('fsBtn');if(btn)btn.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'\u29c4':'\u26f6';});
 
-document.getElementById('callBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
-document.getElementById('raiseBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
-document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
+document.getElementById('callBtn').onclick=()=>{ensureAudio();_actionSubmitted=true;if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'call'});};
+document.getElementById('raiseBtn').onclick=()=>{ensureAudio();_actionSubmitted=true;if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:drumGetPence()});};
+document.getElementById('foldBtn').onclick=()=>{ensureAudio();_actionSubmitted=true;if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'fold'});};
 
 // ── Swipe-to-confirm All In ───────────────────────────────────────────────────
 (function(){
@@ -930,7 +978,7 @@ document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClea
   function maxTravel(){return track.offsetWidth-THUMB_W-8;}
   function setPos(px){const mx=maxTravel();const clamped=Math.max(0,Math.min(px,mx));thumb.style.left=(4+clamped)+'px';fill.style.width=(clamped/mx*100)+'%';}
   function snapBack(){thumb.classList.remove('dragging');thumb.style.left='4px';fill.style.transition='width '+SNAP_MS+'ms cubic-bezier(0.34,1.56,0.64,1)';fill.style.width='0%';setTimeout(()=>{fill.style.transition='none';},SNAP_MS+50);}
-  function confirmAllIn(){thumb.classList.remove('dragging');const mx=maxTravel();thumb.style.left=(4+mx)+'px';fill.style.width='100%';fill.classList.add('flash');ensureAudio();snd_win();setTimeout(()=>{fill.classList.remove('flash');snapBack();const me=lastState&&lastState.players&&lastState.players[mySeat];const allInAmount=me?me.chips:drumGetPence();if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:allInAmount});},220);}
+  function confirmAllIn(){thumb.classList.remove('dragging');const mx=maxTravel();thumb.style.left=(4+mx)+'px';fill.style.width='100%';fill.classList.add('flash');ensureAudio();snd_win();setTimeout(()=>{fill.classList.remove('flash');snapBack();const me=lastState&&lastState.players&&lastState.players[mySeat];const allInAmount=me?me.chips:drumGetPence();_actionSubmitted=true;if(window.drumClearDrag)drumClearDrag();setActions(false);showMsg('');wsSend({type:'action',action:'raise',amount:allInAmount});},220);}
   function shakeHint(){thumb.classList.remove('shake');void thumb.offsetWidth;thumb.classList.add('shake');setTimeout(()=>thumb.classList.remove('shake'),560);}
   track.addEventListener('pointerdown',e=>{e.preventDefault();track.setPointerCapture(e.pointerId);active=true;startX=e.clientX;travelX=0;thumb.classList.add('dragging');fill.style.transition='none';},{passive:false});
   track.addEventListener('pointermove',e=>{if(!active)return;e.preventDefault();travelX=Math.max(0,e.clientX-startX);setPos(travelX);},{passive:false});
