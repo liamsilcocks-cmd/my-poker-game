@@ -309,6 +309,51 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
   }
 }
 
+
+/* Final 2D-only action controls: keep betting buttons visible above the table */
+#gameUI #actionPanel{
+  position:fixed !important;
+  left:50% !important;
+  right:auto !important;
+  bottom:calc(70px + env(safe-area-inset-bottom,0px)) !important;
+  top:auto !important;
+  transform:translateX(-50%) !important;
+  width:min(94vw, 420px) !important;
+  max-height:none !important;
+  overflow:visible !important;
+  z-index:30000 !important;
+  background:rgba(0,0,0,0.96) !important;
+  border:2px solid #c8a020 !important;
+  border-radius:14px !important;
+  box-shadow:0 0 30px rgba(0,0,0,.85) !important;
+}
+#gameUI #actionPanel.action-visible{display:flex !important; visibility:visible !important; opacity:1 !important;}
+#gameUI #actionPanel.action-visible #callBtn,
+#gameUI #actionPanel.action-visible #raiseBtn,
+#gameUI #actionPanel.action-visible #foldBtn{display:block !important;}
+#gameUI #actionPanel.action-visible #drumWidget{display:flex !important;}
+#gameUI #actionPanel.action-visible #allInBtn{display:block !important;}
+
+
+#view2d{display:block !important;}
+
+/* 2D-only action controls: fixed above the bottom edge and always above the table */
+#gameUI #actionPanel.action-visible,
+#gameUI #actionPanel[style*="display: flex"]{
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  position:fixed !important;
+  left:8px !important;
+  bottom:calc(62px + env(safe-area-inset-bottom,0px)) !important;
+  top:auto !important;
+  transform:none !important;
+  z-index:20000 !important;
+  pointer-events:auto !important;
+}
+#gameUI #actionPanel.action-visible button,
+#gameUI #actionPanel[style*="display: flex"] button{pointer-events:auto !important;}
+
 </style>
 </head>
 <body>
@@ -592,7 +637,7 @@ function snd_win(){ensureAudio();const t=audioCtx.currentTime;[523,659,784,1047,
 function snd_joinAlert(){ensureAudio();const t=audioCtx.currentTime;[[0,880],[0.22,1100]].forEach(([delay,freq])=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq*0.8,t+delay);o.frequency.linearRampToValueAtTime(freq,t+delay+0.12);g.gain.setValueAtTime(0,t+delay);g.gain.linearRampToValueAtTime(0.28,t+delay+0.04);g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.28);o.connect(g);g.connect(audioCtx.destination);o.start(t+delay);o.stop(t+delay+0.3);});}
 const SUITS=['\u2660','\u2665','\u2666','\u2663'],RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const NP=9,BB=20,TRX=5.4,TRZ=3.5,SRX=7.0,SRZ=5.2;
-let myId=localStorage.getItem('pokerPlayerId')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,myBuyIn=1000,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
+let myId=localStorage.getItem('pokerPlayerId')||null,mySecret=localStorage.getItem('pokerPlayerSecret')||null,myName=localStorage.getItem('pokerPlayerName')||null,mySeat=0,isHost=false,myRoomId=localStorage.getItem('pokerRoomId')||null,myBuyIn=1000,ws=null,lastState=null,lastLobbyMsg=null,dealing=false;
 let occupiedSeats=[];
 let is2D=true;
 let currentGameType='cash';
@@ -687,6 +732,26 @@ function updatePlayerStackPanel(st) {
   });
 }
 
+
+function syncActionButtonsFromState(st){
+  if(!st||!st.players||typeof mySeat==='undefined')return;
+  const me=st.players[mySeat];
+  const isMyTurn=(Number(st.toActSeat)===Number(mySeat))&&me&&!me.folded&&!me.spectator&&!me.pendingBuyBack;
+  if(!isMyTurn){return;}
+  let highestBet=Number(st.currentBet||0);
+  st.players.forEach(p=>{if(p&&Number(p.bet||0)>highestBet)highestBet=Number(p.bet||0);});
+  const callAmt=Math.max(0,highestBet-Number(me.bet||0));
+  const callBtn=document.getElementById('callBtn');
+  if(callBtn)callBtn.textContent=callAmt>0?'CALL '+fc(callAmt):'CHECK';
+  const raiseBtn=document.getElementById('raiseBtn');
+  if(raiseBtn){
+    raiseBtn.dataset.verb=highestBet>0?'RAISE':'BET';
+    raiseBtn.textContent=(highestBet>0?'RAISE ':'BET ')+fc(Math.max((st.currentBB||20)*2,highestBet+(st.currentBB||20)));
+  }
+  if(window.drumSetMin)window.drumSetMin(Math.max((st.currentBB||20)*2,highestBet+(st.currentBB||20)));
+  setActions(true);
+}
+
 function applyState(st){
   if(!st)return;
   lastState=st;
@@ -701,6 +766,7 @@ function applyState(st){
   const coBtn=document.getElementById('cashOutBtn');
   if(coBtn)coBtn.style.display=(st.gameType==='tournament')?'none':'';
   render2D(st);
+  syncActionButtonsFromState(st);
 }
 
 function toggle2D(){/* 2D-only build: no view toggle needed. */}
@@ -712,7 +778,7 @@ let _reconnectTimer=null,_reconnectAttempts=0,_intentionalClose=false,_serverShu
 const MAX_RECONNECT_ATTEMPTS=12;
 const RECONNECT_DELAYS=[1000,2000,3000,5000,5000,8000,8000,10000,10000,10000,10000,10000];
 const SHUTDOWN_FIRST_DELAY=12000;
-function connectWS(name,roomId,playerId){_intentionalClose=false;if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);ws.onopen=()=>{_reconnectAttempts=0;_serverShutdown=false;const rb=document.getElementById('reconnectBanner');if(rb)rb.style.display='none';ws.send(JSON.stringify({type:'join',id:playerId,name,room:roomId,buyIn:myBuyIn}));};ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};ws.onclose=()=>{if(_intentionalClose)return;if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){showRestartPrompt();return;}const baseDelay=_serverShutdown&&_reconnectAttempts===0?SHUTDOWN_FIRST_DELAY:RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];_reconnectAttempts++;showReconnectBanner(_reconnectAttempts,baseDelay);_reconnectTimer=setTimeout(()=>{if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);},baseDelay);};ws.onerror=()=>{if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';}};}
+function connectWS(name,roomId,playerId){_intentionalClose=false;if(_reconnectTimer){clearTimeout(_reconnectTimer);_reconnectTimer=null;}const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host);ws.onopen=()=>{_reconnectAttempts=0;_serverShutdown=false;const rb=document.getElementById('reconnectBanner');if(rb)rb.style.display='none';ws.send(JSON.stringify({type:'join',id:playerId,secret:mySecret,name,room:roomId,buyIn:myBuyIn}));};ws.onmessage=(ev)=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handleServerMsg(msg);};ws.onclose=()=>{if(_intentionalClose)return;if(_reconnectAttempts>=MAX_RECONNECT_ATTEMPTS){showRestartPrompt();return;}const baseDelay=_serverShutdown&&_reconnectAttempts===0?SHUTDOWN_FIRST_DELAY:RECONNECT_DELAYS[Math.min(_reconnectAttempts,RECONNECT_DELAYS.length-1)];_reconnectAttempts++;showReconnectBanner(_reconnectAttempts,baseDelay);_reconnectTimer=setTimeout(()=>{if(myName&&myRoomId&&myId)connectWS(myName,myRoomId,myId);},baseDelay);};ws.onerror=()=>{if(_reconnectAttempts===0&&document.getElementById('gameUI').style.display==='none'){document.getElementById('loginErr').textContent='Could not connect to server.';document.getElementById('loginOverlay').style.display='flex';document.getElementById('waitingOverlay').style.display='none';document.getElementById('lobbyOverlay').style.display='none';}};}
 function showReconnectBanner(attempt,delayMs){let rb=document.getElementById('reconnectBanner');if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.94);border:2px solid #c8a020;border-radius:14px;padding:20px 30px;color:#ffd700;font-size:15px;font-weight:bold;text-align:center;z-index:999;white-space:pre-line;min-width:260px';document.body.appendChild(rb);}rb.style.display='block';const secs=Math.round(delayMs/1000);const shutMsg=_serverShutdown?'\nServer restarting \u2014 please wait\u2026':'';rb.textContent='\u26A0 Reconnecting\u2026 ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+secs+'s'+shutMsg;if(rb._countdown)clearInterval(rb._countdown);let remaining=secs;rb._countdown=setInterval(()=>{remaining--;if(remaining<=0){clearInterval(rb._countdown);rb._countdown=null;return;}const sm=_serverShutdown?'\nServer restarting \u2014 please wait\u2026':'';rb.textContent='\u26A0 Reconnecting\u2026 ('+attempt+'/'+MAX_RECONNECT_ATTEMPTS+')\nRetrying in '+remaining+'s'+sm;},1000);}
 function showRestartPrompt(){let rb=document.getElementById('reconnectBanner');if(!rb){rb=document.createElement('div');rb.id='reconnectBanner';document.body.appendChild(rb);}rb.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.96);border:2px solid #c84040;border-radius:14px;padding:24px 32px;color:#ff9090;font-size:15px;font-weight:bold;text-align:center;z-index:999;min-width:280px';rb.innerHTML='\u26A0 Lost connection to server.<br><br><span style="color:#c8a060;font-weight:normal;font-size:13px">The server may have restarted.<br>Your seat will be held if you reconnect.</span><br><br><button onclick="location.reload()" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#c8a020,#8a6a08);color:#000;font-size:14px;font-weight:bold;cursor:pointer">\uD83D\uDD04 Reload &amp; Reconnect</button>';}
 function wsSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
@@ -757,8 +823,8 @@ function showTournamentResults(placement, winnerName){
 function handleServerMsg(msg){switch(msg.type){
 case 'serverShutdown':{_serverShutdown=true;showReconnectBanner(0,SHUTDOWN_FIRST_DELAY);addLog('\u26A0 Server restarting \u2014 will reconnect automatically\u2026','log-fold');break;}
 case 'logEvent':{addLog(msg.text,'log-system');break;}
-case 'joined':myId=msg.id;mySeat=msg.seat;isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';break;
-case 'waiting':document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
+case 'joined':myId=msg.id;if(msg.secret){mySecret=msg.secret;localStorage.setItem('pokerPlayerSecret',mySecret);}mySeat=Number(msg.seat);isHost=msg.isHost;localStorage.setItem('pokerPlayerId',myId);document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='none';document.getElementById('stackEditorBtn').style.display=isHost?'inline-block':'none';break;
+case 'waiting':if(msg.id){myId=msg.id;localStorage.setItem('pokerPlayerId',myId);}if(msg.secret){mySecret=msg.secret;localStorage.setItem('pokerPlayerSecret',mySecret);}document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';break;
 case 'rejected':document.getElementById('waitingOverlay').style.display='none';document.getElementById('loginOverlay').style.display='flex';document.getElementById('loginErr').textContent=msg.reason||'Entry declined.';break;
 case 'lobby':updateOccupiedSeats(msg.seats||[]);renderLobby(msg);if(isHost&&msg.pending){for(const p of msg.pending){if(!pendingInGame[p.id])pendingInGame[p.id]={id:p.id,name:p.name};}for(const id of Object.keys(pendingInGame)){if(!msg.pending.find(p=>p.id===id))delete pendingInGame[id];}refreshInGameJoinNotif();}break;
 case 'joinRequest':if(isHost){ensureAudio();snd_joinAlert();addInGameJoinRequest(msg.id,msg.name);if(document.getElementById('lobbyOverlay').style.display!=='none'&&lastLobbyMsg){if(!lastLobbyMsg.pending.find(p=>p.id===msg.id))lastLobbyMsg.pending.push({id:msg.id,name:msg.name});renderLobby(lastLobbyMsg);}}break;
@@ -774,7 +840,7 @@ case 'state':lastState=msg;if(msg.players)updateOccupiedSeats(msg.players);if(ms
   if(msg.players)msg.players.forEach(p=>{if(p&&p.id&&p.chips>0)noteStartChips(p.id,p.chips);});
   if(document.getElementById('gameUI').style.display==='none'&&document.getElementById('lobbyOverlay').style.display==='none'){document.getElementById('gameUI').style.display='block';document.getElementById('view2d').style.display='block';document.getElementById('stackInfo2d').style.display='block';document.getElementById('bottomBar').style.display='none';if(myRoomId)document.getElementById('roomBadge').textContent='ROOM '+myRoomId;document.getElementById('myNameBadge').textContent='\uD83D\uDC64 '+(myName||'');}if(!dealing)applyState(msg);break;
 case 'playerAction':{const pname=msg.name||'Player';let ac=msg.action==='fold'?'FOLD':msg.action==='check'?'CHECK':msg.action==='call'?'CALL '+fc(msg.amount||0):'RAISE '+fc(msg.amount||0);if(msg.label&&msg.label.trim()) ac+=' ('+msg.label.trim()+')';seatActions[msg.seat]=ac;const logClass=msg.action==='fold'?'log-action':'log-action';addLog('\u27a4 '+pname+': '+ac, logClass);if(msg.amount>0)showBet(msg.seat,msg.amount);hideTurnIndicator();if(lastState)applyState(lastState);break;}
-case 'yourTurn':{const ca=msg.callAmt||0;if(msg.seat===mySeat){const callLabel=ca>0?'CALL '+fc(ca):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2B50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
+case 'yourTurn':{const ca=msg.callAmt||0;if(Number(msg.seat)===Number(mySeat)){const callLabel=ca>0?'CALL '+fc(ca):'CHECK';document.getElementById('callBtn').textContent=callLabel;const raiseBtn=document.getElementById('raiseBtn');if(raiseBtn)raiseBtn.dataset.verb=msg.firstBet?'BET':'RAISE';drumSetMin(msg.minRaise||40);setActions(true);showMsg('\u2B50 Your turn!',0);document.getElementById('waitingMsg').style.display='none';startCountdown(true,'You');}else{setActions(false);showMsg('');const actingPlayer=lastState&&lastState.players[msg.seat];const actingName=actingPlayer?actingPlayer.name:'Seat '+(msg.seat+1);startCountdown(false,actingName);}break;}
 case 'communityDealt':addLog('\u25b6 '+(msg.phase||'').toUpperCase()+': '+(msg.newCards||msg.cards||[]).map(c=>c.r+c.s).join(' '),'log-community');sweepBetsToPot(()=>{if(lastState)applyState(lastState);});break;
 case 'showdown':setPhase('Showdown');hideTurnIndicator();sweepBetsToPot(null);addLog('\u2500\u2500 SHOWDOWN \u2500\u2500','log-hand');showMsg('\uD83C\uDCCF Showdown!',2000);break;
 case 'waitingForPlayers':showMsg('\u23f3 Waiting for more players\u2026',0);hideTurnIndicator();break;
@@ -882,7 +948,7 @@ function doSetStack(idx,playerId){const inp=document.getElementById("se-inp-"+id
 function handlePaused(isPaused,byName){gamePaused=isPaused;const btn=document.getElementById('pauseBtn');const banner=document.getElementById('pauseBanner');if(isPaused){btn.classList.add('active');btn.textContent='\u25b6';banner.style.display='block';addLog('\u23f8 Game PAUSED by '+(byName||'a player'),'log-hand');}else{btn.classList.remove('active');btn.textContent='\u23f8';banner.style.display='none';addLog('\u25b6 Game RESUMED'+(byName?' by '+byName:''),'log-hand');}}
 let myAutoFold=false;
 function toggleAutoFold(){myAutoFold=!myAutoFold;wsSend({type:'voluntaryAutoFold',enabled:myAutoFold});const btn=document.getElementById('autoFoldBtn');if(myAutoFold){btn.classList.add('active');btn.textContent='\u23f8 AUTO-FOLD: ON';showMsg('\u23f8 Auto-fold ON \u2014 folding every hand until turned off',3200);}else{btn.classList.remove('active');btn.textContent='AUTO-FOLD';showMsg('\u2713 Auto-fold OFF \u2014 you are back in the game',2400);}}
-function showBet(serverSeat,amount){if(amount<=0||is2D)return;const vSeat=vs(serverSeat),src=seatPos(vSeat),dst=betPos(vSeat);const existH=seatBetChips[serverSeat].length*0.060;const chips=buildChipStack(amount);seatBetChips[serverSeat].push(...chips);animChipArc(chips,src,dst,38,0.32+existH,null);}
+function showBet(serverSeat,amount){/* 2D-only: no chip animation needed */}
 let activityCollapsed=true;
 function toggleActivityLog(){activityCollapsed=!activityCollapsed;const logEl=document.getElementById('activityLog'),toggle=document.getElementById('activityToggle');logEl.style.display=activityCollapsed?'none':'flex';toggle.textContent=activityCollapsed?'\u25b6 expand':'\u25bc collapse';}
 let chatCollapsed=true;
@@ -920,7 +986,7 @@ document.getElementById('foldBtn').onclick=()=>{ensureAudio();if(window.drumClea
 
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const t=e.target.value.trim();if(t){wsSend({type:'chat',text:t});e.target.value='';}}});
 document.getElementById('startBtn').onclick=()=>{wsSend({type:'startGame'});};
-document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=1000;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!myId){myId='p_'+Math.random().toString(36).slice(2,10);localStorage.setItem('pokerPlayerId',myId);}connectWS(name,room,myId);};
+document.getElementById('joinBtn').onclick=()=>{const name=document.getElementById('nameInput').value.trim(),room=document.getElementById('roomInput').value.trim();if(!name){document.getElementById('loginErr').textContent='Please enter your name.';return;}if(!room){document.getElementById('loginErr').textContent='Please enter a room number.';return;}document.getElementById('loginErr').textContent='';document.getElementById('loginOverlay').style.display='none';document.getElementById('waitingOverlay').style.display='flex';document.getElementById('waitingTxt').textContent='Connecting\u2026';myRoomId=room;myName=name;myBuyIn=1000;localStorage.setItem('pokerPlayerName',name);localStorage.setItem('pokerRoomId',room);if(!mySecret){myId=null;localStorage.removeItem('pokerPlayerId');}connectWS(name,room,myId);};
 ['nameInput','roomInput'].forEach(id=>{document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('joinBtn').click();});});
 document.getElementById('tablePan').addEventListener('input',function(){if(cam)cam.target.y=parseFloat(this.value);});
 
