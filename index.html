@@ -271,6 +271,44 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000000;font-family:
   .psp-stack{font-size:12px !important}
   .psp-bet{font-size:11px !important}
 }
+
+
+/* 2D-only fix: keep player action buttons visible above the 2D table */
+#gameUI{z-index:1000}
+#gameUI #actionPanel{
+  position:fixed !important;
+  left:calc(10px + env(safe-area-inset-left,0px)) !important;
+  bottom:calc(64px + env(safe-area-inset-bottom,0px)) !important;
+  top:auto !important;
+  right:auto !important;
+  transform:none !important;
+  z-index:10000 !important;
+  pointer-events:auto !important;
+}
+#gameUI #actionPanel.action-visible{
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+#gameUI #actionPanel.action-visible #callBtn,
+#gameUI #actionPanel.action-visible #raiseBtn,
+#gameUI #actionPanel.action-visible #foldBtn{
+  display:block !important;
+}
+#gameUI #actionPanel.action-visible #allInBtn{
+  display:block !important;
+}
+#gameUI #actionPanel.action-visible #drumWidget{
+  display:flex !important;
+}
+@media screen and (max-width: 500px){
+  #gameUI #actionPanel{
+    width:170px !important;
+    left:calc(6px + env(safe-area-inset-left,0px)) !important;
+    bottom:calc(52px + env(safe-area-inset-bottom,0px)) !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -820,7 +858,7 @@ const TURN_SECS=15;
 let _countdownInterval=null;
 function startCountdown(isMe,playerName){clearInterval(_countdownInterval);let secs=TURN_SECS;const foldBtn=document.getElementById('foldBtn');function tick(){if(isMe){if(foldBtn){foldBtn.textContent='FOLD '+secs+'s';foldBtn.style.background=secs>5?'#7a1a1a':secs>3?'#9a1a00':'#cc0000';foldBtn.style.boxShadow=secs<=5?'0 0 '+(8+(5-Math.max(secs,0))*4)+'px rgba(220,40,40,0.85)':'none';}}else{showTurnIndicator('\u23f3 '+playerName+' is thinking\u2026 ('+secs+'s)');}if(secs<=0){clearInterval(_countdownInterval);return;}secs--;}tick();_countdownInterval=setInterval(tick,1000);}
 function stopCountdown(){clearInterval(_countdownInterval);const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
-function setActions(v){const panel=document.getElementById('actionPanel');if(panel)panel.style.display=v?'flex':'none';['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
+function setActions(v){const panel=document.getElementById('actionPanel');if(panel){panel.style.display=v?'flex':'none';panel.classList.toggle('action-visible',!!v);panel.style.visibility=v?'visible':'hidden';panel.style.opacity=v?'1':'0';}['callBtn','raiseBtn','allInBtn','foldBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';});const dw=document.getElementById('drumWidget');if(dw)dw.style.display=v?'flex':'none';if(!v){const foldBtn=document.getElementById('foldBtn');if(foldBtn){foldBtn.textContent='FOLD';foldBtn.style.background='';foldBtn.style.boxShadow='';}}
 }function setPhase(p){document.getElementById('phase').textContent=p.toUpperCase();}
 function showMsg(m,ms=2400){const el=document.getElementById('msg');el.textContent=m;el.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el.style.display='none',ms);const el2=document.getElementById('msg2d');if(el2){el2.textContent=m;el2.style.display=m?'block':'none';if(ms>0)setTimeout(()=>el2.style.display='none',ms);}}
 function addChat(txt){const log=document.getElementById('chatLog'),div=document.createElement('div');div.textContent=txt;log.appendChild(div);log.scrollTop=log.scrollHeight;while(log.children.length>60)log.removeChild(log.firstChild);if(chatCollapsed){const box=document.getElementById('chatBox');box.classList.remove('flash');void box.offsetWidth;box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),2200);}}
