@@ -865,6 +865,20 @@ function updatePlayerStackPanel(st) {
   });
 }
 
+// Coalesce rapid server updates so the browser renders at most once per animation frame.
+// This prevents duplicate DOM rebuilds when a state and action message arrive together.
+let _render2DPending=null,_render2DFrame=0;
+function scheduleRender2D(st){
+  _render2DPending=st;
+  if(_render2DFrame)return;
+  _render2DFrame=requestAnimationFrame(()=>{
+    _render2DFrame=0;
+    const latest=_render2DPending;
+    _render2DPending=null;
+    if(latest&&is2D)render2D(latest);
+  });
+}
+
 function applyState(st){try{if(st&&st.players)refreshCallMode(st);}catch(e){}
   if(!st)return;
   lastState=st;
@@ -879,7 +893,7 @@ function applyState(st){try{if(st&&st.players)refreshCallMode(st);}catch(e){}
     const coBtn=document.getElementById('cashOutBtn');
     if(coBtn)coBtn.style.display=(st.gameType==='tournament')?'none':'';
     show2DOnlyChrome();
-    render2D(st);
+    scheduleRender2D(st);
     return;
   }
   for(let i=0;i<NP;i++){const p=st.players[i];if(p)updateLabel(i,p.name,p.chips,p.bet||0,seatActions[i]||'',i===mySeat,p.folded,p.voluntaryAutoFold||false,p.spectator||false,p.pendingBuyBack||false);else updateLabel(i,null,0,0,'',false,false,false,false,false);}
@@ -896,11 +910,11 @@ function applyState(st){try{if(st&&st.players)refreshCallMode(st);}catch(e){}
   // Tournament: hide cash out button
   const coBtn=document.getElementById('cashOutBtn');
   if(coBtn)coBtn.style.display=(st.gameType==='tournament')?'none':'';
-  if(is2D)render2D(st);
+  if(is2D)scheduleRender2D(st);
   syncActionPanelFromState(st);
 }
 
-function toggle2D(){is2D=true;show2DOnlyChrome();if(lastState)render2D(lastState);}
+function toggle2D(){is2D=true;show2DOnlyChrome();if(lastState)scheduleRender2D(lastState);}
 function build2DCard(rank,suit,folded){const el=document.createElement('div');el.className='p2d-card';if(folded){el.classList.add('folded');return el;}if(!rank||rank==='back'){el.classList.add('back');return el;}const isRed=(suit==='\u2665'||suit==='\u2666');el.classList.add(isRed?'red':'black');const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;el.appendChild(tl);el.appendChild(br);const ctr=document.createElement('div');ctr.className='p2dc-center';const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;ctr.appendChild(rSpan);ctr.appendChild(sSpan);el.appendChild(ctr);return el;}
 function build2DCommCard(rank,suit){const el=document.createElement('div');el.className='c2d-card';if(!rank||rank==='back'){el.classList.add('back');return el;}const isRed=(suit==='\u2665'||suit==='\u2666');el.classList.add(isRed?'red':'black');const tl=document.createElement('div');tl.className='p2dc-tl';tl.innerHTML=rank+'<br>'+suit;const br=document.createElement('div');br.className='p2dc-br';br.innerHTML=rank+'<br>'+suit;el.appendChild(tl);el.appendChild(br);const ctr=document.createElement('div');ctr.className='p2dc-center';const rSpan=document.createElement('span');rSpan.className='p2dc-rank';rSpan.textContent=rank;const sSpan=document.createElement('span');sSpan.className='p2dc-suit';sSpan.textContent=suit;ctr.appendChild(rSpan);ctr.appendChild(sSpan);el.appendChild(ctr);return el;}
 function render2D(st){if(!st||!st.players)return;const inner=document.getElementById('table2dInner');inner.querySelectorAll('.p2d-seat').forEach(el=>el.remove());document.getElementById('pot2dVal').textContent=fc(st.pot||0);const p0=st.players[mySeat];const si2d=document.getElementById('stackInfo2d');if(si2d&&p0){si2d.innerHTML='Stack '+fc(p0.chips)+(p0.bet>0?'<br><span style="color:#80cfff;font-size:11px">Bet '+fc(p0.bet)+'</span>':'');}const comm=st.community||[];const commEl=document.getElementById('community2d');commEl.innerHTML='';for(let i=0;i<5;i++){if(i<comm.length&&comm[i]&&comm[i]!=='back'){commEl.appendChild(build2DCommCard(comm[i].r,comm[i].s));}else if(i<comm.length){commEl.appendChild(build2DCommCard('back',null));}else{const ph=document.createElement('div');ph.className='c2d-card';ph.style.visibility='hidden';commEl.appendChild(ph);}}const seated=st.players.map((p,i)=>p?i:null).filter(i=>i!==null);const n=seated.length||2;const rx=44,ry=38;seated.forEach((srvSeat)=>{const p=st.players[srvSeat];if(!p)return;const vSeat=vs(srvSeat);const angle=-Math.PI/2-(vSeat/n)*Math.PI*2;const px=50+rx*Math.cos(angle),py=50-ry*Math.sin(angle);const isMe=(srvSeat===mySeat),isToAct=(st.toActSeat===srvSeat),isDealer=(st.dealerSeat===srvSeat),isSB=(st.sbSeat===srvSeat),isBB=(st.bbSeat===srvSeat);const div=document.createElement('div');div.className='p2d-seat'+(isMe?' me':'');div.style.left=px+'%';div.style.top=py+'%';if(p.cards&&p.cards.length&&(!p.folded||isMe)){const cardsDiv=document.createElement('div');cardsDiv.className='p2d-cards';let faceUp=false;p.cards.forEach(cd=>{const rank=cd&&cd!=='back'?cd.r:null,suit=cd&&cd!=='back'?cd.s:null;if(rank)faceUp=true;cardsDiv.appendChild(build2DCard(rank,suit,p.folded));});if(faceUp&&!isMe)cardsDiv.classList.add('revealed');div.appendChild(cardsDiv);}const info=document.createElement('div');info.className='p2d-info';const nameDiv=document.createElement('div');nameDiv.className='p2d-name'+(isMe?' me':'')+(p.folded?' folded':'');nameDiv.textContent=p.name;info.appendChild(nameDiv);const tokens=document.createElement('div');if(isToAct){const t=document.createElement('span');t.className='p2d-token toact';t.textContent='ACT';tokens.appendChild(t);}if(isDealer){const t=document.createElement('span');t.className='p2d-token dealer';t.textContent='D';tokens.appendChild(t);}if(isSB){const t=document.createElement('span');t.className='p2d-token sb';t.textContent='SB';tokens.appendChild(t);}if(isBB){const t=document.createElement('span');t.className='p2d-token bb';t.textContent='BB';tokens.appendChild(t);}if(tokens.children.length)info.appendChild(tokens);if(!isMe){const stackDiv=document.createElement('div');stackDiv.className='p2d-stack';stackDiv.textContent=fc(p.chips);info.appendChild(stackDiv);}if(p.bet>0){const betDiv=document.createElement('div');betDiv.className='p2d-bet';betDiv.textContent='bet '+fc(p.bet);info.appendChild(betDiv);}div.appendChild(info);inner.appendChild(div);});}
